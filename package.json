@@ -1,0 +1,31 @@
+{
+  "name": "workflow",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "node -r ts-node/register --test --test-timeout 800000000 \"tests/index.test.ts\" \"src/mongodb/mongodb-workflow-engine.test.ts\"",
+    "sandbox": "ts-node tests/sandbox.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/botflux/workflow.git"
+  },
+  "keywords": [
+    "workflow"
+  ],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/botflux/workflow/issues"
+  },
+  "homepage": "https://github.com/botflux/workflow#readme",
+  "devDependencies": {
+    "@testcontainers/mongodb": "^10.13.1",
+    "@types/node": "^22.7.4",
+    "mongodb": "^6.9.0",
+    "testcontainers": "^10.13.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  }
+}
