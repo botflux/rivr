@@ -15,7 +15,8 @@ export class MongoDBTrigger<State> implements TriggerInterface<State> {
             state,
             belongsTo: this.workflow.name,
             recipient: this.workflow.getFirstStep()?.name,
-            acknowledged: false
+            acknowledged: false,
+            context: { attempt: 1 }
         })
     }
 }

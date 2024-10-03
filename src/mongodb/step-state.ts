@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb"
+import { StepHandlerContext } from "../workflow"
 
 export type StepState<State> = {
     _id: ObjectId
@@ -24,5 +25,7 @@ export type StepState<State> = {
     createdAt: Date
 
     acknowledged: boolean
+
+    context: StepHandlerContext
 }
 

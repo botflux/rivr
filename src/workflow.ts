@@ -1,5 +1,6 @@
 export type WorkflowBuilder<State> = (w: Workflow<State>) => void
-export type StepHandler<State> = (state: State) => void | State | Promise<void | State>
+export type StepHandlerContext = { attempt: number }
+export type StepHandler<State> = (state: State, context: StepHandlerContext) => void | State | Promise<void | State>
 
 export type Step<State> = {
     name: string

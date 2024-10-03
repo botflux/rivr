@@ -7,7 +7,7 @@ export class StepStateCollection {
         private readonly collection: Collection<StepState<unknown>>
     ) {}
 
-    async pull<State>(workflow: Workflow<State>, steps: Step<State>[], pageSize: number): Promise<StepState<State>[]> {
+    async pull<State>(workflow: Workflow<State>, steps: Step<State>[], pageSize: number, maxRetry: number): Promise<StepState<State>[]> {
         const stepNames = steps.map(step => step.name)
 
         const documents = await this.collection.find({
@@ -15,6 +15,7 @@ export class StepStateCollection {
             recipient: {
                 $in: stepNames
             },
+            "context.attempt": { $lt: maxRetry },
             acknowledged: false
         }).limit(pageSize).toArray()
 
@@ -46,4 +47,21 @@ export class StepStateCollection {
                 ]
         ])
     }
+
+    async nack<State>(state: StepState<State>): Promise<void> {
+        await this.collection.findOneAndUpdate({
+            _id: state._id
+        }, {
+            $inc: {
+                "context.attempt": 1
+            }
+        })
+    }
+
+    async findStepStates(workflowName: string, stepName: string): Promise<StepState<unknown>[]> {
+        return this.collection.find({
+            belongsTo: workflowName,
+            recipient: stepName
+        }).toArray()
+    } 
 }

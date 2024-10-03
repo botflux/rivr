@@ -12,7 +12,7 @@ class TestTrigger<State> implements TriggerInterface<State> {
         let currentState = state
 
         for (const step of this.workflow.getSteps()) {
-            currentState = (await step.handler(currentState)) ?? currentState 
+            currentState = (await step.handler(currentState, { attempt: 1 })) ?? currentState 
         }
     }
 }
