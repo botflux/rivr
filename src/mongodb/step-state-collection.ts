@@ -58,12 +58,17 @@ export class StepStateCollection {
         })
     }
 
-    async nack<State>(state: StepState<State>): Promise<void> {
+    async nack<State>(state: StepState<State>, timeBeforeNextAttempt: number): Promise<void> {
+        const minDateBeforeNextAttempt = new Date(new Date().getTime() + timeBeforeNextAttempt)
+
         await this.collection.findOneAndUpdate({
             _id: state._id
         }, {
             $inc: {
                 "context.attempt": 1
+            },
+            $set: {
+                minDateBeforeNextAttempt
             }
         })
     }

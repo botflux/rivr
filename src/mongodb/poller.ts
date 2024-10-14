@@ -79,7 +79,7 @@ export class MongoDBPoller {
 
                             await this.collection.publishAndAcknowledge(newDocument, document)
                         } else {
-                            await this.collection.nack(document)
+                            await this.collection.nack(document, this.timeBetweenRetries(document.context.attempt))
                         }
                     }
 

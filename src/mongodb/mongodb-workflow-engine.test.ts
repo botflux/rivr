@@ -252,8 +252,49 @@ test("mongodb workflow engine", async function (t) {
             assert.deepStrictEqual(values, [ 20, 100 ])
         }, 1_000)
     })
+
+    await t.test("should be able to space attempt based on a time function", async function (t) {
+        // Given
+        let date: Date | undefined = undefined
+        const dbName = randomUUID()
+        const engine = MongoDBWorkflowEngine.create({
+            client,
+            dbName,
+        })
+
+        const workflow = Workflow.create<number>("workflow", w => {
+            w.step("add-10", s => s + 10)
+            w.step("throw", () => {
+                date = new Date()
+                throw new Error("oops")
+            })
+        })
+
+        await engine.start(workflow, {
+            maxAttempts: 2,
+            timeBetweenRetries: attempt => 3_000,
+            signal: t.signal,
+            pollingIntervalMs: 100
+        })
+
+        const trigger = await engine.getTrigger(workflow)
+
+        // When
+        await trigger.trigger(10)
+
+        // Then
+        await waitAtLeastForSuccess(async () => {
+            assert.deepStrictEqual(
+              (await getState(client, dbName, "workflow", "throw"))[0]?.minDateBeforeNextAttempt!.getTime() >= dateAdd(date!, 3_000).getTime(),
+              true)
+        }, 5_000)
+    })
 })
 
 function getState(client: MongoClient, db: string, workflow: string, step: string, collection: string = "workflows") {
     return new StepStateCollection(client.db(db).collection(collection)).findStepStates(workflow, step)
+}
+
+function dateAdd (date: Date, ms: number): Date {
+    return new Date(date.getTime() + ms)
 }
