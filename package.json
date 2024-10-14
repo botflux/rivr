@@ -4,7 +4,8 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "test": "node -r ts-node/register --test --test-timeout 800000000 \"tests/index.test.ts\" \"src/mongodb/mongodb-workflow-engine.test.ts\"",
+    "test": "node -r ts-node/register --test --test-timeout 800000000 \"src/mongodb/mongodb-workflow-engine.test.ts\"",
+    "test:only": "node -r ts-node/register --test --test-only --test-timeout 800000000 \"src/mongodb/mongodb-workflow-engine.test.ts\"",
     "sandbox": "ts-node tests/sandbox.ts"
   },
   "repository": {

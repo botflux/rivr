@@ -1,12 +1,15 @@
-import { test } from "node:test"
+import {it, test} from "node:test"
 import assert from "node:assert"
 import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongodb"
-import { Workflow } from "../workflow"
+import {failure, skip, stop, success, Workflow} from "../workflow"
 import { MongoClient } from "mongodb"
 import { MongoDBWorkflowEngine } from "./mongodb-workflow-engine"
 import { randomUUID } from "node:crypto"
 import { tryUntilSuccess } from "../try-until-success"
 import { StepStateCollection } from "./step-state-collection"
+import { waitAtLeastForSuccess } from "../wait-at-least-for-success"
+import {linear} from "../retry";
+import {waitAtLeastOrTimeout} from "../wait-at-least-or-timeout";
 
 test("mongodb workflow engine", async function (t) {
     let mongo: StartedMongoDBContainer = undefined!
@@ -121,6 +124,133 @@ test("mongodb workflow engine", async function (t) {
         await tryUntilSuccess(async () => {
             assert.equal((await getState(client, dbName, "workflow", "always_throw"))[0]?.context.attempt, 10)
         }, 3_000)
+    })
+
+    await t.test("should be able to return a state from each step to control the process flow", async function (t) {
+        // Given
+        const dbName = randomUUID()
+        let result: number | undefined
+
+        const engine = MongoDBWorkflowEngine.create({
+            client,
+            dbName
+        })
+
+        const workflow = Workflow.create<number>("workflow", w => {
+            w.step("add-5", s => success(s + 5))
+            w.step("multiply-by-attempt", (s, { attempt }) => attempt === 1
+              ? failure(new Error("oops"), { retry: linear(1_000) })
+              : success(s * attempt))
+            w.step("assign", s => {
+                result = s
+            })
+        })
+
+        await engine.start(workflow, {
+            maxAttempts: 10,
+            signal: t.signal,
+            pollingIntervalMs: 100
+        })
+
+        const trigger = await engine.getTrigger(workflow)
+
+        // When
+        await trigger.trigger(2)
+
+        // Then
+        await waitAtLeastForSuccess(async () => {
+            assert.strictEqual(result, 14)
+        }, 1_000)
+    })
+
+    await t.test("should be able to stop a process in the middle of it", async function (t) {
+        // Given
+        const dbName = randomUUID()
+
+        const engine = MongoDBWorkflowEngine.create({
+            client,
+            dbName
+        })
+
+        let values: number[] = []
+
+        let i = 0
+
+        const workflow = Workflow.create<number>("workflow", w => {
+            w.step("add-10", s => s + 10)
+            w.step("assign", s => {
+                values.push(s)
+            })
+            w.step("stopping", () => {
+                i ++
+                if (i === 1)
+                    return stop()
+            })
+            w.step("multiple_by_2", s => s * 2)
+            w.step("assign 2", s => {
+                values.push(s)
+            })
+        })
+
+        await engine.start(workflow, {
+            signal: t.signal,
+            pollingIntervalMs: 10,
+        })
+
+        const trigger = await engine.getTrigger(workflow)
+
+        // When
+        await trigger.trigger(10)
+        await trigger.trigger(20)
+
+        // Then
+        await tryUntilSuccess(async () => {
+            assert.deepStrictEqual(values, [ 20, 30, 60 ])
+        }, 1_000)
+    })
+
+    await t.test("should be able to skip a step", async function (t) {
+        // Given
+        const dbName = randomUUID()
+        const engine = MongoDBWorkflowEngine.create({
+            client,
+            dbName
+        })
+
+        let i = 0
+        const values: number[] = []
+
+        const workflow = Workflow.create<number>("workflow", w => {
+            w.step("add-10", s => s + 10)
+            w.step("add-20-or-skip", s => {
+                i++
+
+                if (i === 1)
+                    return skip()
+
+                return s + 20
+            })
+            w.step("multiply", s => s * 2)
+            w.step("assign", s => {
+                values.push(s)
+            })
+        })
+
+        await engine.start(workflow, {
+            signal: t.signal,
+            pollingIntervalMs: 100,
+        })
+
+        const trigger = await engine.getTrigger(workflow)
+
+        // When
+        await trigger.trigger(10)
+        await trigger.trigger(20)
+
+        // Then
+        await tryUntilSuccess(async () => {
+            assert.deepStrictEqual(values, [ 20, 100 ])
+        }, 1_000)
     })
 })
 

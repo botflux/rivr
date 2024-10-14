@@ -1,8 +1,9 @@
 import { OptionalId } from "mongodb";
-import { Workflow } from "../workflow";
+import {failure, isStepResult, Step, StepHandlerContext, StepResult, success, Workflow} from "../workflow";
 import { StepState } from "./step-state";
 import { StepStateCollection } from "./step-state-collection";
 import { setInterval, setTimeout } from "node:timers/promises"
+import { GetTimeToWait } from "../retry";
 
 export class MongoDBPoller {
     constructor(
@@ -11,6 +12,7 @@ export class MongoDBPoller {
         private readonly pageSize: number,
         private readonly pollingIntervalMs: number,
         private readonly maxRetry: number,
+        private readonly timeBetweenRetries: GetTimeToWait,
         private readonly signal?: AbortSignal
     ) {}
 
@@ -31,12 +33,12 @@ export class MongoDBPoller {
             this.signal?.addEventListener("abort", () => stop = true)
 
             try {
-                for await (const _ of setInterval(0, { signal: this.signal })) {
+                for await (const _ of setInterval(0, {signal: this.signal})) {
                     const documents = await this.collection.pull(
-                        this.workflow, 
-                        this.workflow.getSteps(), 
-                        this.pageSize,
-                        this.maxRetry
+                      this.workflow,
+                      this.workflow.getSteps(),
+                      this.pageSize,
+                      this.maxRetry
                     )
 
                     for (const document of documents) {
@@ -45,25 +47,38 @@ export class MongoDBPoller {
                         }
 
                         const mStep = this.workflow.getStepByName(document.recipient!)
-                        
+
                         if (!mStep) {
                             continue
                         }
 
-                        try {
-                            const newState = (await mStep.handler(document.state, document.context)) ?? document.state
+                        const result = await this.handle(mStep, document.state, document.context)
 
+                        if (result.type === "success") {
                             const newDocument: OptionalId<StepState<unknown>> = {
                                 createdAt: new Date(),
                                 belongsTo: this.workflow.name,
                                 recipient: this.workflow.getNextStep(mStep)?.name,
-                                state: newState,
+                                state: result.value ?? document.state,
                                 acknowledged: false,
-                                context: { attempt: 1 }
+                                context: {attempt: 1}
                             }
 
                             await this.collection.publishAndAcknowledge(newDocument, document)
-                        } catch (error) {
+                        } else if (result.type === "stop") {
+                            await this.collection.ack(document)
+                        } else if (result.type === "skip") {
+                            const newDocument: OptionalId<StepState<unknown>> = {
+                                createdAt: new Date(),
+                                belongsTo: this.workflow.name,
+                                recipient: this.workflow.getNextStep(mStep, 2)?.name,
+                                state: document.state,
+                                acknowledged: false,
+                                context: {attempt: 1}
+                            }
+
+                            await this.collection.publishAndAcknowledge(newDocument, document)
+                        } else {
                             await this.collection.nack(document)
                         }
                     }
@@ -78,8 +93,18 @@ export class MongoDBPoller {
             } catch (e) {
                 reject?.(e)
             }
-        })()
+        })().then()
 
         return p
+    }
+
+    private async handle (step: Step<unknown>, state: unknown, context: StepHandlerContext): Promise<StepResult<unknown>> {
+        try {
+            const result = await step.handler(state, context)
+
+            return isStepResult(result) ? result : success(result)
+        } catch (error) {
+            return failure(error)
+        }
     }
 }

@@ -1,6 +1,35 @@
+export type Stop = { type: "stop" }
+export type Skip = { type: "skip" }
+export type Failure = { type: "failure", error: unknown }
+export type Success<T> = { type: "success", value: T }
+export type StepResult<T> = Success<T> | Failure | Stop | Skip
+
+export function success<T> (result: T): Success<T> {
+    return { type: "success", value: result }
+}
+
+export type FailureOpts = {}
+
+export function failure(error: unknown, opts: FailureOpts = {}): Failure {
+    return { type: "failure", error }
+}
+
+export function stop (): Stop {
+    return { type: "stop" }
+}
+
+export function skip(): Skip {
+    return { type: "skip" }
+}
+
+export function isStepResult (result: unknown): result is StepResult<unknown> {
+    return result !== null && typeof result === "object"
+        && "type" in result && (result["type"] === "failure" || result["type"] === "success" || result["type"] === "stop" || result["type"] === "skip")
+}
+
 export type WorkflowBuilder<State> = (w: Workflow<State>) => void
 export type StepHandlerContext = { attempt: number }
-export type StepHandler<State> = (state: State, context: StepHandlerContext) => void | State | Promise<void | State>
+export type StepHandler<State> = (state: State, context: StepHandlerContext) => void | State | StepResult<State> | Promise<void | State | StepResult<State>>
 
 export type Step<State> = {
     name: string
@@ -38,13 +67,13 @@ export class Workflow<State> {
         return this.steps[0]
     }
 
-    getNextStep(step: Step<State>): Step<State> | undefined {
+    getNextStep(step: Step<State>, offset: number = 1): Step<State> | undefined {
         const stepIndex = this.steps.findIndex(s => s.name === step.name)
 
         if (stepIndex === -1)
             return undefined
 
-        const nextStepIndex = stepIndex + 1
+        const nextStepIndex = stepIndex + offset
 
         if (nextStepIndex >= this.steps.length)
             return undefined

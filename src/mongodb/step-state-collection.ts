@@ -48,6 +48,16 @@ export class StepStateCollection {
         ])
     }
 
+    async ack<State>(state: StepState<State>): Promise<void> {
+        await this.collection.findOneAndUpdate({
+            _id: state._id
+        }, {
+            $set: {
+                acknowledged: true
+            }
+        })
+    }
+
     async nack<State>(state: StepState<State>): Promise<void> {
         await this.collection.findOneAndUpdate({
             _id: state._id

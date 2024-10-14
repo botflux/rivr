@@ -6,6 +6,7 @@ import { MongoDBTrigger } from "./mongodb-trigger"
 import { StepState } from "./step-state"
 import { StepStateCollection } from "./step-state-collection"
 import { MongoDBPoller } from "./poller"
+import { GetTimeToWait } from "../retry"
 
 export type CreateOpts = {
     /**
@@ -44,8 +45,15 @@ export type StartOpts = {
 
     /**
      * The amount of time a step will be retried in case of an error.
+     * 
+     * @default 3
      */
     maxAttempts?: number
+
+    /**
+     * A function that computes the time to wait based on the current attempt number.
+     */
+    timeBetweenRetries?: GetTimeToWait
 }
 
 export class MongoDBWorkflowEngine {
@@ -55,7 +63,13 @@ export class MongoDBWorkflowEngine {
     }
 
     async start<State> (workflow: Workflow<State>, opts: StartOpts = {}): Promise<void> {
-        const { signal, pageSize = 50, pollingIntervalMs = 3_000, maxAttempts: maxRetry = 3 } = opts
+        const { 
+            signal, 
+            pageSize = 50, 
+            pollingIntervalMs = 3_000, 
+            maxAttempts: maxRetry = 3,
+            timeBetweenRetries = () => 0
+        } = opts
 
         const collectionWrapper = this.createCollectionWrapper()
 
@@ -65,7 +79,8 @@ export class MongoDBWorkflowEngine {
             pageSize, 
             pollingIntervalMs,
             maxRetry,
-            signal
+            timeBetweenRetries,
+            signal,
         ).start()
     }
 
