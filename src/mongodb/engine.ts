@@ -1,12 +1,11 @@
-import { MongoClient, OptionalId } from "mongodb"
+import { MongoClient } from "mongodb"
 import { Workflow } from "../workflow"
-import { setTimeout, setInterval } from "node:timers/promises"
 import { TriggerInterface } from "../trigger.interface"
-import { MongoDBTrigger } from "./trigger"
-import { StepState } from "./step-state"
-import { StepStateCollection } from "./step-state-collection"
-import { MongoDBPoller } from "./poller"
 import { GetTimeToWait } from "../retry"
+import {Poller} from "../poll/poller";
+import {MongodbRecord, MongodbStorage} from "./mongodb-storage";
+import {StorageInterface} from "../poll/storage.interface";
+import {StorageTrigger} from "../poll/trigger";
 
 export type CreateOpts = {
     /**
@@ -27,7 +26,7 @@ export type CreateOpts = {
 }
 
 export type StartOpts = {
-    signal?: AbortSignal
+    signal: AbortSignal
 
     /**
      * The amount of docuemnts fetch once.
@@ -62,40 +61,41 @@ export class MongoDBWorkflowEngine {
     ) {
     }
 
-    async start<State> (workflow: Workflow<State>, opts: StartOpts = {}): Promise<void> {
+    async start<State> (workflow: Workflow<State>, opts: StartOpts): Promise<void> {
         const { 
-            signal, 
+            signal,
             pageSize = 50, 
             pollingIntervalMs = 3_000, 
             maxAttempts: maxRetry = 3,
             timeBetweenRetries = () => 0
         } = opts
 
-        const collectionWrapper = this.createCollectionWrapper()
+        const storage = this.createCollectionWrapper<State>()
+        const poller = new Poller(
+          pollingIntervalMs,
+          storage,
+          workflow,
+          pageSize,
+          maxRetry,
+          timeBetweenRetries
+        )
 
-        await new MongoDBPoller(
-            workflow as Workflow<unknown>,
-            collectionWrapper, 
-            pageSize, 
-            pollingIntervalMs,
-            maxRetry,
-            timeBetweenRetries,
-            signal,
-        ).start()
+        await poller.start(signal)
     }
 
     async getTrigger<State>(workflow: Workflow<State>): Promise<TriggerInterface<State>> {
-        const collection = this.createCollectionWrapper()
-    
-        return new MongoDBTrigger(workflow, collection)
+        const storage = this.createCollectionWrapper<State>()
+        // return new MongoDBTrigger<State>(workflow, storage)
+        return new StorageTrigger(workflow, storage)
     }
 
     static create(opts: CreateOpts): MongoDBWorkflowEngine {
         return new MongoDBWorkflowEngine(opts)
     }
 
-    private createCollectionWrapper (): StepStateCollection {
+    private createCollectionWrapper<State> (): StorageInterface<State> {
         const { client, dbName, collectionName = "workflows" } = this.opts
-        return new StepStateCollection(client.db(dbName).collection(collectionName))
+        const collection = client.db(dbName).collection<MongodbRecord<State>>(collectionName)
+        return new MongodbStorage(collection)
     }
 }
