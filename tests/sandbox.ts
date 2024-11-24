@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb"
-import { MongoDBWorkflowEngine } from "../src/mongodb/mongodb-workflow-engine"
+import { MongoDBWorkflowEngine } from "../src/mongodb/engine"
 import {failure, success, Workflow} from "../src/workflow"
 import { setTimeout } from "timers/promises"
 import {linear} from "../src/retry";

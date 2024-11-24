@@ -6,3 +6,10 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: example
     ports:
       - "27017:27017"
+
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_PASSWORD: example
+    ports:
+      - "5433:5432"
