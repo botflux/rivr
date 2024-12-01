@@ -42,10 +42,10 @@ test("mongodb workflow engine", async function (t) {
             dbName: randomUUID(),
         })
 
-        await engine.start(workflow, { 
+        engine.start(workflow, {
             signal: t.signal,
             pollingIntervalMs: 10 
-        })
+        }).catch(error => console.log("Error", error))
         const trigger = await engine.getTrigger(workflow)
 
         // When
@@ -78,10 +78,10 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        await engine.start(workflow, {
+        engine.start(workflow, {
             signal: t.signal,
             pollingIntervalMs: 10
-        })
+        }).catch(error => console.log("Error", error))
 
         const trigger = await engine.getTrigger(workflow)
 
@@ -109,11 +109,11 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        await engine.start(workflow, {
+        engine.start(workflow, {
             signal: t.signal,
             pollingIntervalMs: 10,
             maxAttempts: 10
-        })
+        }).catch(error => console.log("Error", error))
 
         const trigger = await engine.getTrigger(workflow)
 
@@ -146,11 +146,11 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        await engine.start(workflow, {
+        engine.start(workflow, {
             maxAttempts: 10,
             signal: t.signal,
             pollingIntervalMs: 100
-        })
+        }).catch(error => console.log("Error", error))
 
         const trigger = await engine.getTrigger(workflow)
 
@@ -192,10 +192,10 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        await engine.start(workflow, {
+        engine.start(workflow, {
             signal: t.signal,
             pollingIntervalMs: 10,
-        })
+        }).catch(error => console.log("Error", error))
 
         const trigger = await engine.getTrigger(workflow)
 
@@ -236,10 +236,10 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        await engine.start(workflow, {
+        engine.start(workflow, {
             signal: t.signal,
             pollingIntervalMs: 100,
-        })
+        }).catch(error => console.log("Error", error))
 
         const trigger = await engine.getTrigger(workflow)
 
@@ -270,12 +270,12 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        await engine.start(workflow, {
+        engine.start(workflow, {
             maxAttempts: 2,
             timeBetweenRetries: attempt => 3_000,
             signal: t.signal,
             pollingIntervalMs: 100
-        })
+        }).catch(error => console.log("Error", error))
 
         const trigger = await engine.getTrigger(workflow)
 
