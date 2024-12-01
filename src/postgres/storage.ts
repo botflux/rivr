@@ -9,7 +9,7 @@ export class PostgresStorage<T> implements StorageInterface<T> {
   ) {
   }
 
-  async poll(workflow: Workflow<T>, pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<T>[]]> {
+  async poll(pollerId: string, workflow: Workflow<T>, pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<T>[]]> {
       const { rows } = await this.client.query(`
         SELECT * FROM "public"."workflow_messages"
         WHERE acknowledged = false

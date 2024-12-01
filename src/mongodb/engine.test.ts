@@ -311,6 +311,63 @@ test("mongodb workflow engine", async function (t) {
         }, 5_000)
         assert.deepEqual(getErrors(), [])
     })
+
+    await t.test("should be able to split work across multiple pollers", async function (t) {
+        // Given
+        const dbName = randomUUID()
+        const engine = MongoDBWorkflowEngine.create({
+            client,
+            dbName,
+        })
+
+        let results: number[] = []
+        let countByPoller = new Map<string, number>()
+
+        const workflow = Workflow.create<number>("workflow", w => {
+            w.step("add-10", s => s + 10)
+            w.step("multiply-by-5", s => s * 5)
+            w.step("assign", (s, c, id) => {
+                results.push(s)
+                countByPoller.set(id, (countByPoller.get(id) ?? 0) + 1)
+            })
+        })
+
+        const poller1 = await engine.getPoller(workflow, {
+            pollingIntervalMs: 1_000,
+            pageSize: 2,
+            replicated: true
+        })
+        const poller2 = await engine.getPoller(workflow, {
+            pollingIntervalMs: 1_000,
+            pageSize: 2,
+            replicated: true
+        })
+
+        poller1.start(t.signal)
+        poller2.start(t.signal)
+
+        const trigger = await engine.getTrigger(workflow)
+
+        // When
+        await trigger.trigger(1)
+        await trigger.trigger(2)
+        await trigger.trigger(3)
+        await trigger.trigger(4)
+        await trigger.trigger(5)
+        await trigger.trigger(6)
+        await trigger.trigger(7)
+        await trigger.trigger(8)
+        await trigger.trigger(9)
+
+        // Then
+        await tryUntilSuccess(async () => {
+            assert.deepStrictEqual(results.toSorted(), [55, 60, 65, 70, 75, 80, 85, 90, 95])
+
+            const [ poller1Count, poller2Count ] = countByPoller.values()
+            assert.notEqual(poller1Count, 0)
+            assert.notEqual(poller2Count, 0)
+        }, 3_000)
+    })
 })
 
 function getState(client: MongoClient, db: string, workflow: string, step: string, collection: string = "workflows") {

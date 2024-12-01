@@ -8,6 +8,7 @@ export class Poller<T> extends EventEmitter {
   private stopped = false
 
   constructor(
+    private readonly pollerId: string,
     private readonly minTimeBetweenPollsMs: number,
     private readonly storage: StorageInterface<T>,
     private readonly workflow: Workflow<T>,
@@ -24,6 +25,7 @@ export class Poller<T> extends EventEmitter {
         this.emit("started")
         for (const _ of this.stoppableInfiniteLoop(signal)) {
           const [isPaginationExhausted, records] = await this.storage.poll(
+            this.pollerId,
             this.workflow,
             this.pageSize,
             this.maxRetry
@@ -101,7 +103,7 @@ export class Poller<T> extends EventEmitter {
 
   private async handle(step: Step<T>, state: T, context: StepHandlerContext): Promise<StepResult<T>> {
     try {
-      const result = await step.handler(state, context)
+      const result = await step.handler(state, context, this.pollerId)
 
       if (result === undefined) {
         return success(state)

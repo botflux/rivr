@@ -6,6 +6,7 @@ import {Poller} from "../poll/poller";
 import {PostgresStorage} from "./storage";
 import {StorageTrigger} from "../poll/trigger";
 import {GetTimeToWait} from "../retry";
+import {randomUUID} from "node:crypto";
 
 export class PostgresWorkflowEngine {
   private constructor() {}
@@ -24,6 +25,7 @@ export class PostgresWorkflowEngine {
     const storage = new PostgresStorage<State>(client)
 
     return new Poller<State>(
+      randomUUID(),
       pollingIntervalMs,
       storage,
       workflow,

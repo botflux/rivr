@@ -6,6 +6,8 @@ import {Poller} from "../poll/poller";
 import {MongodbRecord, MongodbStorage} from "./mongodb-storage";
 import {StorageInterface} from "../poll/storage.interface";
 import {StorageTrigger} from "../poll/trigger";
+import {randomUUID} from "node:crypto";
+import {ReplicatedMongodbStorage} from "./replicated-mongodb-storage";
 
 export type CreateOpts = {
     /**
@@ -51,6 +53,13 @@ export type StartOpts = {
      * A function that computes the time to wait based on the current attempt number.
      */
     timeBetweenRetries?: GetTimeToWait
+
+    /**
+     * True if multiple poller are started at the same time.
+     *
+     * @default false
+     */
+    replicated?: boolean
 }
 
 export class MongoDBWorkflowEngine {
@@ -60,15 +69,20 @@ export class MongoDBWorkflowEngine {
     }
 
     async getPoller<State> (workflow: Workflow<State>, opts: StartOpts): Promise<Poller<State>> {
+        const pollerId = randomUUID()
+
         const { 
             pageSize = 50,
-            pollingIntervalMs = 3_000, 
+            pollingIntervalMs = 3_000,
             maxAttempts: maxRetry = 3,
-            timeBetweenRetries = () => 0
+            timeBetweenRetries = () => 0,
+            replicated = false
         } = opts
 
-        const storage = this.createCollectionWrapper<State>()
+        const storage = this.createCollectionWrapper<State>(replicated)
+
         return new Poller(
+          pollerId,
           pollingIntervalMs,
           storage,
           workflow,
@@ -79,7 +93,7 @@ export class MongoDBWorkflowEngine {
     }
 
     async getTrigger<State>(workflow: Workflow<State>): Promise<TriggerInterface<State>> {
-        const storage = this.createCollectionWrapper<State>()
+        const storage = this.createCollectionWrapper<State>(false)
         // return new MongoDBTrigger<State>(workflow, storage)
         return new StorageTrigger(workflow, storage)
     }
@@ -88,9 +102,12 @@ export class MongoDBWorkflowEngine {
         return new MongoDBWorkflowEngine(opts)
     }
 
-    private createCollectionWrapper<State> (): StorageInterface<State> {
+    private createCollectionWrapper<State> (replicated: boolean): StorageInterface<State> {
         const { client, dbName, collectionName = "workflows" } = this.opts
         const collection = client.db(dbName).collection<MongodbRecord<State>>(collectionName)
-        return new MongodbStorage(collection)
+
+        return replicated
+            ? new ReplicatedMongodbStorage(collection)
+            : new MongodbStorage(collection)
     }
 }
