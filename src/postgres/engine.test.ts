@@ -2,11 +2,14 @@ import { test } from "node:test"
 import { Client } from "pg"
 import {PostgreSqlContainer, StartedPostgreSqlContainer} from "@testcontainers/postgresql";
 import {randomUUID} from "node:crypto";
-import {Workflow} from "../workflow";
+import {failure, skip, stop, success, Workflow} from "../workflow";
 import {waitAtLeastForSuccess} from "../wait-at-least-for-success";
 import assert from "node:assert";
 import {PostgresWorkflowEngine} from "./engine";
 import {tryUntilSuccess} from "../try-until-success";
+import {linear} from "../retry";
+import {StorageInterface} from "../poll/storage.interface";
+import {PostgresStorage} from "./storage";
 
 test("postgres workflow engine", async function (t) {
   let startedContainer!: StartedPostgreSqlContainer
@@ -158,7 +161,190 @@ test("postgres workflow engine", async function (t) {
       assert.equal(lastAttempt, 10)
     }, 3_000)
   })
+
+  await t.test("should be able to return a state from each step to control the process flow", async function (t) {
+    // Given
+    let result: number | undefined
+
+    const engine = PostgresWorkflowEngine.create()
+
+    const workflow = Workflow.create<number>("workflow", w => {
+      w.step("add-5", s => success(s + 5))
+      w.step("multiply-by-attempt", (s, { attempt }) => attempt === 1
+        ? failure(new Error("oops"), { retry: linear(1_000) })
+        : success(s * attempt))
+      w.step("assign", s => {
+        result = s
+      })
+    })
+
+    engine.start({
+      workflow,
+      signal: t.signal,
+      pollingIntervalMs: 100,
+      maxAttempts: 10,
+      client,
+      pageSize: 10
+    }).catch(error => console.log("Error", error))
+
+    const trigger = await engine.getTrigger({
+      client,
+      workflow
+    })
+
+    // When
+    await trigger.trigger(2)
+
+    // Then
+    await waitAtLeastForSuccess(async () => {
+      assert.strictEqual(result, 14)
+    }, 1_000)
+  })
+
+  await t.test("should be able to stop a process in the middle of it", async function (t) {
+    // Given
+    const engine = PostgresWorkflowEngine.create()
+
+    let values: number[] = []
+    let i = 0
+
+
+    const workflow = Workflow.create<number>("workflow", w => {
+      w.step("add-10", s => s + 10)
+      w.step("assign", s => {
+        values.push(s)
+      })
+      w.step("stopping", () => {
+        i++
+        if (i === 1)
+          return stop()
+      })
+      w.step("multiple_by_2", s => s * 2)
+      w.step("assign 2", s => {
+        values.push(s)
+      })
+    })
+
+    engine.start({
+      workflow,
+      client,
+      signal: t.signal,
+      pollingIntervalMs: 10
+    }).catch(error => console.log("Error", error))
+
+    const trigger = await engine.getTrigger({
+      client,
+      workflow
+    })
+
+    // When
+    await trigger.trigger(10)
+    await trigger.trigger(20)
+
+    // Then
+    await tryUntilSuccess(async () => {
+      assert.deepStrictEqual(values, [ 20, 30, 60 ])
+    }, 1_000)
+  })
+
+  await t.test("should be able to skip a step", async function (t) {
+    // Given
+    const engine = PostgresWorkflowEngine.create()
+    let values: number[] = []
+    let i = 0
+
+    const workflow = Workflow.create<number>("workflow", w => {
+      w.step("add-10", s => s + 10)
+      w.step("add-20-or-skip", s => {
+        i++
+
+        if (i === 1)
+          return skip()
+
+        return s + 20
+      })
+      w.step("multiply", s => s * 2)
+      w.step("assign", s => {
+        values.push(s)
+      })
+    })
+
+    engine.start({
+      workflow,
+      client,
+      pollingIntervalMs: 10,
+      signal: t.signal
+    }).catch(error => console.log("Error", error))
+
+    const trigger = await engine.getTrigger({
+      client,
+      workflow
+    })
+
+    // When
+    await trigger.trigger(10)
+    await trigger.trigger(20)
+
+    // Then
+    await tryUntilSuccess(async () => {
+      assert.deepStrictEqual(values, [ 20, 100 ])
+    }, 1_000)
+  })
+
+  await t.test("should be able to space attempt based on a time function", async function (t) {
+    // Given
+    let date: Date | undefined = undefined
+    const engine = PostgresWorkflowEngine.create()
+
+    const workflow = Workflow.create<number>("workflow", w => {
+      w.step("add-10", s => s + 10)
+      w.step("throw", () => {
+        date = new Date()
+        throw new Error("oops")
+      })
+    })
+
+    engine.start({
+      workflow,
+      client,
+      signal: t.signal,
+      pollingIntervalMs: 10,
+      maxAttempts: 2,
+      timeBetweenRetries: attempt => 3_000
+    }).catch(error => console.log("Error", error))
+
+    const trigger = await engine.getTrigger({
+      client,
+      workflow
+    })
+
+    // When
+    await trigger.trigger(10)
+
+    // Then
+    await waitAtLeastForSuccess(async () => {
+      assert.deepStrictEqual(
+        ((await getRows(client, workflow, "throw"))[0])?.min_date_before_next_attempt.getTime() >= dateAdd(date!, 3_000),
+        true
+      )
+    }, 5_000)
+  })
 })
+
+async function getRows<T> (client: Client, workflow: Workflow<T>, step: string): Promise<any[]> {
+  const { rows } = await client.query('SELECT * FROM "public"."workflow_messages" ' +
+    'WHERE workflow_name = $1 ' +
+    'AND step_name = $2', [
+      workflow.name,
+      step
+  ])
+
+  return rows
+}
+
+export function dateAdd(date: Date, ms: number): Date {
+  return new Date(date.getTime() + ms)
+}
 
 async function createDb (client: Client) {
   const uuid = randomUUID().replaceAll("-", "")

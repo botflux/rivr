@@ -5,6 +5,7 @@ import {createTables} from "./create-tables";
 import {Poller} from "../poll/poller";
 import {PostgresStorage} from "./storage";
 import {StorageTrigger} from "../poll/trigger";
+import {GetTimeToWait} from "../retry";
 
 export class PostgresWorkflowEngine {
   private constructor() {}
@@ -16,7 +17,8 @@ export class PostgresWorkflowEngine {
       signal,
       pageSize = 20,
       pollingIntervalMs,
-      maxAttempts = 3
+      maxAttempts = 3,
+      timeBetweenRetries = () => 0
     } = opts
 
     await createTables(client)
@@ -28,7 +30,7 @@ export class PostgresWorkflowEngine {
       workflow,
       pageSize,
       maxAttempts,
-      () => 0,
+      timeBetweenRetries,
     ).start(signal)
   }
 
@@ -56,4 +58,5 @@ export type StartOpts<State> = {
   pageSize?: number
   signal: AbortSignal
   maxAttempts?: number
+  timeBetweenRetries?: GetTimeToWait
 }

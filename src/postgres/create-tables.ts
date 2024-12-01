@@ -8,6 +8,7 @@ export async function createTables(client: Client): Promise<void> {
     step_data jsonb,
     attempts integer,
     acknowledged boolean,
-    created_at timestamptz
+    created_at timestamptz,
+    min_date_before_next_attempt timestamptz
   )`)
 }
