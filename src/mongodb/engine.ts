@@ -1,7 +1,7 @@
-import { MongoClient } from "mongodb"
-import { Workflow } from "../workflow"
-import { TriggerInterface } from "../trigger.interface"
-import { GetTimeToWait } from "../retry"
+import {MongoClient} from "mongodb"
+import {Workflow} from "../workflow"
+import {TriggerInterface} from "../trigger.interface"
+import {GetTimeToWait} from "../retry"
 import {Poller} from "../poll/poller";
 import {MongodbRecord, MongodbStorage} from "./mongodb-storage";
 import {StorageInterface} from "../poll/storage.interface";
@@ -26,8 +26,6 @@ export type CreateOpts = {
 }
 
 export type StartOpts = {
-    signal: AbortSignal
-
     /**
      * The amount of docuemnts fetch once.
      * 
@@ -61,17 +59,16 @@ export class MongoDBWorkflowEngine {
     ) {
     }
 
-    async start<State> (workflow: Workflow<State>, opts: StartOpts): Promise<void> {
+    async getPoller<State> (workflow: Workflow<State>, opts: StartOpts): Promise<Poller<State>> {
         const { 
-            signal,
-            pageSize = 50, 
+            pageSize = 50,
             pollingIntervalMs = 3_000, 
             maxAttempts: maxRetry = 3,
             timeBetweenRetries = () => 0
         } = opts
 
         const storage = this.createCollectionWrapper<State>()
-        const poller = new Poller(
+        return new Poller(
           pollingIntervalMs,
           storage,
           workflow,
@@ -79,8 +76,6 @@ export class MongoDBWorkflowEngine {
           maxRetry,
           timeBetweenRetries
         )
-
-        await poller.start(signal)
     }
 
     async getTrigger<State>(workflow: Workflow<State>): Promise<TriggerInterface<State>> {

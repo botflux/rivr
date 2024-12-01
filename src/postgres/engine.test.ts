@@ -65,17 +65,18 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    engine.start({
+    const poller = await engine.getPoller({
       workflow,
       client,
       pollingIntervalMs: 10,
-      signal: t.signal,
-    }).catch(error => console.log("Error", error))
+    })
 
     const trigger = await engine.getTrigger({
       client,
       workflow,
     })
+
+    poller.start(t.signal)
 
     // When
     await trigger.trigger(5)
@@ -107,17 +108,18 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    engine.start({
+    const poller = await engine.getPoller({
       workflow,
       client,
-      signal: t.signal,
       pollingIntervalMs: 10,
-    }).catch(error => console.log("Error", error))
+    })
 
     const trigger = await engine.getTrigger({
       client,
       workflow
     })
+
+    poller.start(t.signal)
 
     // When
     await trigger.trigger(5)
@@ -140,13 +142,14 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    engine.start({
+    const poller = await engine.getPoller({
       workflow,
       client,
       pollingIntervalMs: 10,
-      signal: t.signal,
       maxAttempts: 10
-    }).catch(error => console.log("Error", error))
+    })
+
+    poller.start(t.signal)
 
     const trigger = await engine.getTrigger({
       client,
@@ -178,14 +181,15 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    engine.start({
+    const poller = await engine.getPoller({
       workflow,
-      signal: t.signal,
       pollingIntervalMs: 100,
       maxAttempts: 10,
       client,
       pageSize: 10
-    }).catch(error => console.log("Error", error))
+    })
+
+    poller.start(t.signal)
 
     const trigger = await engine.getTrigger({
       client,
@@ -225,12 +229,13 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    engine.start({
+    const poller = await engine.getPoller({
       workflow,
       client,
-      signal: t.signal,
       pollingIntervalMs: 10
-    }).catch(error => console.log("Error", error))
+    })
+
+    poller.start(t.signal)
 
     const trigger = await engine.getTrigger({
       client,
@@ -269,12 +274,13 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    engine.start({
+    const poller = await engine.getPoller({
       workflow,
       client,
       pollingIntervalMs: 10,
-      signal: t.signal
-    }).catch(error => console.log("Error", error))
+    })
+
+    poller.start(t.signal)
 
     const trigger = await engine.getTrigger({
       client,
@@ -304,14 +310,15 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    engine.start({
+    const poller = await engine.getPoller({
       workflow,
       client,
-      signal: t.signal,
       pollingIntervalMs: 10,
       maxAttempts: 2,
       timeBetweenRetries: attempt => 3_000
-    }).catch(error => console.log("Error", error))
+    })
+
+    poller.start(t.signal)
 
     const trigger = await engine.getTrigger({
       client,

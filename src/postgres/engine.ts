@@ -10,11 +10,10 @@ import {GetTimeToWait} from "../retry";
 export class PostgresWorkflowEngine {
   private constructor() {}
 
-  async start<State> (opts: StartOpts<State>): Promise<void> {
+  async getPoller<State> (opts: StartOpts<State>): Promise<Poller<State>> {
     const {
       client,
       workflow,
-      signal,
       pageSize = 20,
       pollingIntervalMs,
       maxAttempts = 3,
@@ -24,14 +23,14 @@ export class PostgresWorkflowEngine {
     await createTables(client)
     const storage = new PostgresStorage<State>(client)
 
-    await new Poller<State>(
+    return new Poller<State>(
       pollingIntervalMs,
       storage,
       workflow,
       pageSize,
       maxAttempts,
       timeBetweenRetries,
-    ).start(signal)
+    )
   }
 
   async getTrigger<State>(opts: GetTriggerOpts<State>): Promise<TriggerInterface<State>> {
@@ -56,7 +55,6 @@ export type StartOpts<State> = {
   workflow: Workflow<State>
   pollingIntervalMs: number
   pageSize?: number
-  signal: AbortSignal
   maxAttempts?: number
   timeBetweenRetries?: GetTimeToWait
 }

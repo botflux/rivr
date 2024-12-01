@@ -10,6 +10,8 @@ import { StepStateCollection } from "./step-state-collection"
 import { waitAtLeastForSuccess } from "../wait-at-least-for-success"
 import {linear} from "../retry";
 import {waitAtLeastOrTimeout} from "../wait-at-least-or-timeout";
+import { once } from "node:events"
+import {Poller} from "../poll/poller";
 
 test("mongodb workflow engine", async function (t) {
     let mongo: StartedMongoDBContainer = undefined!
@@ -42,11 +44,13 @@ test("mongodb workflow engine", async function (t) {
             dbName: randomUUID(),
         })
 
-        engine.start(workflow, {
-            signal: t.signal,
+        const poller = await engine.getPoller(workflow, {
             pollingIntervalMs: 10 
-        }).catch(error => console.log("Error", error))
+        })
         const trigger = await engine.getTrigger(workflow)
+
+        const getErrors = collectErrors(poller)
+        poller.start(t.signal)
 
         // When
         await trigger.trigger(2)
@@ -55,6 +59,7 @@ test("mongodb workflow engine", async function (t) {
         await tryUntilSuccess(async () => {
             assert.equal(result, (2 + 5) * 7)
         }, 3_000)
+        assert.deepEqual(getErrors(), [])
     })
 
     await t.test("should be able to retry a step", async function (t) {
@@ -78,12 +83,14 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        engine.start(workflow, {
-            signal: t.signal,
+        const poller = await engine.getPoller(workflow, {
             pollingIntervalMs: 10
-        }).catch(error => console.log("Error", error))
+        })
 
         const trigger = await engine.getTrigger(workflow)
+
+        const getErrors = collectErrors(poller)
+        poller.start(t.signal)
 
         // When
         await trigger.trigger(5)
@@ -92,6 +99,7 @@ test("mongodb workflow engine", async function (t) {
         await tryUntilSuccess(async () => {
             assert.equal(result, 5 + 5)
         }, 3_000)
+        assert.deepEqual(getErrors(), [])
     })
 
     await t.test("should be able to retry a step until the max retry is reached", async function (t) {
@@ -109,13 +117,15 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        engine.start(workflow, {
-            signal: t.signal,
+        const poller = await engine.getPoller(workflow, {
             pollingIntervalMs: 10,
             maxAttempts: 10
-        }).catch(error => console.log("Error", error))
+        })
 
         const trigger = await engine.getTrigger(workflow)
+
+        const getErrors = collectErrors(poller)
+        poller.start(t.signal)
 
         // When
         await trigger.trigger(10)
@@ -124,6 +134,7 @@ test("mongodb workflow engine", async function (t) {
         await tryUntilSuccess(async () => {
             assert.equal((await getState(client, dbName, "workflow", "always_throw"))[0]?.context.attempt, 10)
         }, 3_000)
+        assert.deepEqual(getErrors(), [])
     })
 
     await t.test("should be able to return a state from each step to control the process flow", async function (t) {
@@ -146,13 +157,15 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        engine.start(workflow, {
+        const poller = await engine.getPoller(workflow, {
             maxAttempts: 10,
-            signal: t.signal,
             pollingIntervalMs: 100
-        }).catch(error => console.log("Error", error))
+        })
 
         const trigger = await engine.getTrigger(workflow)
+
+        const getErrors = collectErrors(poller)
+        poller.start(t.signal)
 
         // When
         await trigger.trigger(2)
@@ -161,6 +174,7 @@ test("mongodb workflow engine", async function (t) {
         await waitAtLeastForSuccess(async () => {
             assert.strictEqual(result, 14)
         }, 1_000)
+        assert.deepEqual(getErrors(), [])
     })
 
     await t.test("should be able to stop a process in the middle of it", async function (t) {
@@ -192,12 +206,13 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        engine.start(workflow, {
-            signal: t.signal,
+        const poller = await engine.getPoller(workflow, {
             pollingIntervalMs: 10,
-        }).catch(error => console.log("Error", error))
-
+        })
+        const getErrors = collectErrors(poller)
         const trigger = await engine.getTrigger(workflow)
+
+        poller.start(t.signal)
 
         // When
         await trigger.trigger(10)
@@ -207,6 +222,7 @@ test("mongodb workflow engine", async function (t) {
         await tryUntilSuccess(async () => {
             assert.deepStrictEqual(values, [ 20, 30, 60 ])
         }, 1_000)
+        assert.deepEqual(getErrors(), [])
     })
 
     await t.test("should be able to skip a step", async function (t) {
@@ -236,12 +252,14 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        engine.start(workflow, {
-            signal: t.signal,
+        const poller = await engine.getPoller(workflow, {
             pollingIntervalMs: 100,
-        }).catch(error => console.log("Error", error))
+        })
 
         const trigger = await engine.getTrigger(workflow)
+
+        const getErrors = collectErrors(poller)
+        poller.start(t.signal)
 
         // When
         await trigger.trigger(10)
@@ -251,6 +269,7 @@ test("mongodb workflow engine", async function (t) {
         await tryUntilSuccess(async () => {
             assert.deepStrictEqual(values, [ 20, 100 ])
         }, 1_000)
+        assert.deepEqual(getErrors(), [])
     })
 
     await t.test("should be able to space attempt based on a time function", async function (t) {
@@ -270,14 +289,16 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        engine.start(workflow, {
+        const poller = await engine.getPoller(workflow, {
             maxAttempts: 2,
             timeBetweenRetries: attempt => 3_000,
-            signal: t.signal,
             pollingIntervalMs: 100
-        }).catch(error => console.log("Error", error))
+        })
 
         const trigger = await engine.getTrigger(workflow)
+
+        const getErrors = collectErrors(poller)
+        poller.start(t.signal)
 
         // When
         await trigger.trigger(10)
@@ -288,11 +309,20 @@ test("mongodb workflow engine", async function (t) {
               (await getState(client, dbName, "workflow", "throw"))[0]?.minDateBeforeNextAttempt!.getTime() >= dateAdd(date!, 3_000).getTime(),
               true)
         }, 5_000)
+        assert.deepEqual(getErrors(), [])
     })
 })
 
 function getState(client: MongoClient, db: string, workflow: string, step: string, collection: string = "workflows") {
     return new StepStateCollection(client.db(db).collection(collection)).findStepStates(workflow, step)
+}
+
+function collectErrors<T> (poller: Poller<T>) {
+    let errors: unknown[] = []
+
+    poller.on("error", e => errors.push(e))
+
+    return () => errors
 }
 
 function dateAdd (date: Date, ms: number): Date {

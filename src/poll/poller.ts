@@ -2,8 +2,11 @@ import { setTimeout } from "node:timers/promises"
 import {failure, isStepResult, Step, StepHandlerContext, StepResult, success, Workflow} from "../workflow";
 import {StorageInterface, WithoutIt} from "./storage.interface";
 import {GetTimeToWait} from "../retry";
+import EventEmitter, {once} from "node:events";
 
-export class Poller<T> {
+export class Poller<T> extends EventEmitter {
+  private stopped = false
+
   constructor(
     private readonly minTimeBetweenPollsMs: number,
     private readonly storage: StorageInterface<T>,
@@ -12,72 +15,88 @@ export class Poller<T> {
     private readonly maxRetry: number,
     private readonly timeBetweenRetries: GetTimeToWait
   ) {
+    super()
   }
 
-  async start (signal: AbortSignal): Promise<void> {
-    for (const _ of this.stoppableInfiniteLoop(signal)) {
-      const [isPaginationExhausted, records] = await this.storage.poll(
-        this.workflow,
-        this.pageSize,
-        this.maxRetry
-      )
+  start (signal: AbortSignal): void {
+    (async () => {
+      try {
+        this.emit("started")
+        for (const _ of this.stoppableInfiniteLoop(signal)) {
+          const [isPaginationExhausted, records] = await this.storage.poll(
+            this.workflow,
+            this.pageSize,
+            this.maxRetry
+          )
 
-      for (const record of records) {
-        const mStep = this.workflow.getStepByName(record.recipient)
+          for (const record of records) {
+            const mStep = this.workflow.getStepByName(record.recipient)
 
-        if (!mStep)
-          continue
+            if (!mStep)
+              continue
 
-        const result = await this.handle(mStep, record.state, record.context)
+            const result = await this.handle(mStep, record.state, record.context)
 
-        if (result.type === "success") {
-          const mNextStep = this.workflow.getNextStep(mStep)
+            if (result.type === "success") {
+              const mNextStep = this.workflow.getNextStep(mStep)
 
-          if (!mNextStep) {
-            await this.storage.acknowledge(record)
-            continue
+              if (!mNextStep) {
+                await this.storage.acknowledge(record)
+                continue
+              }
+
+              const newRecord: WithoutIt<T> = {
+                recipient: mNextStep?.name,
+                belongsTo: this.workflow.name,
+                createdAt: new Date(),
+                state: result.value ?? record.state,
+                context: { attempt: 1 }
+              }
+
+              await this.storage.publishAndAcknowledge(newRecord, record)
+            }
+            else if (result.type === "stop") {
+              await this.storage.acknowledge(record)
+            }
+            else if (result.type === "skip") {
+              const mNextStep = this.workflow.getNextStep(mStep, 2)
+
+              if (!mNextStep) {
+                await this.storage.acknowledge(record)
+                continue
+              }
+
+              const newRecord: WithoutIt<T> = {
+                recipient: mNextStep?.name,
+                belongsTo: this.workflow.name,
+                createdAt: new Date(),
+                state: record.state,
+                context: { attempt: 1 }
+              }
+
+              await this.storage.publishAndAcknowledge(newRecord, record)
+            }
+            else {
+              await this.storage.nack(record, this.timeBetweenRetries)
+            }
           }
 
-          const newRecord: WithoutIt<T> = {
-            recipient: mNextStep?.name,
-            belongsTo: this.workflow.name,
-            createdAt: new Date(),
-            state: result.value ?? record.state,
-            context: { attempt: 1 }
+          if (isPaginationExhausted) {
+            await setTimeout(this.minTimeBetweenPollsMs, undefined, { signal })
           }
-
-          await this.storage.publishAndAcknowledge(newRecord, record)
         }
-        else if (result.type === "stop") {
-          await this.storage.acknowledge(record)
-        }
-        else if (result.type === "skip") {
-          const mNextStep = this.workflow.getNextStep(mStep, 2)
-
-          if (!mNextStep) {
-            await this.storage.acknowledge(record)
-            continue
-          }
-
-          const newRecord: WithoutIt<T> = {
-            recipient: mNextStep?.name,
-            belongsTo: this.workflow.name,
-            createdAt: new Date(),
-            state: record.state,
-            context: { attempt: 1 }
-          }
-
-          await this.storage.publishAndAcknowledge(newRecord, record)
-        }
-        else {
-          await this.storage.nack(record, this.timeBetweenRetries)
+      } catch (e) {
+        if (this.listenerCount("error") > 0) {
+          this.emit("error", e)
         }
       }
+    })()
+  }
 
-      if (isPaginationExhausted) {
-        await setTimeout(this.minTimeBetweenPollsMs, undefined, { signal })
-      }
-    }
+  async stop () {
+    const p = once(this, "stopped")
+    this.stopped = true
+    return p
   }
 
   private async handle(step: Step<T>, state: T, context: StepHandlerContext): Promise<StepResult<T>> {
@@ -95,12 +114,12 @@ export class Poller<T> {
   }
 
   private * stoppableInfiniteLoop (signal: AbortSignal) {
-    let stopped = false
+    signal.addEventListener("abort", () => this.stopped = true)
 
-    signal.addEventListener("abort", () => stopped = true)
-
-    while (!stopped) {
+    while (!this.stopped) {
       yield
     }
+
+    this.emit("stopped")
   }
 }
