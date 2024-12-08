@@ -95,10 +95,14 @@ export class Poller<T> extends EventEmitter {
     })()
   }
 
-  async stop () {
+  async stopAndWaitToBeStopped () {
     const p = once(this, "stopped")
     this.stopped = true
     return p
+  }
+
+  stop () {
+    this.stopped = true
   }
 
   private async handle(step: Step<T>, state: T, context: StepHandlerContext): Promise<StepResult<T>> {

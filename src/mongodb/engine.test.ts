@@ -383,7 +383,7 @@ test("mongodb workflow engine", async function (t) {
         const workflow = Workflow.create<number>("workflow", w => {
             w.step("add-10", async (s, c, id) => {
                 if (id === "poller-1") {
-                    poller1?.stop2()
+                    poller1?.stop()
                     return failure(new Error("oops"))
                 }
 
