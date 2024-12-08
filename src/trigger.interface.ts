@@ -1,6 +1,9 @@
 export interface TriggerInterface<State> {
     /**
      * Trigger the workflow
+     *
+     * @param state
+     * @param tenant
      */
-    trigger(state: State): Promise<void>
+    trigger(state: State, tenant?: string): Promise<void>
 }

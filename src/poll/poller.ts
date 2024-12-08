@@ -52,7 +52,7 @@ export class Poller<T> extends EventEmitter {
                 belongsTo: this.workflow.name,
                 createdAt: new Date(),
                 state: result.value ?? record.state,
-                context: { attempt: 1 }
+                context: { attempt: 1, tenant: record.context.tenant }
               }
 
               await this.storage.publishAndAcknowledge(newRecord, record)
@@ -73,7 +73,7 @@ export class Poller<T> extends EventEmitter {
                 belongsTo: this.workflow.name,
                 createdAt: new Date(),
                 state: record.state,
-                context: { attempt: 1 }
+                context: { attempt: 1, tenant: record.context.tenant }
               }
 
               await this.storage.publishAndAcknowledge(newRecord, record)

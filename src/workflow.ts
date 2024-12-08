@@ -28,7 +28,7 @@ export function isStepResult (result: unknown): result is StepResult<unknown> {
 }
 
 export type WorkflowBuilder<State> = (w: Workflow<State>) => void
-export type StepHandlerContext = { attempt: number }
+export type StepHandlerContext = { attempt: number, tenant?: string }
 export type StepHandler<State> = (state: State, context: StepHandlerContext, pollerId: string) => void | State | StepResult<State> | Promise<void | State | StepResult<State>>
 
 export type Step<State> = {

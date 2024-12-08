@@ -9,7 +9,7 @@ export class StorageTrigger<State> implements TriggerInterface<State> {
     ) {
     }
 
-    async trigger(state: State): Promise<void> {
+    async trigger(state: State, tenant?: string): Promise<void> {
       const mStep = this.workflow.getFirstStep()
 
       if (!mStep) {
@@ -21,7 +21,7 @@ export class StorageTrigger<State> implements TriggerInterface<State> {
         state,
         belongsTo: this.workflow.name,
         recipient: mStep.name,
-        context: { attempt: 1 }
+        context: { attempt: 1, tenant }
       })
     }
 }

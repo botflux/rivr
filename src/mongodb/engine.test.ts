@@ -438,6 +438,56 @@ test("mongodb workflow engine", async function (t) {
             ])
         }, 10_000)
     })
+
+    await t.test("mongodb workflow engine - multi tenancy", async function (t) {
+        await t.test("should be able to add the tenant information", async function (t) {
+            // Given
+            const dbName = randomUUID()
+            const engine = MongoDBWorkflowEngine.create({
+                client,
+                dbName,
+            })
+
+            let results: number[] = []
+
+            const workflow = Workflow.create<number>("workflow", w => {
+                w.step("add-10", async (s, c, id) => {
+                    if (c.tenant === "tenant-1") {
+                        return s + 10
+                    }
+
+                    return s
+                })
+                w.step("multiply-by-20", (s, c) => {
+                    if (c.tenant === "tenant-1") {
+                        return s * 20
+                    }
+
+                    return s
+                })
+                w.step("assign", (s, c, id) => results.push(s))
+            })
+
+            const poller = await engine.getPoller(workflow, {
+                pollingIntervalMs: 100,
+                pageSize: 20,
+            })
+
+            const trigger = await engine.getTrigger(workflow)
+
+            poller.start(t.signal)
+
+            // When
+            await trigger.trigger(5, "tenant-1")
+            await trigger.trigger(15, "tenant-2")
+            await trigger.trigger(10, "tenant-2")
+
+            // Then
+            await tryUntilSuccess(async () => {
+                assert.deepStrictEqual(results.toSorted(), [ 10, 15, 300 ])
+            }, 10_000)
+        })
+    })
 })
 
 function getState(client: MongoClient, db: string, workflow: string, step: string, collection: string = "workflows") {
