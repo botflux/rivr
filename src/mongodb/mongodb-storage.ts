@@ -7,6 +7,7 @@ export interface MongodbRecord<T> extends Omit<PollerRecord<T>, "id"> {
   acknowledged: boolean
   minDateBeforeNextAttempt: Date
   handledBy: string
+  handledByUntil: Date
 }
 
 export class MongodbStorage<T> implements StorageInterface<T> {
@@ -41,7 +42,8 @@ export class MongodbStorage<T> implements StorageInterface<T> {
         ...newRecord,
         acknowledged: false,
         minDateBeforeNextAttempt: new Date(0),
-        handledBy: "not_picked"
+        handledBy: "not_picked",
+        handledByUntil: new Date(0)
       })
     }
 
@@ -66,7 +68,8 @@ export class MongodbStorage<T> implements StorageInterface<T> {
         },
         $set: {
           minDateBeforeNextAttempt,
-          handledBy: "not_picked"
+          handledBy: "not_picked",
+          handledByUntil: new Date(0)
         }
       })
     }
@@ -80,6 +83,7 @@ export class MongodbStorage<T> implements StorageInterface<T> {
                 acknowledged: false,
                 minDateBeforeNextAttempt: new Date(0),
                 handledBy: "not_picked",
+                handledByUntil: new Date(0)
               }
             }
           },

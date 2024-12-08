@@ -368,6 +368,76 @@ test("mongodb workflow engine", async function (t) {
             assert.notEqual(poller2Count, 0)
         }, 3_000)
     })
+
+    await t.test("should be able to pick locked jobs if a worker did not handle it on time", async function (t) {
+        // Given
+        const dbName = randomUUID()
+        const engine = MongoDBWorkflowEngine.create({
+            client,
+            dbName,
+        })
+
+        let poller1: Poller<number> | undefined
+        let resultByWorker = new Map<string, number[]>()
+
+        const workflow = Workflow.create<number>("workflow", w => {
+            w.step("add-10", async (s, c, id) => {
+                if (id === "poller-1") {
+                    poller1?.stop2()
+                    return failure(new Error("oops"))
+                }
+
+                return s + 10
+            })
+            w.step("multiply-by-5", s => s * 5)
+            w.step("assign", (s, c, id) => {
+                implace(resultByWorker, id, v => [...v, s].toSorted(), [])
+            })
+        })
+
+        poller1 = await engine.getPoller(workflow, {
+            pollingIntervalMs: 100,
+            pageSize: 1,
+            replicated: true,
+            pollerId: "poller-1",
+            maxAttempts: 100,
+            lockDurationMs: 500
+        })
+        const poller2 = await engine.getPoller(workflow, {
+            pollingIntervalMs: 100,
+            lockDurationMs: 500,
+            pageSize: 1,
+            replicated: true,
+            maxAttempts: 100,
+            pollerId: "poller-2"
+        })
+
+        poller1.start(t.signal)
+        poller2.start(t.signal)
+
+        const trigger = await engine.getTrigger(workflow)
+
+        // When
+        await trigger.trigger(1)
+        await trigger.trigger(2)
+        await trigger.trigger(3)
+        await trigger.trigger(4)
+        await trigger.trigger(5)
+        await trigger.trigger(6)
+        await trigger.trigger(7)
+        await trigger.trigger(8)
+        await trigger.trigger(9)
+
+        // Then
+        await waitAtLeastForSuccess(async () => {
+            assert.deepEqual(Array.from(resultByWorker.entries()), [
+                [
+                    "poller-2",
+                    [ 55, 60, 65, 70, 75, 80, 85, 90, 95 ],
+                ]
+            ])
+        }, 10_000)
+    })
 })
 
 function getState(client: MongoClient, db: string, workflow: string, step: string, collection: string = "workflows") {
@@ -384,4 +454,11 @@ function collectErrors<T> (poller: Poller<T>) {
 
 function dateAdd (date: Date, ms: number): Date {
     return new Date(date.getTime() + ms)
+}
+
+function implace<K, V> (map: Map<K, V>, key: K, fn: (v: V) => V, defaultValue: V): Map<K, V> {
+    const value = map.get(key) ?? defaultValue
+    const newValue = fn(value)
+    map.set(key, newValue)
+    return map
 }

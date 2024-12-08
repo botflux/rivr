@@ -60,6 +60,22 @@ export type StartOpts = {
      * @default false
      */
     replicated?: boolean
+
+    /**
+     * The duration of the lock.
+     * After this duration the job will be taken by another poller.
+     *
+     * @default pollingIntervalMs * 3_000
+     */
+    lockDurationMs?: number
+
+    /**
+     * The id of the given poller.
+     * This value must be unique.
+     *
+     * @default {crypto.randomUUID()}
+     */
+    pollerId?: string
 }
 
 export class MongoDBWorkflowEngine {
@@ -69,17 +85,20 @@ export class MongoDBWorkflowEngine {
     }
 
     async getPoller<State> (workflow: Workflow<State>, opts: StartOpts): Promise<Poller<State>> {
-        const pollerId = randomUUID()
-
         const { 
             pageSize = 50,
             pollingIntervalMs = 3_000,
             maxAttempts: maxRetry = 3,
             timeBetweenRetries = () => 0,
-            replicated = false
+            replicated = false,
+            pollerId = randomUUID(),
         } = opts
 
-        const storage = this.createCollectionWrapper<State>(replicated)
+        const {
+            lockDurationMs = pollingIntervalMs * 3
+        } = opts
+
+        const storage = this.createCollectionWrapper<State>(replicated, lockDurationMs)
 
         return new Poller(
           pollerId,
@@ -93,7 +112,7 @@ export class MongoDBWorkflowEngine {
     }
 
     async getTrigger<State>(workflow: Workflow<State>): Promise<TriggerInterface<State>> {
-        const storage = this.createCollectionWrapper<State>(false)
+        const storage = this.createCollectionWrapper<State>(false, 0)
         // return new MongoDBTrigger<State>(workflow, storage)
         return new StorageTrigger(workflow, storage)
     }
@@ -102,12 +121,12 @@ export class MongoDBWorkflowEngine {
         return new MongoDBWorkflowEngine(opts)
     }
 
-    private createCollectionWrapper<State> (replicated: boolean): StorageInterface<State> {
+    private createCollectionWrapper<State> (replicated: boolean, lockDurationMs: number): StorageInterface<State> {
         const { client, dbName, collectionName = "workflows" } = this.opts
         const collection = client.db(dbName).collection<MongodbRecord<State>>(collectionName)
 
         return replicated
-            ? new ReplicatedMongodbStorage(collection)
+            ? new ReplicatedMongodbStorage(collection, lockDurationMs)
             : new MongodbStorage(collection)
     }
 }
