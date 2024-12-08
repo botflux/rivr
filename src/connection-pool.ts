@@ -27,7 +27,7 @@ export class ConnectionPool<Connection> {
     const mConnection = this.connections.get(tenant)
 
     if (mConnection) {
-      if (!this.isUsable(mConnection)) {
+      if (!await this.isUsable(mConnection)) {
         this.connections.delete(tenant)
         return await this.getConnection(tenant)
       }
