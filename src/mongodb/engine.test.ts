@@ -440,7 +440,7 @@ test("mongodb workflow engine", async function (t) {
     })
 
     await t.test("mongodb workflow engine - multi tenancy", async function (t) {
-        await t.test("should be able to add the tenant information", async function (t) {
+        await t.test("should be able to support multiple tenant in the same collection", async function (t) {
             // Given
             const dbName = randomUUID()
             const engine = MongoDBWorkflowEngine.create({
