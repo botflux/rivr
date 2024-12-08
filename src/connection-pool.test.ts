@@ -22,9 +22,9 @@ test("connection pool", async (t) => {
     const pool = new ConnectionPool(
       async () => {
         calls ++
-        return await await new MongoClient(mongo.getConnectionString(), {
+        return new MongoClient(mongo.getConnectionString(), {
           directConnection: true
-        }).connect()
+        }).connect();
       },
       async connection => await connection.close(true),
       async connection => {
@@ -41,6 +41,44 @@ test("connection pool", async (t) => {
     // When
     await pool.getConnection("foo")
     await pool.getConnection("foo")
+
+    // Then
+    assert.deepEqual(calls, 1)
+  })
+
+  await t.test("should be able to de-duplicate connection creation", async (t) => {
+    // Given
+    let calls = 0
+
+    const pool = new ConnectionPool(
+      async () => {
+        calls ++
+        return new MongoClient(mongo.getConnectionString(), {
+          directConnection: true
+        }).connect();
+      },
+      async connection => await connection.close(true),
+      async connection => {
+        try {
+          await connection.db().command({ ping: 1 })
+          return true
+        } catch {
+          return false
+        }
+      },
+      t.signal
+    )
+
+    // When
+    await Promise.all([
+      await pool.getConnection("foo"),
+      await pool.getConnection("foo"),
+      await pool.getConnection("foo"),
+      await pool.getConnection("foo"),
+      await pool.getConnection("foo"),
+      await pool.getConnection("foo"),
+      await pool.getConnection("foo")
+    ])
 
     // Then
     assert.deepEqual(calls, 1)
