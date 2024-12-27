@@ -55,16 +55,37 @@ export class Poller<T> extends EventEmitter {
                 context: { attempt: 1, tenant: record.context.tenant }
               }
 
-              await this.storage.publishAndAcknowledge(newRecord, record)
+              // await this.storage.publishAndAcknowledge(newRecord, record)
+              await this.storage.batchWrite?.([
+                {
+                  type: "ack",
+                  record
+                },
+                {
+                  type: "publish",
+                  record: newRecord
+                }
+              ])
             }
             else if (result.type === "stop") {
-              await this.storage.acknowledge(record)
+              await this.storage.batchWrite?.([
+                {
+                  type: "ack",
+                  record
+                }
+              ])
             }
             else if (result.type === "skip") {
               const mNextStep = this.workflow.getNextStep(mStep, 2)
 
               if (!mNextStep) {
-                await this.storage.acknowledge(record)
+                // await this.storage.acknowledge(record)
+                await this.storage.batchWrite?.([
+                  {
+                    type: "ack",
+                    record
+                  }
+                ])
                 continue
               }
 
@@ -76,10 +97,27 @@ export class Poller<T> extends EventEmitter {
                 context: { attempt: 1, tenant: record.context.tenant }
               }
 
-              await this.storage.publishAndAcknowledge(newRecord, record)
+              // await this.storage.publishAndAcknowledge(newRecord, record)
+              await this.storage.batchWrite?.([
+                {
+                  type: "ack",
+                  record
+                },
+                {
+                  type: "publish",
+                  record: newRecord
+                }
+              ])
             }
             else {
-              await this.storage.nack(record, this.timeBetweenRetries)
+              // await this.storage.nack(record, this.timeBetweenRetries)
+              await this.storage.batchWrite?.([
+                {
+                  type: "nack",
+                  record,
+                  timeBetweenRetries: this.timeBetweenRetries
+                }
+              ])
             }
           }
 

@@ -16,12 +16,25 @@ export class StorageTrigger<State> implements TriggerInterface<State> {
         return
       }
 
-      await this.storage.publish({
-        createdAt: new Date(),
-        state,
-        belongsTo: this.workflow.name,
-        recipient: mStep.name,
-        context: { attempt: 1, tenant }
-      })
+      // await this.storage.publish({
+      //   createdAt: new Date(),
+      //   state,
+      //   belongsTo: this.workflow.name,
+      //   recipient: mStep.name,
+      //   context: { attempt: 1, tenant }
+      // })
+
+      await this.storage.batchWrite?.([
+        {
+          type: "publish",
+          record: {
+            createdAt: new Date(),
+            state,
+            belongsTo: this.workflow.name,
+            recipient: mStep.name,
+            context: { attempt: 1, tenant }
+          }
+        }
+      ])
     }
 }
