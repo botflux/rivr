@@ -1,4 +1,4 @@
-import {PollerRecord, StorageInterface, WithoutIt} from "../poll/storage.interface";
+import {PollerRecord, StorageInterface, WithoutIt, Write} from "../poll/storage.interface";
 import {GetTimeToWait} from "../retry";
 import {Workflow} from "../workflow";
 import {Client} from "pg";
@@ -86,6 +86,59 @@ export class PostgresStorage<T> implements StorageInterface<T> {
       createdAt,
       new Date().toISOString()
     ])
+  }
+
+  async batchWrite(writes: Write<T>[]): Promise<void> {
+    await this.client.query("BEGIN")
+
+    try {
+      for (const write of writes) {
+        switch (write.type) {
+          case "publish": {
+            const { record } = write
+
+            await this.client.query(`
+              INSERT INTO workflow_messages(workflow_name, step_name, step_data, attempts, created_at, acknowledged, min_date_before_next_attempt)
+              VALUES ($1, $2, $3, $4, $5, false, $6)
+            `, [
+                record.belongsTo,
+                record.recipient,
+                record.state,
+                record.context.attempt,
+                record.createdAt,
+                new Date().toISOString()
+              ])
+            break
+          }
+          case "nack": {
+            const { record, timeBetweenRetries } = write
+            await this.client.query(`
+              UPDATE "public"."workflow_messages"
+              SET attempts = $1,
+              min_date_before_next_attempt = $3
+              WHERE id = $2
+            `, [
+              record.context.attempt + 1,
+              record.id,
+              this.addToDate(new Date(), timeBetweenRetries(record.context.attempt)),
+            ])
+            break
+          }
+          case "ack": {
+            const { record } = write
+            await this.client.query(`UPDATE workflow_messages SET acknowledged = true WHERE id = $1`, [
+              record.id
+            ])
+            break
+          }
+        }
+      }
+
+      await this.client.query("COMMIT")
+    } catch (e) {
+      await this.client.query("ROLLBACK")
+      throw e
+    }
   }
 
   private addToDate (date: Date, ms: number): Date {
