@@ -153,20 +153,6 @@ export class Poller<T> extends EventEmitter {
     }))
   }
 
-  private async handle(step: Step<T>, state: T, context: StepHandlerContext): Promise<StepResult<T>> {
-    try {
-      const result = await step.handler(state, context, this.pollerId)
-
-      if (result === undefined) {
-        return success(state)
-      }
-
-      return isStepResult(result) ? result : success(result)
-    } catch (error) {
-      return failure(error)
-    }
-  }
-
   private * stoppableInfiniteLoop (signal: AbortSignal) {
     signal.addEventListener("abort", () => this.stopped = true)
 
