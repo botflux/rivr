@@ -1,6 +1,6 @@
 import { setTimeout } from "node:timers/promises"
 import {failure, isStepResult, Step, StepHandlerContext, StepResult, success, Workflow} from "../workflow";
-import {StorageInterface, WithoutIt} from "./storage.interface";
+import {PollerRecord, StorageInterface, WithoutIt, Write} from "./storage.interface";
 import {GetTimeToWait} from "../retry";
 import EventEmitter, {once} from "node:events";
 
@@ -37,89 +37,82 @@ export class Poller<T> extends EventEmitter {
             if (!mStep)
               continue
 
-            const result = await this.handle(mStep, record.state, record.context)
-
-            if (result.type === "success") {
-              const mNextStep = this.workflow.getNextStep(mStep)
-
-              if (!mNextStep) {
-                await this.storage.batchWrite([
-                  {
-                    type: "ack",
-                    record
-                  }
-                ])
-                continue
-              }
-
-              const newRecord: WithoutIt<T> = {
-                recipient: mNextStep?.name,
-                belongsTo: this.workflow.name,
-                createdAt: new Date(),
-                state: result.value ?? record.state,
-                context: { attempt: 1, tenant: record.context.tenant }
-              }
-
-              await this.storage.batchWrite([
-                {
-                  type: "ack",
-                  record
-                },
-                {
-                  type: "publish",
-                  record: newRecord
+            const results = await this.handleBatch(mStep, [ record ])
+            const writes: Write<T>[] = results.map(result => {
+              switch (result.type) {
+                case "success": {
+                  const mNextStep = this.workflow.getNextStep(mStep)
+                  return mNextStep === undefined
+                    ? [
+                      {
+                        type: "ack",
+                        record
+                      }
+                    ] satisfies Write<T>[]
+                    : [
+                      {
+                        type: "ack",
+                        record
+                      },
+                      {
+                        type: "publish",
+                        record: {
+                          recipient: mNextStep.name,
+                          belongsTo: this.workflow.name,
+                          createdAt: new Date(),
+                          state: result.value ?? record.state,
+                          context: { attempt: 1, tenant: record.context.tenant }
+                        }
+                      }
+                    ] satisfies Write<T>[]
                 }
-              ])
-            }
-            else if (result.type === "stop") {
-              await this.storage.batchWrite([
-                {
-                  type: "ack",
-                  record
+                case "failure": {
+                  return [
+                    {
+                      type: "nack",
+                      record,
+                      timeBetweenRetries: this.timeBetweenRetries
+                    }
+                  ] satisfies Write<T>[]
                 }
-              ])
-            }
-            else if (result.type === "skip") {
-              const mNextStep = this.workflow.getNextStep(mStep, 2)
-
-              if (!mNextStep) {
-                await this.storage.batchWrite([
-                  {
-                    type: "ack",
-                    record
-                  }
-                ])
-                continue
+                case "skip": {
+                  const mNextStep = this.workflow.getNextStep(mStep, 2)
+                  return mNextStep === undefined
+                    ? [
+                      {
+                        type: "ack",
+                        record
+                      }
+                    ] satisfies Write<T>[]
+                    : [
+                      {
+                        type: "ack",
+                        record
+                      },
+                      {
+                        type: "publish",
+                        record: {
+                          recipient: mNextStep.name,
+                          belongsTo: this.workflow.name,
+                          createdAt: new Date(),
+                          state: record.state,
+                          context: { attempt: 1, tenant: record.context.tenant }
+                        }
+                      }
+                    ] satisfies Write<T>[]
+                }
+                case "stop": {
+                  return [
+                    {
+                      type: "ack",
+                      record,
+                    }
+                  ] satisfies Write<T>[]
+                }
               }
+            }).flat()
 
-              const newRecord: WithoutIt<T> = {
-                recipient: mNextStep?.name,
-                belongsTo: this.workflow.name,
-                createdAt: new Date(),
-                state: record.state,
-                context: { attempt: 1, tenant: record.context.tenant }
-              }
-
-              await this.storage.batchWrite([
-                {
-                  type: "ack",
-                  record
-                },
-                {
-                  type: "publish",
-                  record: newRecord
-                }
-              ])
-            }
-            else {
-              await this.storage.batchWrite([
-                {
-                  type: "nack",
-                  record,
-                  timeBetweenRetries: this.timeBetweenRetries
-                }
-              ])
-            }
+            await this.storage.batchWrite(writes)
           }
 
           if (isPaginationExhausted) {
@@ -142,6 +135,22 @@ export class Poller<T> extends EventEmitter {
 
   stop () {
     this.stopped = true
+  }
+
+  private handleBatch(step: Step<T>, records: PollerRecord<T>[]): Promise<StepResult<T>[]> {
+    return Promise.all(records.map(async record => {
+      try {
+        const result = await step.handler(record.state, record.context, this.pollerId)
+
+        if (result === undefined) {
+          return success(record.state)
+        }
+
+        return isStepResult(result) ? result : success(result)
+      } catch (e) {
+        return failure(e)
+      }
+    }))
   }
 
   private async handle(step: Step<T>, state: T, context: StepHandlerContext): Promise<StepResult<T>> {
