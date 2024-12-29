@@ -113,7 +113,6 @@ export class MongoDBWorkflowEngine {
 
     async getTrigger<State>(workflow: Workflow<State>): Promise<TriggerInterface<State>> {
         const storage = this.createCollectionWrapper<State>(false, 0)
-        // return new MongoDBTrigger<State>(workflow, storage)
         return new StorageTrigger(workflow, storage)
     }
 

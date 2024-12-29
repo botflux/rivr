@@ -60,7 +60,6 @@ export class Poller<T> extends EventEmitter {
                 context: { attempt: 1, tenant: record.context.tenant }
               }
 
-              // await this.storage.publishAndAcknowledge(newRecord, record)
               await this.storage.batchWrite([
                 {
                   type: "ack",
@@ -84,7 +83,6 @@ export class Poller<T> extends EventEmitter {
               const mNextStep = this.workflow.getNextStep(mStep, 2)
 
               if (!mNextStep) {
-                // await this.storage.acknowledge(record)
                 await this.storage.batchWrite([
                   {
                     type: "ack",
@@ -102,7 +100,6 @@ export class Poller<T> extends EventEmitter {
                 context: { attempt: 1, tenant: record.context.tenant }
               }
 
-              // await this.storage.publishAndAcknowledge(newRecord, record)
               await this.storage.batchWrite([
                 {
                   type: "ack",
@@ -115,7 +112,6 @@ export class Poller<T> extends EventEmitter {
               ])
             }
             else {
-              // await this.storage.nack(record, this.timeBetweenRetries)
               await this.storage.batchWrite([
                 {
                   type: "nack",
