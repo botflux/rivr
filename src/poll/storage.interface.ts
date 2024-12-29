@@ -21,11 +21,7 @@ export type Write<T> = Ack<T> | Publish<T> | Nack<T>
 
 export interface StorageInterface<T> {
   poll(pollerId: string, workflow: Workflow<T>, pageSize: number, maxRetry: number): Promise<[ isPaginationExhausted: boolean, records: PollerRecord<T>[]]>
-  acknowledge(record: PollerRecord<T>): Promise<void>
-  nack(record: PollerRecord<T>, timeBetweenRetries: GetTimeToWait): Promise<void>
-  publishAndAcknowledge(newRecord: WithoutIt<T>, record: PollerRecord<T>): Promise<void>
-  publish(newRecord: WithoutIt<T>): Promise<void>
-  batchWrite?(writes: Write<T>[]): Promise<void>
+  batchWrite(writes: Write<T>[]): Promise<void>
 }
 
 export interface PollerRecord<T> {

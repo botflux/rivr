@@ -53,19 +53,6 @@ export class PostgresStorage<T> implements StorageInterface<T> {
     ])
   }
 
-  async publishAndAcknowledge(newRecord: WithoutIt<T>, record: PollerRecord<T>): Promise<void> {
-    await this.client.query("BEGIN")
-
-    try {
-      await this.publish(newRecord)
-      await this.acknowledge(record)
-      await this.client.query("COMMIT")
-    } catch (e) {
-      await this.client.query("ROLLBACK")
-      throw e
-    }
-  }
-
   async publish(newRecord: WithoutIt<T>): Promise<void> {
     const {
       belongsTo,

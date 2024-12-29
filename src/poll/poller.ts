@@ -43,7 +43,12 @@ export class Poller<T> extends EventEmitter {
               const mNextStep = this.workflow.getNextStep(mStep)
 
               if (!mNextStep) {
-                await this.storage.acknowledge(record)
+                await this.storage.batchWrite([
+                  {
+                    type: "ack",
+                    record
+                  }
+                ])
                 continue
               }
 
@@ -56,7 +61,7 @@ export class Poller<T> extends EventEmitter {
               }
 
               // await this.storage.publishAndAcknowledge(newRecord, record)
-              await this.storage.batchWrite?.([
+              await this.storage.batchWrite([
                 {
                   type: "ack",
                   record
@@ -68,7 +73,7 @@ export class Poller<T> extends EventEmitter {
               ])
             }
             else if (result.type === "stop") {
-              await this.storage.batchWrite?.([
+              await this.storage.batchWrite([
                 {
                   type: "ack",
                   record
@@ -80,7 +85,7 @@ export class Poller<T> extends EventEmitter {
 
               if (!mNextStep) {
                 // await this.storage.acknowledge(record)
-                await this.storage.batchWrite?.([
+                await this.storage.batchWrite([
                   {
                     type: "ack",
                     record
@@ -98,7 +103,7 @@ export class Poller<T> extends EventEmitter {
               }
 
               // await this.storage.publishAndAcknowledge(newRecord, record)
-              await this.storage.batchWrite?.([
+              await this.storage.batchWrite([
                 {
                   type: "ack",
                   record
@@ -111,7 +116,7 @@ export class Poller<T> extends EventEmitter {
             }
             else {
               // await this.storage.nack(record, this.timeBetweenRetries)
-              await this.storage.batchWrite?.([
+              await this.storage.batchWrite([
                 {
                   type: "nack",
                   record,
