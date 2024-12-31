@@ -36,14 +36,15 @@ export type StartOpts = {
     pageSize?: number
 
     /**
-     * The time between each polling given the message pagination is exhausted.
+     * The time between (in ms) each polling given the message pagination is exhausted.
      * 
      * @default 3_000
      */
     pollingIntervalMs?: number
 
     /**
-     * The amount of time a step will be retried in case of an error.
+     * The amount of time a step will be tried in case of an error.
+     * This number includes the first try of a message (e.g. '3' means 'first try + 2 retries').
      * 
      * @default 3
      */
