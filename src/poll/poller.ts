@@ -44,163 +44,85 @@ export class Poller<T> extends EventEmitter {
           const recordsByStep = this.groupRecordsByStep(records)
 
           for (const [ step, records ] of recordsByStep) {
-            if (step.type === "single") {
-              const results = await this.handleSingleStep(step, records)
-              const writes: Write<T>[] = results.map(([ record, result ]) => {
-                switch (result.type) {
-                  case "success": {
-                    const mNextStep = this.workflow.getNextStep(step)
-                    return mNextStep === undefined
-                      ? [
-                        {
-                          type: "ack",
-                          record
-                        }
-                      ] satisfies Write<T>[]
-                      : [
-                        {
-                          type: "ack",
-                          record
-                        },
-                        {
-                          type: "publish",
-                          record: {
-                            recipient: mNextStep.name,
-                            belongsTo: this.workflow.name,
-                            createdAt: new Date(),
-                            state: result.value ?? record.state,
-                            context: { attempt: 1, tenant: record.context.tenant }
-                          }
-                        }
-                      ] satisfies Write<T>[]
-                  }
-                  case "failure": {
-                    return [
-                      {
-                        type: "nack",
-                        record,
-                        timeBetweenRetries: this.timeBetweenRetries
-                      }
-                    ] satisfies Write<T>[]
-                  }
-                  case "skip": {
-                    const mNextStep = this.workflow.getNextStep(step, 2)
-                    return mNextStep === undefined
-                      ? [
-                        {
-                          type: "ack",
-                          record
-                        }
-                      ] satisfies Write<T>[]
-                      : [
-                        {
-                          type: "ack",
-                          record
-                        },
-                        {
-                          type: "publish",
-                          record: {
-                            recipient: mNextStep.name,
-                            belongsTo: this.workflow.name,
-                            createdAt: new Date(),
-                            state: record.state,
-                            context: { attempt: 1, tenant: record.context.tenant }
-                          }
-                        }
-                      ] satisfies Write<T>[]
-                  }
-                  case "stop": {
-                    return [
+            const results = step.type === "single"
+              ? await this.handleSingleStep(step, records)
+              : await this.handleBatchStep(step, records)
+
+            const writes: Write<T>[] = results.map(([ record, result ]) => {
+              switch (result.type) {
+                case "success": {
+                  const mNextStep = this.workflow.getNextStep(step)
+                  return mNextStep === undefined
+                    ? [
                       {
                         type: "ack",
-                        record,
+                        record
                       }
                     ] satisfies Write<T>[]
-                  }
-                }
-              }).flat()
-
-              await this.storage.batchWrite(writes)
-            }
-
-            if (step.type === "batch") {
-              const results = await this.handleBatchStep(step, records)
-              const writes: Write<T>[] = results.map(([ record, result ]) => {
-                switch (result.type) {
-                  case "success": {
-                    const mNextStep = this.workflow.getNextStep(step)
-                    return mNextStep === undefined
-                      ? [
-                        {
-                          type: "ack",
-                          record
-                        }
-                      ] satisfies Write<T>[]
-                      : [
-                        {
-                          type: "ack",
-                          record
-                        },
-                        {
-                          type: "publish",
-                          record: {
-                            recipient: mNextStep.name,
-                            belongsTo: this.workflow.name,
-                            createdAt: new Date(),
-                            state: result.value ?? record.state,
-                            context: { attempt: 1, tenant: record.context.tenant }
-                          }
-                        }
-                      ] satisfies Write<T>[]
-                  }
-                  case "failure": {
-                    return [
-                      {
-                        type: "nack",
-                        record,
-                        timeBetweenRetries: this.timeBetweenRetries
-                      }
-                    ] satisfies Write<T>[]
-                  }
-                  case "skip": {
-                    const mNextStep = this.workflow.getNextStep(step, 2)
-                    return mNextStep === undefined
-                      ? [
-                        {
-                          type: "ack",
-                          record
-                        }
-                      ] satisfies Write<T>[]
-                      : [
-                        {
-                          type: "ack",
-                          record
-                        },
-                        {
-                          type: "publish",
-                          record: {
-                            recipient: mNextStep.name,
-                            belongsTo: this.workflow.name,
-                            createdAt: new Date(),
-                            state: record.state,
-                            context: { attempt: 1, tenant: record.context.tenant }
-                          }
-                        }
-                      ] satisfies Write<T>[]
-                  }
-                  case "stop": {
-                    return [
+                    : [
                       {
                         type: "ack",
-                        record,
+                        record
+                      },
+                      {
+                        type: "publish",
+                        record: {
+                          recipient: mNextStep.name,
+                          belongsTo: this.workflow.name,
+                          createdAt: new Date(),
+                          state: result.value ?? record.state,
+                          context: { attempt: 1, tenant: record.context.tenant }
+                        }
                       }
                     ] satisfies Write<T>[]
-                  }
                 }
-              }).flat()
+                case "failure": {
+                  return [
+                    {
+                      type: "nack",
+                      record,
+                      timeBetweenRetries: this.timeBetweenRetries
+                    }
+                  ] satisfies Write<T>[]
+                }
+                case "skip": {
+                  const mNextStep = this.workflow.getNextStep(step, 2)
+                  return mNextStep === undefined
+                    ? [
+                      {
+                        type: "ack",
+                        record
+                      }
+                    ] satisfies Write<T>[]
+                    : [
+                      {
+                        type: "ack",
+                        record
+                      },
+                      {
+                        type: "publish",
+                        record: {
+                          recipient: mNextStep.name,
+                          belongsTo: this.workflow.name,
+                          createdAt: new Date(),
+                          state: record.state,
+                          context: { attempt: 1, tenant: record.context.tenant }
+                        }
+                      }
+                    ] satisfies Write<T>[]
+                }
+                case "stop": {
+                  return [
+                    {
+                      type: "ack",
+                      record,
+                    }
+                  ] satisfies Write<T>[]
+                }
+              }
+            }).flat()
 
-              await this.storage.batchWrite(writes)
-            }
+            await this.storage.batchWrite(writes)
           }
 
           if (isPaginationExhausted) {
