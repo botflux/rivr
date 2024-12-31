@@ -47,6 +47,7 @@ export type Step<State> = {
     name: string
     workflow: Workflow<State>
     handler: StepHandler<State>
+    type: "single"
 }
 
 export class Workflow<State> {
@@ -61,7 +62,8 @@ export class Workflow<State> {
         this.steps.push({
             name,
             handler,
-            workflow: this
+            workflow: this,
+            type: "single"
         })
 
         return this

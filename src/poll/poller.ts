@@ -34,10 +34,9 @@ export class Poller<T> extends EventEmitter {
           const recordsByStep = this.groupRecordsByStep(records)
 
           for (const [ step, records ] of recordsByStep) {
-            for (const record of records) {
-
-              const results = await this.handleBatch(step, [ record ])
-              const writes: Write<T>[] = results.map(result => {
+            if (step.type === "single") {
+              const results = await this.handleBatch(step, records)
+              const writes: Write<T>[] = results.map(([ record, result ]) => {
                 switch (result.type) {
                   case "success": {
                     const mNextStep = this.workflow.getNextStep(step)
@@ -155,7 +154,7 @@ export class Poller<T> extends EventEmitter {
     )
   }
 
-  private handleBatch(step: Step<T>, records: PollerRecord<T>[]): Promise<StepResult<T>[]> {
+  private handleBatch(step: Step<T>, records: PollerRecord<T>[]): Promise<[PollerRecord<T>, StepResult<T>][]> {
     return Promise.all(records.map(async record => {
       try {
         const result = await step.handler({
@@ -170,12 +169,12 @@ export class Poller<T> extends EventEmitter {
         // const result = await step.handler(record.state, record.context, this.pollerId)
 
         if (result === undefined) {
-          return success(record.state)
+          return [record, success(record.state)] as const
         }
 
-        return isStepResult(result) ? result : success(result)
+        return [record, isStepResult(result) ? result : success(result)] as const
       } catch (e) {
-        return failure(e)
+        return [record, failure(e)] as const
       }
     }))
   }
