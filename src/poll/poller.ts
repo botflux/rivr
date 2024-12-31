@@ -15,7 +15,7 @@ import {GetTimeToWait} from "../retry";
 import EventEmitter, {once} from "node:events";
 
 export class Poller<T> extends EventEmitter {
-  private stopped = false
+  private stopped = true
 
   constructor(
     private readonly pollerId: string,
@@ -29,8 +29,19 @@ export class Poller<T> extends EventEmitter {
     super()
   }
 
+  /**
+   * Start the poller.
+   *
+   * @param signal
+   */
   start (signal: AbortSignal): void {
-    (async () => {
+    if (!this.stopped) {
+      return
+    }
+
+    this.stopped = false
+
+    ;(async () => {
       try {
         this.emit("started")
         for (const _ of this.stoppableInfiniteLoop(signal)) {
@@ -139,13 +150,25 @@ export class Poller<T> extends EventEmitter {
     })()
   }
 
-  async stopAndWaitToBeStopped () {
+  /**
+   * Stop the poller and wait for it to be stopped.
+   * The poller will finish its last poll before stopping.
+   *
+   * Use `stop()` if you don't need to wait for the poller to be stopped.
+   */
+  async stopAndWaitToBeStopped (): Promise<void> {
     const p = once(this, "stopped")
     this.stopped = true
-    return p
+    await p
   }
 
-  stop () {
+  /**
+   * Stop the poller.
+   * The poller will finish its last poll before stopping.
+   * You can wait for `stopped` event to be fired.
+   * You can also call `stopAndWaitToBeStopped` also.
+   */
+  stop (): void {
     this.stopped = true
   }
 
