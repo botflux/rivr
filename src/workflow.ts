@@ -42,12 +42,22 @@ export type StepHandlerContext2<State> = {
     metadata: StepHandlerMetadata
 }
 export type StepHandler<State> = (context: StepHandlerContext2<State>) => void | State | StepResult<State> | Promise<void | State | StepResult<State>>
+export type BatchStepHandler<State> = (contexts: StepHandlerContext2<State>[]) => void | State[] | StepResult<State>[] | Promise<void | State[] | StepResult<State>[]>
 
-export type Step<State> = {
+export type Step<State> = SingleStep<State> | BatchStep<State>
+
+export type SingleStep<State> = {
     name: string
     workflow: Workflow<State>
     handler: StepHandler<State>
     type: "single"
+}
+
+export type BatchStep<State> = {
+    name: string
+    workflow: Workflow<State>
+    handler: BatchStepHandler<State>
+    type: "batch"
 }
 
 export class Workflow<State> {
@@ -64,6 +74,17 @@ export class Workflow<State> {
             handler,
             workflow: this,
             type: "single"
+        })
+
+        return this
+    }
+
+    batchStep(name: string, handler: BatchStepHandler<State>): this {
+        this.steps.push({
+            name,
+            handler,
+            workflow: this,
+            type: "batch"
         })
 
         return this

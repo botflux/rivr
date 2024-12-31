@@ -488,6 +488,48 @@ test("mongodb workflow engine", async function (t) {
             }, 10_000)
         })
     })
+
+    await t.test("mongodb workflow engine - batch", async function (t) {
+        await t.test("should be able to handle a batch of step", async function (t) {
+            // Given
+            const dbName = randomUUID()
+            const engine = MongoDBWorkflowEngine.create({
+                client,
+                dbName,
+            })
+
+            let results: number[] = []
+
+            const workflow = Workflow.create<number>("workflow", w => {
+                w.batchStep("add_sum", contexts => {
+                    const sum = contexts.reduce((sum, { state }) => sum + state, 0)
+                    return contexts.map (({ state }) => state + sum)
+                })
+                w.step("assign", ({ state }) => results.push(state))
+            })
+
+            const poller = await engine.getPoller(workflow, {
+                pollingIntervalMs: 100,
+                pageSize: 3
+            })
+            const trigger = await engine.getTrigger(workflow)
+
+            // When
+            await trigger.trigger(1)
+            await trigger.trigger(1)
+            await trigger.trigger(1)
+            await trigger.trigger(1)
+            await trigger.trigger(1)
+            await trigger.trigger(1)
+
+            poller.start(t.signal)
+
+            // Then
+            await tryUntilSuccess(async () => {
+                assert.deepStrictEqual(results, [ 4, 4, 4, 4, 4, 4 ])
+            }, 3_000)
+        })
+    })
 })
 
 function getState(client: MongoClient, db: string, workflow: string, step: string, collection: string = "workflows") {

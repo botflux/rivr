@@ -1,5 +1,15 @@
 import { setTimeout } from "node:timers/promises"
-import {failure, isStepResult, Step, StepHandlerContext, StepResult, success, Workflow} from "../workflow";
+import {
+  BatchStep,
+  failure,
+  isStepResult,
+  SingleStep,
+  Step,
+  StepHandlerContext, StepHandlerContext2,
+  StepResult,
+  success,
+  Workflow
+} from "../workflow";
 import {PollerRecord, StorageInterface, WithoutIt, Write} from "./storage.interface";
 import {GetTimeToWait} from "../retry";
 import EventEmitter, {once} from "node:events";
@@ -35,7 +45,86 @@ export class Poller<T> extends EventEmitter {
 
           for (const [ step, records ] of recordsByStep) {
             if (step.type === "single") {
-              const results = await this.handleBatch(step, records)
+              const results = await this.handleSingleStep(step, records)
+              const writes: Write<T>[] = results.map(([ record, result ]) => {
+                switch (result.type) {
+                  case "success": {
+                    const mNextStep = this.workflow.getNextStep(step)
+                    return mNextStep === undefined
+                      ? [
+                        {
+                          type: "ack",
+                          record
+                        }
+                      ] satisfies Write<T>[]
+                      : [
+                        {
+                          type: "ack",
+                          record
+                        },
+                        {
+                          type: "publish",
+                          record: {
+                            recipient: mNextStep.name,
+                            belongsTo: this.workflow.name,
+                            createdAt: new Date(),
+                            state: result.value ?? record.state,
+                            context: { attempt: 1, tenant: record.context.tenant }
+                          }
+                        }
+                      ] satisfies Write<T>[]
+                  }
+                  case "failure": {
+                    return [
+                      {
+                        type: "nack",
+                        record,
+                        timeBetweenRetries: this.timeBetweenRetries
+                      }
+                    ] satisfies Write<T>[]
+                  }
+                  case "skip": {
+                    const mNextStep = this.workflow.getNextStep(step, 2)
+                    return mNextStep === undefined
+                      ? [
+                        {
+                          type: "ack",
+                          record
+                        }
+                      ] satisfies Write<T>[]
+                      : [
+                        {
+                          type: "ack",
+                          record
+                        },
+                        {
+                          type: "publish",
+                          record: {
+                            recipient: mNextStep.name,
+                            belongsTo: this.workflow.name,
+                            createdAt: new Date(),
+                            state: record.state,
+                            context: { attempt: 1, tenant: record.context.tenant }
+                          }
+                        }
+                      ] satisfies Write<T>[]
+                  }
+                  case "stop": {
+                    return [
+                      {
+                        type: "ack",
+                        record,
+                      }
+                    ] satisfies Write<T>[]
+                  }
+                }
+              }).flat()
+
+              await this.storage.batchWrite(writes)
+            }
+
+            if (step.type === "batch") {
+              const results = await this.handleBatchStep(step, records)
               const writes: Write<T>[] = results.map(([ record, result ]) => {
                 switch (result.type) {
                   case "success": {
@@ -154,7 +243,7 @@ export class Poller<T> extends EventEmitter {
     )
   }
 
-  private handleBatch(step: Step<T>, records: PollerRecord<T>[]): Promise<[PollerRecord<T>, StepResult<T>][]> {
+  private handleSingleStep(step: SingleStep<T>, records: PollerRecord<T>[]): Promise<[PollerRecord<T>, StepResult<T>][]> {
     return Promise.all(records.map(async record => {
       try {
         const result = await step.handler({
@@ -187,5 +276,27 @@ export class Poller<T> extends EventEmitter {
     }
 
     this.emit("stopped")
+  }
+
+  private async handleBatchStep(step: BatchStep<T>, records: PollerRecord<T>[]): Promise<[PollerRecord<T>, StepResult<T>][]> {
+    try {
+      const contexts: StepHandlerContext2<T>[] = records.map(record => ({
+        metadata: { pollerId: this.pollerId, attempt: record.context.attempt, tenant: record.context.tenant, id: record.id },
+        state: record.state
+      }))
+      const results = await step.handler(contexts)
+
+      if (results === undefined) {
+        return records.map(r => [ r, success(r.state) ])
+      }
+
+      if (results.length !== records.length) {
+        throw new Error("Not implemented at line 219 in poller.ts")
+      }
+      
+      return results.map ((result, i) => [ records[i], isStepResult(result) ? result : success(result) ] as const)
+    } catch (e) {
+      return records.map(r => [ r, failure(e)])
+    }
   }
 }
