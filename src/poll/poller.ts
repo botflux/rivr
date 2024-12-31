@@ -31,88 +31,88 @@ export class Poller<T> extends EventEmitter {
             this.maxRetry
           )
 
-          for (const record of records) {
-            const mStep = this.workflow.getStepByName(record.recipient)
+          const recordsByStep = this.groupRecordsByStep(records)
 
-            if (!mStep)
-              continue
+          for (const [ step, records ] of recordsByStep) {
+            for (const record of records) {
 
-            const results = await this.handleBatch(mStep, [ record ])
-            const writes: Write<T>[] = results.map(result => {
-              switch (result.type) {
-                case "success": {
-                  const mNextStep = this.workflow.getNextStep(mStep)
-                  return mNextStep === undefined
-                    ? [
-                      {
-                        type: "ack",
-                        record
-                      }
-                    ] satisfies Write<T>[]
-                    : [
-                      {
-                        type: "ack",
-                        record
-                      },
-                      {
-                        type: "publish",
-                        record: {
-                          recipient: mNextStep.name,
-                          belongsTo: this.workflow.name,
-                          createdAt: new Date(),
-                          state: result.value ?? record.state,
-                          context: { attempt: 1, tenant: record.context.tenant }
+              const results = await this.handleBatch(step, [ record ])
+              const writes: Write<T>[] = results.map(result => {
+                switch (result.type) {
+                  case "success": {
+                    const mNextStep = this.workflow.getNextStep(step)
+                    return mNextStep === undefined
+                      ? [
+                        {
+                          type: "ack",
+                          record
                         }
-                      }
-                    ] satisfies Write<T>[]
-                }
-                case "failure": {
-                  return [
-                    {
-                      type: "nack",
-                      record,
-                      timeBetweenRetries: this.timeBetweenRetries
-                    }
-                  ] satisfies Write<T>[]
-                }
-                case "skip": {
-                  const mNextStep = this.workflow.getNextStep(mStep, 2)
-                  return mNextStep === undefined
-                    ? [
-                      {
-                        type: "ack",
-                        record
-                      }
-                    ] satisfies Write<T>[]
-                    : [
-                      {
-                        type: "ack",
-                        record
-                      },
-                      {
-                        type: "publish",
-                        record: {
-                          recipient: mNextStep.name,
-                          belongsTo: this.workflow.name,
-                          createdAt: new Date(),
-                          state: record.state,
-                          context: { attempt: 1, tenant: record.context.tenant }
+                      ] satisfies Write<T>[]
+                      : [
+                        {
+                          type: "ack",
+                          record
+                        },
+                        {
+                          type: "publish",
+                          record: {
+                            recipient: mNextStep.name,
+                            belongsTo: this.workflow.name,
+                            createdAt: new Date(),
+                            state: result.value ?? record.state,
+                            context: { attempt: 1, tenant: record.context.tenant }
+                          }
                         }
+                      ] satisfies Write<T>[]
+                  }
+                  case "failure": {
+                    return [
+                      {
+                        type: "nack",
+                        record,
+                        timeBetweenRetries: this.timeBetweenRetries
                       }
                     ] satisfies Write<T>[]
+                  }
+                  case "skip": {
+                    const mNextStep = this.workflow.getNextStep(step, 2)
+                    return mNextStep === undefined
+                      ? [
+                        {
+                          type: "ack",
+                          record
+                        }
+                      ] satisfies Write<T>[]
+                      : [
+                        {
+                          type: "ack",
+                          record
+                        },
+                        {
+                          type: "publish",
+                          record: {
+                            recipient: mNextStep.name,
+                            belongsTo: this.workflow.name,
+                            createdAt: new Date(),
+                            state: record.state,
+                            context: { attempt: 1, tenant: record.context.tenant }
+                          }
+                        }
+                      ] satisfies Write<T>[]
+                  }
+                  case "stop": {
+                    return [
+                      {
+                        type: "ack",
+                        record,
+                      }
+                    ] satisfies Write<T>[]
+                  }
                 }
-                case "stop": {
-                  return [
-                    {
-                      type: "ack",
-                      record,
-                    }
-                  ] satisfies Write<T>[]
-                }
-              }
-            }).flat()
+              }).flat()
 
-            await this.storage.batchWrite(writes)
+              await this.storage.batchWrite(writes)
+            }
           }
 
           if (isPaginationExhausted) {
@@ -135,6 +135,24 @@ export class Poller<T> extends EventEmitter {
 
   stop () {
     this.stopped = true
+  }
+
+  private groupRecordsByStep (records: PollerRecord<T>[]): [Step<T>, PollerRecord<T>[]][] {
+    const pollerRecordsAndStep = records
+      .map(r => [r, this.workflow.getStepByName(r.recipient)] as const)
+      .filter(([, mStep]) => mStep !== undefined) as [ PollerRecord<T>, Step<T> ][]
+
+    return pollerRecordsAndStep.reduce (
+      (acc: [Step<T>, PollerRecord<T>[]][], [ record, step ])=> {
+        const [ , records ] = acc.find(([s]) => s.name === step.name) ?? [ undefined, [] ]
+
+        return [
+          ...acc.filter(([ s ]) => s.name !== step.name),
+          [ step, [ ...records, record ] ]
+        ]
+      },
+      []
+    )
   }
 
   private handleBatch(step: Step<T>, records: PollerRecord<T>[]): Promise<StepResult<T>[]> {
