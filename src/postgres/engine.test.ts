@@ -58,10 +58,10 @@ test("postgres workflow engine", async function (t) {
     let result: number | undefined
 
     const workflow = Workflow.create<number>("workflow", w => {
-      w.step("add-10", s => s + 10)
-      w.step("multiply-by-5", s => s * 5)
-      w.step("assign", s => {
-        result = s
+      w.step("add-10", ({state}) => state + 10)
+      w.step("multiply-by-5", ({state}) => state * 5)
+      w.step("assign", ({state}) => {
+        result = state
       })
     })
 
@@ -97,14 +97,14 @@ test("postgres workflow engine", async function (t) {
     const engine = PostgresWorkflowEngine.create()
 
     const workflow = Workflow.create<number>("workflow", w => {
-      w.step("add_5", (s, { attempt }) => {
+      w.step("add_5", ({ state, metadata: { attempt } }) => {
         if (attempt <= 1)
           throw new Error("oops something went wrong")
 
-        return s + 5
+        return state + 5
       })
-      w.step("assign", s => {
-        result = s
+      w.step("assign", ({state}) => {
+        result = state
       })
     })
 
@@ -136,7 +136,7 @@ test("postgres workflow engine", async function (t) {
     let lastAttempt = -1
 
     const workflow = Workflow.create<number>("workflow", w => {
-      w.step("always_throw", (s, { attempt }) => {
+      w.step("always_throw", ({state, metadata: { attempt } }) => {
         lastAttempt = attempt
         throw new Error("oops")
       })
@@ -172,12 +172,12 @@ test("postgres workflow engine", async function (t) {
     const engine = PostgresWorkflowEngine.create()
 
     const workflow = Workflow.create<number>("workflow", w => {
-      w.step("add-5", s => success(s + 5))
-      w.step("multiply-by-attempt", (s, { attempt }) => attempt === 1
+      w.step("add-5", ({state}) => success(state + 5))
+      w.step("multiply-by-attempt", ({ state, metadata: { attempt } }) => attempt === 1
         ? failure(new Error("oops"), { retry: linear(1_000) })
-        : success(s * attempt))
-      w.step("assign", s => {
-        result = s
+        : success(state * attempt))
+      w.step("assign", ({state}) => {
+        result = state
       })
     })
 
@@ -214,18 +214,18 @@ test("postgres workflow engine", async function (t) {
 
 
     const workflow = Workflow.create<number>("workflow", w => {
-      w.step("add-10", s => s + 10)
-      w.step("assign", s => {
-        values.push(s)
+      w.step("add-10", ({state}) => state + 10)
+      w.step("assign", ({state}) => {
+        values.push(state)
       })
       w.step("stopping", () => {
         i++
         if (i === 1)
           return stop()
       })
-      w.step("multiple_by_2", s => s * 2)
-      w.step("assign 2", s => {
-        values.push(s)
+      w.step("multiple_by_2", ({state}) => state * 2)
+      w.step("assign 2", ({state}) => {
+        values.push(state)
       })
     })
 
@@ -259,18 +259,18 @@ test("postgres workflow engine", async function (t) {
     let i = 0
 
     const workflow = Workflow.create<number>("workflow", w => {
-      w.step("add-10", s => s + 10)
-      w.step("add-20-or-skip", s => {
+      w.step("add-10", ({ state }) => state + 10)
+      w.step("add-20-or-skip", ({ state }) => {
         i++
 
         if (i === 1)
           return skip()
 
-        return s + 20
+        return state + 20
       })
-      w.step("multiply", s => s * 2)
-      w.step("assign", s => {
-        values.push(s)
+      w.step("multiply", ({state}) => state * 2)
+      w.step("assign", ({state}) => {
+        values.push(state)
       })
     })
 
@@ -303,7 +303,7 @@ test("postgres workflow engine", async function (t) {
     const engine = PostgresWorkflowEngine.create()
 
     const workflow = Workflow.create<number>("workflow", w => {
-      w.step("add-10", s => s + 10)
+      w.step("add-10", ({ state }) => state + 10)
       w.step("throw", () => {
         date = new Date()
         throw new Error("oops")

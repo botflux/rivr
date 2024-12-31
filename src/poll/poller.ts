@@ -158,7 +158,16 @@ export class Poller<T> extends EventEmitter {
   private handleBatch(step: Step<T>, records: PollerRecord<T>[]): Promise<StepResult<T>[]> {
     return Promise.all(records.map(async record => {
       try {
-        const result = await step.handler(record.state, record.context, this.pollerId)
+        const result = await step.handler({
+          state: record.state,
+          metadata: {
+            pollerId: this.pollerId,
+            attempt: record.context.attempt,
+            tenant: record.context.tenant,
+            id: record.id
+          }
+        })
+        // const result = await step.handler(record.state, record.context, this.pollerId)
 
         if (result === undefined) {
           return success(record.state)
