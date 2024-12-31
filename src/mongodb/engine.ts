@@ -84,7 +84,7 @@ export class MongoDBWorkflowEngine {
     ) {
     }
 
-    async getPoller<State> (workflow: Workflow<State>, opts: StartOpts): Promise<Poller<State>> {
+    async getPoller<State> (workflow: Workflow<State>, opts: StartOpts = {}): Promise<Poller<State>> {
         const { 
             pageSize = 50,
             pollingIntervalMs = 3_000,
