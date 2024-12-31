@@ -26,7 +26,8 @@ export type StepState<State> = {
 
     acknowledged: boolean
 
-    context: StepHandlerContext
+    tenant?: string
+    attempt: number
 
     minDateBeforeNextAttempt?: Date
 }

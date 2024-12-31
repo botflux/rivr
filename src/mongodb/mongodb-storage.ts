@@ -25,7 +25,7 @@ export class MongodbStorage<T> implements StorageInterface<T> {
         recipient: {
           $in: names
         },
-        "context.attempt": { $lt: maxRetry },
+        attempt: { $lt: maxRetry },
         acknowledged: false,
       }).limit(pageSize).toArray()
 
@@ -55,7 +55,7 @@ export class MongodbStorage<T> implements StorageInterface<T> {
               }
             } satisfies AnyBulkWriteOperation<MongodbRecord<T>>
           case "nack": {
-            const minDateBeforeNextAttempt = new Date(new Date().getTime() + w.timeBetweenRetries(w.record.context.attempt))
+            const minDateBeforeNextAttempt = new Date(new Date().getTime() + w.timeBetweenRetries(w.record.attempt))
 
             return {
               updateOne: {
@@ -64,7 +64,7 @@ export class MongodbStorage<T> implements StorageInterface<T> {
                 },
                 update: {
                   $inc: {
-                    "context.attempt": 1,
+                    attempt: 1,
                   },
                   $set: {
                     minDateBeforeNextAttempt,

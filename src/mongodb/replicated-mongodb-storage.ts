@@ -29,7 +29,7 @@ export class ReplicatedMongodbStorage<State> extends MongodbStorage<State>{
             recipient: {
               $in: names
             },
-            "context.attempt": { $lt: maxRetry },
+            attempt: { $lt: maxRetry },
             acknowledged: false,
             // handledBy: { $in: [ pollerId, "not_picked" ] }
           },

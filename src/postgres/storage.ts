@@ -26,9 +26,9 @@ export class PostgresStorage<T> implements StorageInterface<T> {
         belongsTo: workflow_name,
         recipient: step_name,
         id,
-        context: { attempt: attempts },
         state: step_data,
-        createdAt: created_at
+        createdAt: created_at,
+        attempt: attempts
       }))
 
       return [ records.length < pageSize, records ]
@@ -47,9 +47,9 @@ export class PostgresStorage<T> implements StorageInterface<T> {
       min_date_before_next_attempt = $3
       WHERE id = $2
     `, [
-      record.context.attempt + 1,
+      record.attempt + 1,
       record.id,
-      this.addToDate(new Date(), timeBetweenRetries(record.context.attempt)),
+      this.addToDate(new Date(), timeBetweenRetries(record.attempt)),
     ])
   }
 
@@ -57,9 +57,9 @@ export class PostgresStorage<T> implements StorageInterface<T> {
     const {
       belongsTo,
       createdAt,
-      context,
       state,
-      recipient
+      recipient,
+      attempt
     } = newRecord
 
     await this.client.query(`
@@ -69,7 +69,7 @@ export class PostgresStorage<T> implements StorageInterface<T> {
       belongsTo,
       recipient,
       state,
-      context.attempt,
+      attempt,
       createdAt,
       new Date().toISOString()
     ])
@@ -91,7 +91,7 @@ export class PostgresStorage<T> implements StorageInterface<T> {
                 record.belongsTo,
                 record.recipient,
                 record.state,
-                record.context.attempt,
+                record.attempt,
                 record.createdAt,
                 new Date().toISOString()
               ])
@@ -105,9 +105,9 @@ export class PostgresStorage<T> implements StorageInterface<T> {
               min_date_before_next_attempt = $3
               WHERE id = $2
             `, [
-              record.context.attempt + 1,
+              record.attempt + 1,
               record.id,
-              this.addToDate(new Date(), timeBetweenRetries(record.context.attempt)),
+              this.addToDate(new Date(), timeBetweenRetries(record.attempt)),
             ])
             break
           }

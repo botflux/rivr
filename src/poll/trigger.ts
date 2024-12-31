@@ -32,7 +32,8 @@ export class StorageTrigger<State> implements TriggerInterface<State> {
             state,
             belongsTo: this.workflow.name,
             recipient: mStep.name,
-            context: { attempt: 1, tenant }
+            tenant,
+            attempt: 1
           }
         }
       ])

@@ -132,7 +132,7 @@ test("mongodb workflow engine", async function (t) {
 
         // Then
         await tryUntilSuccess(async () => {
-            assert.equal((await getState(client, dbName, "workflow", "always_throw"))[0]?.context.attempt, 10)
+            assert.equal((await getState(client, dbName, "workflow", "always_throw"))[0]?.attempt, 10)
         }, 3_000)
         assert.deepEqual(getErrors(), [])
     })

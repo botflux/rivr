@@ -30,7 +30,8 @@ export interface PollerRecord<T> {
   belongsTo: string
   createdAt: Date
   state: T
-  context: StepHandlerContext
+  tenant?: string
+  attempt: number
 }
 
 export interface WithoutIt<T> extends Omit<PollerRecord<T>, "id"> {}

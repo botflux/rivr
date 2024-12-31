@@ -71,7 +71,8 @@ export class Poller<T> extends EventEmitter {
                           belongsTo: this.workflow.name,
                           createdAt: new Date(),
                           state: result.value ?? record.state,
-                          context: { attempt: 1, tenant: record.context.tenant }
+                          tenant: record.tenant,
+                          attempt: 1
                         }
                       }
                     ] satisfies Write<T>[]
@@ -106,7 +107,8 @@ export class Poller<T> extends EventEmitter {
                           belongsTo: this.workflow.name,
                           createdAt: new Date(),
                           state: record.state,
-                          context: { attempt: 1, tenant: record.context.tenant }
+                          attempt: 1,
+                          tenant: record.tenant
                         }
                       }
                     ] satisfies Write<T>[]
@@ -172,8 +174,8 @@ export class Poller<T> extends EventEmitter {
           state: record.state,
           metadata: {
             pollerId: this.pollerId,
-            attempt: record.context.attempt,
-            tenant: record.context.tenant,
+            attempt: record.attempt,
+            tenant: record.tenant,
             id: record.id
           }
         })
@@ -203,7 +205,7 @@ export class Poller<T> extends EventEmitter {
   private async handleBatchStep(step: BatchStep<T>, records: PollerRecord<T>[]): Promise<[PollerRecord<T>, StepResult<T>][]> {
     try {
       const contexts: StepHandlerContext2<T>[] = records.map(record => ({
-        metadata: { pollerId: this.pollerId, attempt: record.context.attempt, tenant: record.context.tenant, id: record.id },
+        metadata: { pollerId: this.pollerId, attempt: record.attempt, tenant: record.tenant, id: record.id },
         state: record.state
       }))
       const results = await step.handler(contexts)
