@@ -1,4 +1,4 @@
-import {StepHandlerContext, Workflow} from "../workflow";
+import {Workflow} from "../workflow";
 import {GetTimeToWait} from "../retry";
 
 export interface Ack<T> {

@@ -1,5 +1,4 @@
 import { ObjectId } from "mongodb"
-import { StepHandlerContext } from "../workflow"
 
 export type StepState<State> = {
     _id: ObjectId

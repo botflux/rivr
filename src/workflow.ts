@@ -28,7 +28,6 @@ export function isStepResult (result: unknown): result is StepResult<unknown> {
 }
 
 export type WorkflowBuilder<State> = (w: Workflow<State>) => void
-export type StepHandlerContext = { attempt: number, tenant?: string }
 
 export type StepHandlerMetadata = {
     pollerId: string
