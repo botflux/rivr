@@ -326,9 +326,9 @@ test("mongodb workflow engine", async function (t) {
         const workflow = Workflow.create<number>("workflow", w => {
             w.step("add-10", ({state}) => state + 10)
             w.step("multiply-by-5", ({state}) => state * 5)
-            w.step("assign", ({ state, metadata: { pollerId } }) => {
+            w.step("assign", ({ state }, { workerId }) => {
                 results.push(state)
-                countByPoller.set(pollerId, (countByPoller.get(pollerId) ?? 0) + 1)
+                countByPoller.set(workerId, (countByPoller.get(workerId) ?? 0) + 1)
             })
         })
 
@@ -381,8 +381,8 @@ test("mongodb workflow engine", async function (t) {
         let resultByWorker = new Map<string, number[]>()
 
         const workflow = Workflow.create<number>("workflow", w => {
-            w.step("add-10", async ({ state, metadata: { pollerId } }) => {
-                if (pollerId === "poller-1") {
+            w.step("add-10", async ({ state }, { workerId }) => {
+                if (workerId === "poller-1") {
                     poller1?.stop()
                     return failure(new Error("oops"))
                 }
@@ -390,8 +390,8 @@ test("mongodb workflow engine", async function (t) {
                 return state + 10
             })
             w.step("multiply-by-5", ({state}) => state * 5)
-            w.step("assign", ({ state, metadata: { pollerId } }) => {
-                implace(resultByWorker, pollerId, v => [...v, state].toSorted(), [])
+            w.step("assign", ({ state }, { workerId }) => {
+                implace(resultByWorker, workerId, v => [...v, state].toSorted(), [])
             })
         })
 

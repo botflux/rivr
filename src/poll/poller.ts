@@ -5,7 +5,7 @@ import {
   isStepResult,
   SingleStep,
   Step,
-  StepHandlerContext2,
+  StepExecutionContext,
   StepResult,
   success,
   Workflow
@@ -173,11 +173,12 @@ export class Poller<T> extends EventEmitter {
         const result = await step.handler({
           state: record.state,
           metadata: {
-            pollerId: this.pollerId,
             attempt: record.attempt,
             tenant: record.tenant,
             id: record.id
           }
+        }, {
+          workerId: this.pollerId
         })
         // const result = await step.handler(record.state, record.context, this.pollerId)
 
@@ -204,11 +205,13 @@ export class Poller<T> extends EventEmitter {
 
   private async handleBatchStep(step: BatchStep<T>, records: PollerRecord<T>[]): Promise<[PollerRecord<T>, StepResult<T>][]> {
     try {
-      const contexts: StepHandlerContext2<T>[] = records.map(record => ({
-        metadata: { pollerId: this.pollerId, attempt: record.attempt, tenant: record.tenant, id: record.id },
+      const contexts: StepExecutionContext<T>[] = records.map(record => ({
+        metadata: { attempt: record.attempt, tenant: record.tenant, id: record.id },
         state: record.state
       }))
-      const results = await step.handler(contexts)
+      const results = await step.handler(contexts, {
+        workerId: this.pollerId
+      })
 
       if (results === undefined) {
         return records.map(r => [ r, success(r.state) ])

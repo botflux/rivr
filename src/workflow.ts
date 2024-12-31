@@ -29,19 +29,46 @@ export function isStepResult (result: unknown): result is StepResult<unknown> {
 
 export type WorkflowBuilder<State> = (w: Workflow<State>) => void
 
-export type StepHandlerMetadata = {
-    pollerId: string
+/**
+ * Worker metadata represents data about the poller.
+ * I've chosen 'worker' instead of 'poller' because
+ * push based workflow engine will be called 'consumer'
+ * rather than 'poller'.
+ */
+export type WorkerMetadata = {
+    /**
+     * The id of the worker that is handling the step.
+     */
+    workerId: string
+}
+
+export type StepExecutionMetadata = {
+    /**
+     * The current attempt of executing this message.
+     */
     attempt: number
+
     tenant?: string
+
+    /**
+     * The step execution's id.
+     */
     id: string
 }
 
-export type StepHandlerContext2<State> = {
+export type StepExecutionContext<State> = {
+    /**
+     * The state of the workflow.
+     */
     state: State
-    metadata: StepHandlerMetadata
+
+    /**
+     * Metadata about the step execution.
+     */
+    metadata: StepExecutionMetadata
 }
-export type StepHandler<State> = (context: StepHandlerContext2<State>) => void | State | StepResult<State> | Promise<void | State | StepResult<State>>
-export type BatchStepHandler<State> = (contexts: StepHandlerContext2<State>[]) => void | State[] | StepResult<State>[] | Promise<void | State[] | StepResult<State>[]>
+export type StepHandler<State> = (context: StepExecutionContext<State>, workerMetadata: WorkerMetadata) => void | State | StepResult<State> | Promise<void | State | StepResult<State>>
+export type BatchStepHandler<State> = (contexts: StepExecutionContext<State>[], workerMetadata: WorkerMetadata) => void | State[] | StepResult<State>[] | Promise<void | State[] | StepResult<State>[]>
 
 export type Step<State> = SingleStep<State> | BatchStep<State>
 
