@@ -53,7 +53,10 @@ test("postgres workflow engine", async function (t) {
 
   await t.test("should be able to execute a workflow", async function (t) {
     // Given
-    const engine = PostgresWorkflowEngine.create()
+    const engine = PostgresWorkflowEngine.create({
+      client,
+      pollingIntervalMs: 10
+    })
 
     let result: number | undefined
 
@@ -65,16 +68,8 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller({
-      workflow,
-      client,
-      pollingIntervalMs: 10,
-    })
-
-    const trigger = await engine.getTrigger({
-      client,
-      workflow,
-    })
+    const poller = await engine.getPoller(workflow)
+    const trigger = engine.getTrigger(workflow)
 
     poller.start(t.signal)
 
@@ -94,7 +89,10 @@ test("postgres workflow engine", async function (t) {
     // Given
     let result: number | undefined = undefined
 
-    const engine = PostgresWorkflowEngine.create()
+    const engine = PostgresWorkflowEngine.create({
+      client,
+      pollingIntervalMs: 10
+    })
 
     const workflow = Workflow.create<number>("workflow", w => {
       w.step("add_5", ({ state, metadata: { attempt } }) => {
@@ -108,16 +106,8 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller({
-      workflow,
-      client,
-      pollingIntervalMs: 10,
-    })
-
-    const trigger = await engine.getTrigger({
-      client,
-      workflow
-    })
+    const poller = await engine.getPoller(workflow)
+    const trigger = engine.getTrigger(workflow)
 
     poller.start(t.signal)
 
@@ -132,7 +122,11 @@ test("postgres workflow engine", async function (t) {
 
   await t.test("should be able to retry a step until the max retry is reached", async function (t) {
     // Given
-    const engine = PostgresWorkflowEngine.create()
+    const engine = PostgresWorkflowEngine.create({
+      client,
+      pollingIntervalMs: 10,
+      maxAttempts: 10
+    })
     let lastAttempt = -1
 
     const workflow = Workflow.create<number>("workflow", w => {
@@ -142,19 +136,10 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller({
-      workflow,
-      client,
-      pollingIntervalMs: 10,
-      maxAttempts: 10
-    })
+    const poller = await engine.getPoller(workflow)
+    const trigger = engine.getTrigger(workflow)
 
     poller.start(t.signal)
-
-    const trigger = await engine.getTrigger({
-      client,
-      workflow
-    })
 
     // When
     await trigger.trigger(10)
@@ -169,7 +154,10 @@ test("postgres workflow engine", async function (t) {
     // Given
     let result: number | undefined
 
-    const engine = PostgresWorkflowEngine.create()
+    const engine = PostgresWorkflowEngine.create({
+      client,
+      pollingIntervalMs: 10
+    })
 
     const workflow = Workflow.create<number>("workflow", w => {
       w.step("add-5", ({state}) => success(state + 5))
@@ -181,20 +169,10 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller({
-      workflow,
-      pollingIntervalMs: 100,
-      maxAttempts: 10,
-      client,
-      pageSize: 10
-    })
+    const poller = await engine.getPoller(workflow)
+    const trigger = engine.getTrigger(workflow)
 
     poller.start(t.signal)
-
-    const trigger = await engine.getTrigger({
-      client,
-      workflow
-    })
 
     // When
     await trigger.trigger(2)
@@ -207,7 +185,10 @@ test("postgres workflow engine", async function (t) {
 
   await t.test("should be able to stop a process in the middle of it", async function (t) {
     // Given
-    const engine = PostgresWorkflowEngine.create()
+    const engine = PostgresWorkflowEngine.create({
+      client,
+      pollingIntervalMs: 10
+    })
 
     let values: number[] = []
     let i = 0
@@ -229,18 +210,10 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller({
-      workflow,
-      client,
-      pollingIntervalMs: 10
-    })
+    const poller = await engine.getPoller(workflow)
+    const trigger = engine.getTrigger(workflow)
 
     poller.start(t.signal)
-
-    const trigger = await engine.getTrigger({
-      client,
-      workflow
-    })
 
     // When
     await trigger.trigger(10)
@@ -254,7 +227,10 @@ test("postgres workflow engine", async function (t) {
 
   await t.test("should be able to skip a step", async function (t) {
     // Given
-    const engine = PostgresWorkflowEngine.create()
+    const engine = PostgresWorkflowEngine.create({
+      client,
+      pollingIntervalMs: 10
+    })
     let values: number[] = []
     let i = 0
 
@@ -274,18 +250,10 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller({
-      workflow,
-      client,
-      pollingIntervalMs: 10,
-    })
+    const poller = await engine.getPoller(workflow)
+    const trigger = engine.getTrigger(workflow)
 
     poller.start(t.signal)
-
-    const trigger = await engine.getTrigger({
-      client,
-      workflow
-    })
 
     // When
     await trigger.trigger(10)
@@ -300,7 +268,11 @@ test("postgres workflow engine", async function (t) {
   await t.test("should be able to space attempt based on a time function", async function (t) {
     // Given
     let date: Date | undefined = undefined
-    const engine = PostgresWorkflowEngine.create()
+    const engine = PostgresWorkflowEngine.create({
+      client,
+      pollingIntervalMs: 10,
+      timeBetweenRetries: () => 3_000
+    })
 
     const workflow = Workflow.create<number>("workflow", w => {
       w.step("add-10", ({ state }) => state + 10)
@@ -310,20 +282,10 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller({
-      workflow,
-      client,
-      pollingIntervalMs: 10,
-      maxAttempts: 2,
-      timeBetweenRetries: attempt => 3_000
-    })
+    const poller = await engine.getPoller(workflow)
+    const trigger = engine.getTrigger(workflow)
 
     poller.start(t.signal)
-
-    const trigger = await engine.getTrigger({
-      client,
-      workflow
-    })
 
     // When
     await trigger.trigger(10)

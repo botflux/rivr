@@ -7,19 +7,21 @@ import {PostgresStorage} from "./storage";
 import {StorageTrigger} from "../poll/trigger";
 import {GetTimeToWait} from "../retry";
 import {randomUUID} from "node:crypto";
+import {EngineInterface} from "../engine.interface";
 
-export class PostgresWorkflowEngine {
-  private constructor() {}
+export class PostgresWorkflowEngine implements EngineInterface {
+  private constructor(
+    private readonly opts: StartOpts
+  ) {}
 
-  async getPoller<State> (opts: StartOpts<State>): Promise<Poller<State>> {
+  async getPoller<State> (workflow: Workflow<State>): Promise<Poller<State>> {
     const {
       client,
-      workflow,
       pageSize = 20,
       pollingIntervalMs,
       maxAttempts = 3,
       timeBetweenRetries = () => 0
-    } = opts
+    } = this.opts
 
     await createTables(client)
     const storage = new PostgresStorage<State>(client)
@@ -35,26 +37,21 @@ export class PostgresWorkflowEngine {
     )
   }
 
-  async getTrigger<State>(opts: GetTriggerOpts<State>): Promise<TriggerInterface<State>> {
-    const { client, workflow } = opts
-    await createTables(client)
-    const storage = new PostgresStorage<State>(client)
-    return new StorageTrigger(workflow, () => Promise.resolve(storage))
+  getTrigger<State>(workflow: Workflow<State>): TriggerInterface<State> {
+    return new StorageTrigger(workflow, async () => {
+      const { client } = this.opts
+      await createTables(client)
+      return new PostgresStorage<State>(client)
+    })
   }
 
-  static create(): PostgresWorkflowEngine {
-    return new PostgresWorkflowEngine()
+  static create(opts: StartOpts): PostgresWorkflowEngine {
+    return new PostgresWorkflowEngine(opts)
   }
 }
 
-export type GetTriggerOpts<State> = {
+export type StartOpts = {
   client: Client
-  workflow: Workflow<State>
-}
-
-export type StartOpts<State> = {
-  client: Client
-  workflow: Workflow<State>
   pollingIntervalMs: number
   pageSize?: number
   maxAttempts?: number
