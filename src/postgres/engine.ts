@@ -39,7 +39,7 @@ export class PostgresWorkflowEngine {
     const { client, workflow } = opts
     await createTables(client)
     const storage = new PostgresStorage<State>(client)
-    return new StorageTrigger(workflow, storage)
+    return new StorageTrigger(workflow, () => Promise.resolve(storage))
   }
 
   static create(): PostgresWorkflowEngine {

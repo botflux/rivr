@@ -5,26 +5,19 @@ import {Workflow} from "../workflow";
 export class StorageTrigger<State> implements TriggerInterface<State> {
     constructor(
       private readonly workflow: Workflow<State>,
-      private readonly storage: StorageInterface<State>,
+      private readonly getStorage: () => Promise<StorageInterface<State>>,
     ) {
     }
 
     async trigger(state: State, tenant?: string): Promise<void> {
+      const storage = await this.getStorage();
       const mStep = this.workflow.getFirstStep()
 
       if (!mStep) {
         return
       }
 
-      // await this.storage.publish({
-      //   createdAt: new Date(),
-      //   state,
-      //   belongsTo: this.workflow.name,
-      //   recipient: mStep.name,
-      //   context: { attempt: 1, tenant }
-      // })
-
-      await this.storage.batchWrite?.([
+      await storage.batchWrite([
         {
           type: "publish",
           record: {

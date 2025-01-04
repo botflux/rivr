@@ -47,7 +47,7 @@ test("mongodb workflow engine", async function (t) {
         const poller = await engine.getPoller(workflow, {
             pollingIntervalMs: 10 
         })
-        const trigger = await engine.getTrigger(workflow)
+        const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
         poller.start(t.signal)
@@ -87,7 +87,7 @@ test("mongodb workflow engine", async function (t) {
             pollingIntervalMs: 10
         })
 
-        const trigger = await engine.getTrigger(workflow)
+        const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
         poller.start(t.signal)
@@ -122,7 +122,7 @@ test("mongodb workflow engine", async function (t) {
             maxAttempts: 10
         })
 
-        const trigger = await engine.getTrigger(workflow)
+        const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
         poller.start(t.signal)
@@ -162,7 +162,7 @@ test("mongodb workflow engine", async function (t) {
             pollingIntervalMs: 100
         })
 
-        const trigger = await engine.getTrigger(workflow)
+        const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
         poller.start(t.signal)
@@ -210,7 +210,7 @@ test("mongodb workflow engine", async function (t) {
             pollingIntervalMs: 10,
         })
         const getErrors = collectErrors(poller)
-        const trigger = await engine.getTrigger(workflow)
+        const trigger = engine.getTrigger(workflow)
 
         poller.start(t.signal)
 
@@ -256,7 +256,7 @@ test("mongodb workflow engine", async function (t) {
             pollingIntervalMs: 100,
         })
 
-        const trigger = await engine.getTrigger(workflow)
+        const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
         poller.start(t.signal)
@@ -295,7 +295,7 @@ test("mongodb workflow engine", async function (t) {
             pollingIntervalMs: 100
         })
 
-        const trigger = await engine.getTrigger(workflow)
+        const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
         poller.start(t.signal)
@@ -346,7 +346,7 @@ test("mongodb workflow engine", async function (t) {
         poller1.start(t.signal)
         poller2.start(t.signal)
 
-        const trigger = await engine.getTrigger(workflow)
+        const trigger = engine.getTrigger(workflow)
 
         // When
         await trigger.trigger(1)
@@ -415,7 +415,7 @@ test("mongodb workflow engine", async function (t) {
         poller1.start(t.signal)
         poller2.start(t.signal)
 
-        const trigger = await engine.getTrigger(workflow)
+        const trigger = engine.getTrigger(workflow)
 
         // When
         await trigger.trigger(1)
@@ -473,7 +473,7 @@ test("mongodb workflow engine", async function (t) {
                 pageSize: 20,
             })
 
-            const trigger = await engine.getTrigger(workflow)
+            const trigger = engine.getTrigger(workflow)
 
             poller.start(t.signal)
 
@@ -512,7 +512,7 @@ test("mongodb workflow engine", async function (t) {
                 pollingIntervalMs: 100,
                 pageSize: 3
             })
-            const trigger = await engine.getTrigger(workflow)
+            const trigger = engine.getTrigger(workflow)
 
             // When
             await trigger.trigger(1)

@@ -8,6 +8,7 @@ import {StorageInterface} from "../poll/storage.interface";
 import {StorageTrigger} from "../poll/trigger";
 import {randomUUID} from "node:crypto";
 import {ReplicatedMongodbStorage} from "./replicated-mongodb-storage";
+import {EngineInterface} from "../engine.interface";
 
 export type CreateOpts = {
     /**
@@ -79,7 +80,7 @@ export type StartOpts = {
     pollerId?: string
 }
 
-export class MongoDBWorkflowEngine {
+export class MongoDBWorkflowEngine implements EngineInterface {
     private constructor(
         private readonly opts: CreateOpts
     ) {
@@ -112,9 +113,9 @@ export class MongoDBWorkflowEngine {
         )
     }
 
-    async getTrigger<State>(workflow: Workflow<State>): Promise<TriggerInterface<State>> {
+    getTrigger<State>(workflow: Workflow<State>): TriggerInterface<State> {
         const storage = this.createCollectionWrapper<State>(false, 0)
-        return new StorageTrigger(workflow, storage)
+        return new StorageTrigger(workflow, () => Promise.resolve(storage))
     }
 
     static create(opts: CreateOpts): MongoDBWorkflowEngine {
