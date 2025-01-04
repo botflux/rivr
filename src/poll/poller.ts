@@ -19,7 +19,7 @@ export class Poller<T> extends EventEmitter implements WorkerInterface {
   private stopped = true
 
   constructor(
-    private readonly pollerId: string,
+    public readonly id: string,
     private readonly minTimeBetweenPollsMs: number,
     private readonly getStorage: () => Promise<StorageInterface<T>>,
     private readonly workflow: Workflow<T>,
@@ -51,7 +51,7 @@ export class Poller<T> extends EventEmitter implements WorkerInterface {
           const storage = await this.getStorage()
 
           const [isPaginationExhausted, records] = await storage.poll(
-            this.pollerId,
+            this.id,
             this.workflow,
             this.pageSize,
             this.maxRetry
@@ -206,7 +206,7 @@ export class Poller<T> extends EventEmitter implements WorkerInterface {
             id: record.id
           }
         }, {
-          workerId: this.pollerId
+          workerId: this.id
         })
         // const result = await step.handler(record.state, record.context, this.pollerId)
 
@@ -238,7 +238,7 @@ export class Poller<T> extends EventEmitter implements WorkerInterface {
         state: record.state
       }))
       const results = await step.handler(contexts, {
-        workerId: this.pollerId
+        workerId: this.id
       })
 
       if (results === undefined) {

@@ -1,5 +1,10 @@
 export interface WorkerInterface {
   /**
+   * This worker's unique id.
+   */
+  id: string
+
+  /**
    * Start the worker.
    * Calling this method does nothing given the worker is already started.
    *
@@ -15,6 +20,10 @@ export interface WorkerInterface {
    * The worker will finish the handling of the current messages.
    */
   stop(): void
+
+  on(event: "error", listener: (e: unknown) => void): void
+  once(event: "error", listener: (e: unknown) => void): void
+  off(event: "error", listener: (e: unknown) => void): void
 }
 
 export type StartOpts = {

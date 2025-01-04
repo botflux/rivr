@@ -8,13 +8,14 @@ import {StorageTrigger} from "../poll/trigger";
 import {GetTimeToWait} from "../retry";
 import {randomUUID} from "node:crypto";
 import {EngineInterface} from "../engine.interface";
+import {WorkerInterface} from "../worker.interface";
 
 export class PostgresWorkflowEngine implements EngineInterface {
   private constructor(
     private readonly opts: StartOpts
   ) {}
 
-  async getPoller<State>(workflow: Workflow<State>): Promise<Poller<State>> {
+  getWorker<State>(workflow: Workflow<State>): WorkerInterface {
     const {
       client,
       pageSize = 20,

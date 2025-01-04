@@ -68,7 +68,7 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller(workflow)
+    const poller = engine.getWorker(workflow)
     const trigger = engine.getTrigger(workflow)
 
     poller.start({ signal: t.signal })
@@ -106,7 +106,7 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller(workflow)
+    const poller = engine.getWorker(workflow)
     const trigger = engine.getTrigger(workflow)
 
     poller.start({ signal: t.signal })
@@ -136,7 +136,7 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller(workflow)
+    const poller = engine.getWorker(workflow)
     const trigger = engine.getTrigger(workflow)
 
     poller.start({ signal: t.signal })
@@ -169,7 +169,7 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller(workflow)
+    const poller = engine.getWorker(workflow)
     const trigger = engine.getTrigger(workflow)
 
     poller.start({ signal: t.signal })
@@ -210,7 +210,7 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller(workflow)
+    const poller = engine.getWorker(workflow)
     const trigger = engine.getTrigger(workflow)
 
     poller.start({ signal: t.signal })
@@ -250,7 +250,7 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller(workflow)
+    const poller = engine.getWorker(workflow)
     const trigger = engine.getTrigger(workflow)
 
     poller.start({ signal: t.signal })
@@ -282,7 +282,7 @@ test("postgres workflow engine", async function (t) {
       })
     })
 
-    const poller = await engine.getPoller(workflow)
+    const poller = engine.getWorker(workflow)
     const trigger = engine.getTrigger(workflow)
 
     poller.start({ signal: t.signal })

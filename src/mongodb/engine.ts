@@ -9,6 +9,7 @@ import {StorageTrigger} from "../poll/trigger";
 import {randomUUID} from "node:crypto";
 import {ReplicatedMongodbStorage} from "./replicated-mongodb-storage";
 import {EngineInterface} from "../engine.interface";
+import {WorkerInterface} from "../worker.interface";
 
 export type CreateOpts = {
     /**
@@ -26,19 +27,16 @@ export type CreateOpts = {
      */
     collectionName?: string
 
-}
-
-export type StartOpts = {
     /**
      * The amount of docuemnts fetch once.
-     * 
+     *
      * @default 50
      */
     pageSize?: number
 
     /**
      * The time between (in ms) each polling given the message pagination is exhausted.
-     * 
+     *
      * @default 3_000
      */
     pollingIntervalMs?: number
@@ -46,7 +44,7 @@ export type StartOpts = {
     /**
      * The amount of time a step will be tried in case of an error.
      * This number includes the first try of a message (e.g. '3' means 'first try + 2 retries').
-     * 
+     *
      * @default 3
      */
     maxAttempts?: number
@@ -86,24 +84,20 @@ export class MongoDBWorkflowEngine implements EngineInterface {
     ) {
     }
 
-    async getPoller<State> (workflow: Workflow<State>, opts: StartOpts = {}): Promise<Poller<State>> {
+    getWorker<State> (workflow: Workflow<State>): WorkerInterface {
         const { 
             pageSize = 50,
             pollingIntervalMs = 3_000,
             maxAttempts: maxRetry = 3,
             timeBetweenRetries = () => 0,
             replicated = false,
-            pollerId = randomUUID(),
-        } = opts
-
-        const {
             lockDurationMs = pollingIntervalMs * 3
-        } = opts
+        } = this.opts
 
         const storage = this.createCollectionWrapper<State>(replicated, lockDurationMs)
 
         return new Poller(
-          pollerId,
+          randomUUID(),
           pollingIntervalMs,
           () => Promise.resolve(storage),
           workflow,
