@@ -50,7 +50,7 @@ test("mongodb workflow engine", async function (t) {
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start(t.signal)
+        poller.start({ signal: t.signal })
 
         // When
         await trigger.trigger(2)
@@ -90,7 +90,7 @@ test("mongodb workflow engine", async function (t) {
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start(t.signal)
+        poller.start({ signal: t.signal })
 
         // When
         await trigger.trigger(5)
@@ -125,7 +125,7 @@ test("mongodb workflow engine", async function (t) {
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start(t.signal)
+        poller.start({ signal: t.signal })
 
         // When
         await trigger.trigger(10)
@@ -165,7 +165,7 @@ test("mongodb workflow engine", async function (t) {
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start(t.signal)
+        poller.start({ signal: t.signal })
 
         // When
         await trigger.trigger(2)
@@ -212,7 +212,7 @@ test("mongodb workflow engine", async function (t) {
         const getErrors = collectErrors(poller)
         const trigger = engine.getTrigger(workflow)
 
-        poller.start(t.signal)
+        poller.start({ signal: t.signal })
 
         // When
         await trigger.trigger(10)
@@ -259,7 +259,7 @@ test("mongodb workflow engine", async function (t) {
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start(t.signal)
+        poller.start({ signal: t.signal })
 
         // When
         await trigger.trigger(10)
@@ -298,7 +298,7 @@ test("mongodb workflow engine", async function (t) {
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start(t.signal)
+        poller.start({ signal: t.signal })
 
         // When
         await trigger.trigger(10)
@@ -343,8 +343,8 @@ test("mongodb workflow engine", async function (t) {
             replicated: true
         })
 
-        poller1.start(t.signal)
-        poller2.start(t.signal)
+        poller1.start({ signal: t.signal })
+        poller2.start({ signal: t.signal })
 
         const trigger = engine.getTrigger(workflow)
 
@@ -412,8 +412,8 @@ test("mongodb workflow engine", async function (t) {
             pollerId: "poller-2"
         })
 
-        poller1.start(t.signal)
-        poller2.start(t.signal)
+        poller1.start({ signal: t.signal })
+        poller2.start({ signal: t.signal })
 
         const trigger = engine.getTrigger(workflow)
 
@@ -475,7 +475,7 @@ test("mongodb workflow engine", async function (t) {
 
             const trigger = engine.getTrigger(workflow)
 
-            poller.start(t.signal)
+            poller.start({ signal: t.signal })
 
             // When
             await trigger.trigger(5, "tenant-1")
@@ -522,7 +522,7 @@ test("mongodb workflow engine", async function (t) {
             await trigger.trigger(1)
             await trigger.trigger(1)
 
-            poller.start(t.signal)
+            poller.start({ signal: t.signal })
 
             // Then
             await tryUntilSuccess(async () => {

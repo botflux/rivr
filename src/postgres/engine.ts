@@ -14,7 +14,7 @@ export class PostgresWorkflowEngine implements EngineInterface {
     private readonly opts: StartOpts
   ) {}
 
-  async getPoller<State> (workflow: Workflow<State>): Promise<Poller<State>> {
+  async getPoller<State>(workflow: Workflow<State>): Promise<Poller<State>> {
     const {
       client,
       pageSize = 20,
@@ -23,13 +23,13 @@ export class PostgresWorkflowEngine implements EngineInterface {
       timeBetweenRetries = () => 0
     } = this.opts
 
-    await createTables(client)
-    const storage = new PostgresStorage<State>(client)
-
     return new Poller<State>(
       randomUUID(),
       pollingIntervalMs,
-      storage,
+      async () => {
+        await createTables(client)
+        return new PostgresStorage<State>(client)
+      },
       workflow,
       pageSize,
       maxAttempts,

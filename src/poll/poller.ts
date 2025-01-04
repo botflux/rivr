@@ -13,14 +13,15 @@ import {
 import {PollerRecord, StorageInterface, Write} from "./storage.interface";
 import {GetTimeToWait} from "../retry";
 import EventEmitter, {once} from "node:events";
+import {StartOpts, WorkerInterface} from "../worker.interface";
 
-export class Poller<T> extends EventEmitter {
+export class Poller<T> extends EventEmitter implements WorkerInterface {
   private stopped = true
 
   constructor(
     private readonly pollerId: string,
     private readonly minTimeBetweenPollsMs: number,
-    private readonly storage: StorageInterface<T>,
+    private readonly getStorage: () => Promise<StorageInterface<T>>,
     private readonly workflow: Workflow<T>,
     private readonly pageSize: number,
     private readonly maxRetry: number,
@@ -32,9 +33,11 @@ export class Poller<T> extends EventEmitter {
   /**
    * Start the poller.
    *
-   * @param signal
+   * @param opts
    */
-  start (signal: AbortSignal): void {
+  start(opts: StartOpts = {}): void {
+    const { signal } = opts
+
     if (!this.stopped) {
       return
     }
@@ -45,14 +48,16 @@ export class Poller<T> extends EventEmitter {
       try {
         this.emit("started")
         for (const _ of this.stoppableInfiniteLoop(signal)) {
-          const [isPaginationExhausted, records] = await this.storage.poll(
+          const storage = await this.getStorage()
+
+          const [isPaginationExhausted, records] = await storage.poll(
             this.pollerId,
             this.workflow,
             this.pageSize,
             this.maxRetry
           )
 
-          const recordsByStep = this.groupRecordsByStep(records)
+          const recordsByStep = this.groupRecordsByStep(this.workflow, records)
 
           for (const [ step, records ] of recordsByStep) {
             const results = step.type === "single"
@@ -135,7 +140,7 @@ export class Poller<T> extends EventEmitter {
               }
             }).flat()
 
-            await this.storage.batchWrite(writes)
+            await storage.batchWrite(writes)
           }
 
           if (isPaginationExhausted) {
@@ -172,9 +177,9 @@ export class Poller<T> extends EventEmitter {
     this.stopped = true
   }
 
-  private groupRecordsByStep (records: PollerRecord<T>[]): [Step<T>, PollerRecord<T>[]][] {
+  private groupRecordsByStep (workflow: Workflow<T>, records: PollerRecord<T>[]): [Step<T>, PollerRecord<T>[]][] {
     const pollerRecordsAndStep = records
-      .map(r => [r, this.workflow.getStepByName(r.recipient)] as const)
+      .map(r => [r, workflow.getStepByName(r.recipient)] as const)
       .filter(([, mStep]) => mStep !== undefined) as [ PollerRecord<T>, Step<T> ][]
 
     return pollerRecordsAndStep.reduce (
@@ -216,8 +221,8 @@ export class Poller<T> extends EventEmitter {
     }))
   }
 
-  private * stoppableInfiniteLoop (signal: AbortSignal) {
-    signal.addEventListener("abort", () => this.stopped = true)
+  private * stoppableInfiniteLoop (signal?: AbortSignal) {
+    signal?.addEventListener("abort", () => this.stopped = true)
 
     while (!this.stopped) {
       yield

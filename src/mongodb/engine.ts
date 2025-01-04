@@ -105,7 +105,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
         return new Poller(
           pollerId,
           pollingIntervalMs,
-          storage,
+          () => Promise.resolve(storage),
           workflow,
           pageSize,
           maxRetry,
