@@ -2,13 +2,15 @@ import {fastify, FastifyInstance} from "fastify";
 import fastifyMongodb from "@fastify/mongodb";
 import fastifyPlugin from "fastify-plugin";
 import {MongoDBWorkflowEngine} from "../mongodb/engine";
-import {MongoClient} from "mongodb";
 import {Workflow} from "../workflow";
 import {EngineInterface} from "../engine.interface";
 import {WorkerInterface} from "../worker.interface";
 
 export type FastifyRivrOpts = {
-  client: (instance: FastifyInstance) => MongoClient
+  /**
+   * The workflow engine used, or a function that creates the engine.
+   */
+  engine: EngineInterface | ((instance: FastifyInstance) => EngineInterface)
   workflows: Workflow<any>[]
 }
 
@@ -20,12 +22,7 @@ declare module "fastify" {
 }
 
 const fastifyRivr = fastifyPlugin((instance, opts: FastifyRivrOpts, done) => {
-  const engine = MongoDBWorkflowEngine.create({
-    client: opts.client(instance),
-    dbName: "fastify",
-  })
-
-  instance.decorate("engine", engine)
+  instance.decorate("engine", typeof opts.engine === "function" ? opts.engine(instance) : opts.engine)
   instance.decorate("worker", undefined)
 
   instance.addHook("onReady", function (this: FastifyInstance) {
@@ -62,7 +59,10 @@ export async function manualTest () {
       url: "mongodb://root:example@localhost:27017"
     })
     .register(fastifyRivr, {
-      client: instance => instance.mongo.client,
+      engine: instance => MongoDBWorkflowEngine.create({
+        client: instance.mongo.client,
+        dbName: "foo"
+      }),
       workflows: [  workflow ]
     })
     .route({
