@@ -1,4 +1,6 @@
-export interface WorkerInterface {
+import EventEmitter from "node:events";
+
+export interface WorkerInterface extends EventEmitter<{ error: [ unknown ], stopped: [] }> {
   /**
    * This worker's unique id.
    */
@@ -21,9 +23,13 @@ export interface WorkerInterface {
    */
   stop(): void
 
-  on(event: "error", listener: (e: unknown) => void): void
-  once(event: "error", listener: (e: unknown) => void): void
-  off(event: "error", listener: (e: unknown) => void): void
+  on(event: "error", listener: (e: unknown) => void): this
+  once(event: "error", listener: (e: unknown) => void): this
+  off(event: "error", listener: (e: unknown) => void): this
+
+  on(event: "stopped", listener: (e: unknown) => void): this
+  once(event: "stopped", listener: (e: unknown) => void): this
+  off(event: "stopped", listener: (e: unknown) => void): this
 }
 
 export type StartOpts = {

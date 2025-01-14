@@ -15,7 +15,7 @@ import {GetTimeToWait} from "../retry";
 import EventEmitter, {once} from "node:events";
 import {StartOpts, WorkerInterface} from "../worker.interface";
 
-export class Poller<T> extends EventEmitter implements WorkerInterface {
+export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }> implements WorkerInterface {
   private stopped = true
 
   constructor(
@@ -46,7 +46,6 @@ export class Poller<T> extends EventEmitter implements WorkerInterface {
 
     ;(async () => {
       try {
-        this.emit("started")
         for (const _ of this.stoppableInfiniteLoop(signal)) {
           const storage = await this.getStorage()
 

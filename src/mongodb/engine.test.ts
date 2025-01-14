@@ -7,22 +7,32 @@ import { MongoDBWorkflowEngine } from "./engine"
 import { randomUUID } from "node:crypto"
 import { tryUntilSuccess } from "../try-until-success"
 import { StepStateCollection } from "./step-state-collection"
-import { waitAtLeastForSuccess } from "../wait-at-least-for-success"
-import {linear} from "../retry";
-import {waitAtLeastOrTimeout} from "../wait-at-least-or-timeout";
-import { once } from "node:events"
-import {Poller} from "../poll/poller";
 import {WorkerInterface} from "../worker.interface";
+import {waitAtLeastForSuccess} from "../wait-at-least-for-success";
+import {linear} from "../retry";
 
 test("mongodb workflow engine", async function (t) {
     let mongo: StartedMongoDBContainer = undefined!
     let client: MongoClient = undefined!
+
+    let deferables: (() => Promise<void>)[] = []
+
+    function defer (fn: () => Promise<void>): void {
+        deferables.push(fn)
+    }
 
     t.before(async () => {
         mongo = await new MongoDBContainer().start()
         client = await new MongoClient(mongo.getConnectionString(), {
             directConnection: true
         }).connect()
+    })
+
+    t.afterEach(async () => {
+        for (const deferable of deferables) {
+            await deferable()
+        }
+        deferables = []
     })
 
     t.after(async () => {
@@ -40,17 +50,22 @@ test("mongodb workflow engine", async function (t) {
             w.step("assign", ({state}) => result = state)
         })
 
-        const engine = MongoDBWorkflowEngine.create({ 
-            client,
+        const engine = MongoDBWorkflowEngine.create({
+            url: mongo.getConnectionString(),
+            clientOpts: {
+                directConnection: true
+            },
             dbName: randomUUID(),
             pollingIntervalMs: 10,
         })
+
+        defer(() => engine.stop())
 
         const poller = engine.getWorker(workflow)
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start({ signal: t.signal })
+        poller.start()
 
         // When
         await trigger.trigger(2)
@@ -67,10 +82,15 @@ test("mongodb workflow engine", async function (t) {
         let result: number | undefined = undefined
 
         const engine = MongoDBWorkflowEngine.create({
-            client,
+            url: mongo.getConnectionString(),
+            clientOpts: {
+                directConnection: true
+            },
             dbName: randomUUID(),
-            pollingIntervalMs: 10
+            pollingIntervalMs: 10,
         })
+
+        defer(() => engine.stop())
 
         const workflow = Workflow.create<number>("workflow", w => {
             w.step("add_5", ({ state, metadata: { attempt } }) => {
@@ -88,7 +108,7 @@ test("mongodb workflow engine", async function (t) {
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start({ signal: t.signal })
+        poller.start()
 
         // When
         await trigger.trigger(5)
@@ -105,11 +125,15 @@ test("mongodb workflow engine", async function (t) {
         const dbName = randomUUID()
 
         const engine = MongoDBWorkflowEngine.create({
-            client,
+            url: mongo.getConnectionString(),
+            clientOpts: {
+                directConnection: true
+            },
             dbName,
             pollingIntervalMs: 10,
-            maxAttempts: 10
+            maxAttempts: 10,
         })
+        defer(() => engine.stop())
 
         const workflow = Workflow.create<number>("workflow", w => {
             w.step("always_throw", () => {
@@ -121,7 +145,7 @@ test("mongodb workflow engine", async function (t) {
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start({ signal: t.signal })
+        poller.start()
 
         // When
         await trigger.trigger(10)
@@ -139,11 +163,15 @@ test("mongodb workflow engine", async function (t) {
         let result: number | undefined
 
         const engine = MongoDBWorkflowEngine.create({
-            client,
+            url: mongo.getConnectionString(),
+            clientOpts: {
+                directConnection: true
+            },
             dbName,
             maxAttempts: 10,
-            pollingIntervalMs: 100
+            pollingIntervalMs: 100,
         })
+        defer(() => engine.stop())
 
         const workflow = Workflow.create<number>("workflow", w => {
             w.step("add-5", ({state}) => success(state + 5))
@@ -159,7 +187,7 @@ test("mongodb workflow engine", async function (t) {
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start({ signal: t.signal })
+        poller.start()
 
         // When
         await trigger.trigger(2)
@@ -176,10 +204,14 @@ test("mongodb workflow engine", async function (t) {
         const dbName = randomUUID()
 
         const engine = MongoDBWorkflowEngine.create({
-            client,
+            url: mongo.getConnectionString(),
+            clientOpts: {
+                directConnection: true
+            },
             dbName,
             pollingIntervalMs: 10,
         })
+        defer(() => engine.stop())
 
         let values: number[] = []
 
@@ -205,7 +237,7 @@ test("mongodb workflow engine", async function (t) {
         const getErrors = collectErrors(poller)
         const trigger = engine.getTrigger(workflow)
 
-        poller.start({ signal: t.signal })
+        poller.start()
 
         // When
         await trigger.trigger(10)
@@ -222,10 +254,14 @@ test("mongodb workflow engine", async function (t) {
         // Given
         const dbName = randomUUID()
         const engine = MongoDBWorkflowEngine.create({
-            client,
+            url: mongo.getConnectionString(),
+            clientOpts: {
+                directConnection: true
+            },
             dbName,
             pollingIntervalMs: 100,
         })
+        defer(() => engine.stop())
 
         let i = 0
         const values: number[] = []
@@ -250,7 +286,7 @@ test("mongodb workflow engine", async function (t) {
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start({ signal: t.signal })
+        poller.start()
 
         // When
         await trigger.trigger(10)
@@ -268,12 +304,16 @@ test("mongodb workflow engine", async function (t) {
         let date: Date | undefined = undefined
         const dbName = randomUUID()
         const engine = MongoDBWorkflowEngine.create({
-            client,
+            url: mongo.getConnectionString(),
+            clientOpts: {
+                directConnection: true
+            },
             dbName,
             maxAttempts: 2,
             timeBetweenRetries: attempt => 3_000,
-            pollingIntervalMs: 100
+            pollingIntervalMs: 100,
         })
+        defer(() => engine.stop())
 
         const workflow = Workflow.create<number>("workflow", w => {
             w.step("add-10", ({state}) => state + 10)
@@ -287,7 +327,7 @@ test("mongodb workflow engine", async function (t) {
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
-        poller.start({ signal: t.signal })
+        poller.start()
 
         // When
         await trigger.trigger(10)
@@ -305,14 +345,18 @@ test("mongodb workflow engine", async function (t) {
         // Given
         const dbName = randomUUID()
         const engine = MongoDBWorkflowEngine.create({
-            client,
+            url: mongo.getConnectionString(),
+            clientOpts: {
+                directConnection: true
+            },
             dbName,
             pollingIntervalMs: 1_000,
             pageSize: 2,
             replication: {
                 replicated: true
-            }
+            },
         })
+        defer(() => engine.stop())
 
         let results: number[] = []
         let countByPoller = new Map<string, number>()
@@ -329,8 +373,8 @@ test("mongodb workflow engine", async function (t) {
         const poller1 = engine.getWorker(workflow)
         const poller2 = engine.getWorker(workflow)
 
-        poller1.start({ signal: t.signal })
-        poller2.start({ signal: t.signal })
+        poller1.start()
+        poller2.start()
 
         const trigger = engine.getTrigger(workflow)
 
@@ -359,7 +403,10 @@ test("mongodb workflow engine", async function (t) {
         // Given
         const dbName = randomUUID()
         const engine = MongoDBWorkflowEngine.create({
-            client,
+            url: mongo.getConnectionString(),
+            clientOpts: {
+                directConnection: true
+            },
             dbName,
             pollingIntervalMs: 100,
             pageSize: 1,
@@ -370,6 +417,8 @@ test("mongodb workflow engine", async function (t) {
             pollerId: "poller-1",
             maxAttempts: 100,
         })
+
+        defer(() => engine.stop())
 
         let poller1: WorkerInterface | undefined
         let resultByWorker = new Map<string, number[]>()
@@ -392,8 +441,8 @@ test("mongodb workflow engine", async function (t) {
         poller1 = engine.getWorker(workflow)
         const poller2 = engine.getWorker(workflow)
 
-        poller1.start({ signal: t.signal })
-        poller2.start({ signal: t.signal })
+        poller1.start()
+        poller2.start()
 
         const trigger = engine.getTrigger(workflow)
 
@@ -424,11 +473,16 @@ test("mongodb workflow engine", async function (t) {
             // Given
             const dbName = randomUUID()
             const engine = MongoDBWorkflowEngine.create({
-                client,
+                url: mongo.getConnectionString(),
+                clientOpts: {
+                    directConnection: true
+                },
                 dbName,
                 pollingIntervalMs: 100,
                 pageSize: 20,
             })
+
+            defer(() => engine.stop())
 
             let results: number[] = []
 
@@ -453,7 +507,7 @@ test("mongodb workflow engine", async function (t) {
             const poller = engine.getWorker(workflow)
             const trigger = engine.getTrigger(workflow)
 
-            poller.start({ signal: t.signal })
+            poller.start()
 
             // When
             await trigger.trigger(5, "tenant-1")
@@ -472,11 +526,16 @@ test("mongodb workflow engine", async function (t) {
             // Given
             const dbName = randomUUID()
             const engine = MongoDBWorkflowEngine.create({
-                client,
+                url: mongo.getConnectionString(),
+                clientOpts: {
+                    directConnection: true
+                },
                 dbName,
                 pollingIntervalMs: 100,
-                pageSize: 3
+                pageSize: 3,
             })
+
+            defer(() => engine.stop())
 
             let results: number[] = []
 
@@ -499,7 +558,7 @@ test("mongodb workflow engine", async function (t) {
             await trigger.trigger(1)
             await trigger.trigger(1)
 
-            poller.start({ signal: t.signal })
+            poller.start()
 
             // Then
             await tryUntilSuccess(async () => {

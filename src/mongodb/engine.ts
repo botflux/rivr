@@ -1,4 +1,4 @@
-import {MongoClient} from "mongodb"
+import {MongoClient, MongoClientOptions} from "mongodb"
 import {Workflow} from "../workflow"
 import {TriggerInterface} from "../trigger.interface"
 import {GetTimeToWait} from "../retry"
@@ -10,12 +10,17 @@ import {randomUUID} from "node:crypto";
 import {ReplicatedMongodbStorage} from "./replicated-mongodb-storage";
 import {EngineInterface} from "../engine.interface";
 import {WorkerInterface} from "../worker.interface";
+import {MongoDBConnectionPool} from "./connection-pool";
+import { setTimeout } from "node:timers/promises"
+import {once} from "node:events";
 
 export type CreateOpts = {
     /**
      * Pass the MongoDB client that will be used.
      */
-    client: MongoClient
+    url: string
+
+    clientOpts?: MongoClientOptions
 
     /**
      * The name of the MongoDB database that will be used to store the step states.
@@ -92,12 +97,19 @@ export type CreateOpts = {
      * @default {crypto.randomUUID()}
      */
     pollerId?: string
+
+    signal?: AbortSignal
 }
 
 export class MongoDBWorkflowEngine implements EngineInterface {
+    private readonly pool: MongoDBConnectionPool
+    private readonly workers: WorkerInterface[] = []
+
     private constructor(
         private readonly opts: CreateOpts
     ) {
+        this.pool = new MongoDBConnectionPool(() => new MongoClient(opts.url, opts.clientOpts).connect())
+        this.opts.signal?.addEventListener("abort", () => this.stop().catch(console.error))
     }
 
     getWorker<State> (workflow: Workflow<State>): WorkerInterface {
@@ -111,7 +123,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
 
         const storage = this.createCollectionWrapper<State>(replicated, lockDurationMs)
 
-        return new Poller(
+        const poller = new Poller(
           randomUUID(),
           pollingIntervalMs,
           () => Promise.resolve(storage),
@@ -120,6 +132,8 @@ export class MongoDBWorkflowEngine implements EngineInterface {
           maxRetry,
           timeBetweenRetries
         )
+        this.workers.push(poller)
+        return poller
     }
 
     getTrigger<State>(workflow: Workflow<State>): TriggerInterface<State> {
@@ -128,14 +142,23 @@ export class MongoDBWorkflowEngine implements EngineInterface {
     }
 
     async stop(): Promise<void> {
+        for (const worker of this.workers) {
+            worker.stop()
+            await Promise.race([
+              once(worker, "stopped"),
+              setTimeout(5_000)
+            ])
+        }
+        await this.pool.clear()
     }
 
     static create(opts: CreateOpts): MongoDBWorkflowEngine {
         return new MongoDBWorkflowEngine(opts)
     }
 
-    private createCollectionWrapper<State> (replicated: boolean, lockDurationMs: number): StorageInterface<State> {
-        const { client, dbName, collectionName = "workflows" } = this.opts
+    private async createCollectionWrapper<State>(replicated: boolean, lockDurationMs: number): Promise<StorageInterface<State>> {
+        const { dbName, collectionName = "workflows" } = this.opts
+        const client = await this.pool.getConnection("")
         const collection = client.db(dbName).collection<MongodbRecord<State>>(collectionName)
 
         return replicated

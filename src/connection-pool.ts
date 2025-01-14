@@ -10,7 +10,7 @@ export class ConnectionPool<Connection> {
     private readonly signal?: AbortSignal
   ) {
     this.signal?.addEventListener("abort", () => {
-      this.clear().catch(console.error)
+      this.clear().catch(e => console.error("Error while clearing the engine", e))
     })
   }
 
