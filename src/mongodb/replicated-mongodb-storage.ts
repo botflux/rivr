@@ -12,8 +12,9 @@ export class ReplicatedMongodbStorage<State> extends MongodbStorage<State>{
     super(collection);
   }
 
-  override async poll(pollerId: string, workflow: Workflow<State>, pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<State>[]]> {
-    const steps = workflow.getSteps()
+  override async poll(pollerId: string, workflows: Workflow<State>[], pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<State>[]]> {
+    const workflowNames = workflows.map(w => w.name)
+    const steps = workflows.map(w => w.getSteps()).flat()
     const names = steps.map(s => s.name)
 
     const documents: WithId<MongodbRecord<State>>[] = []
@@ -25,7 +26,9 @@ export class ReplicatedMongodbStorage<State> extends MongodbStorage<State>{
             _id: {
               $nin: documents.map(doc => doc._id)
             },
-            belongsTo: workflow.name,
+            belongsTo: {
+              $in: workflowNames
+            },
             recipient: {
               $in: names
             },

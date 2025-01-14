@@ -16,14 +16,17 @@ export class MongodbStorage<T> implements StorageInterface<T> {
       protected readonly collection: Collection<MongodbRecord<T>>,
     ) {}
 
-    async poll(pollerId: string, workflow: Workflow<T>, pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<T>[]]> {
-      const steps = workflow.getSteps()
-      const names = steps.map(s => s.name)
+    async poll(pollerId: string, workflows: Workflow<T>[], pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<T>[]]> {
+      const workflowNames = workflows.map (w => w.name)
+      const steps = workflows.map(w => w.getSteps()).flat()
+      const stepNames = steps.map(s => s.name)
 
       const documents = await this.collection.find({
-        belongsTo: workflow.name,
+        belongsTo: {
+          $in: workflowNames
+        },
         recipient: {
-          $in: names
+          $in: stepNames
         },
         attempt: { $lt: maxRetry },
         acknowledged: false,

@@ -61,7 +61,7 @@ test("mongodb workflow engine", async function (t) {
 
         defer(() => engine.stop())
 
-        const poller = engine.getWorker(workflow)
+        const poller = engine.getWorker([workflow])
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
@@ -104,7 +104,7 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        const poller = engine.getWorker(workflow)
+        const poller = engine.getWorker([workflow])
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
@@ -141,7 +141,7 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        const poller = engine.getWorker(workflow)
+        const poller = engine.getWorker([workflow])
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
@@ -183,7 +183,7 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        const poller = await engine.getWorker(workflow)
+        const poller = engine.getWorker([workflow])
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
@@ -233,7 +233,7 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        const poller = engine.getWorker(workflow)
+        const poller = engine.getWorker([workflow])
         const getErrors = collectErrors(poller)
         const trigger = engine.getTrigger(workflow)
 
@@ -282,7 +282,7 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        const poller = engine.getWorker(workflow)
+        const poller = engine.getWorker([workflow])
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
@@ -323,7 +323,7 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        const poller = engine.getWorker(workflow)
+        const poller = engine.getWorker([workflow])
         const trigger = engine.getTrigger(workflow)
 
         const getErrors = collectErrors(poller)
@@ -370,8 +370,8 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        const poller1 = engine.getWorker(workflow)
-        const poller2 = engine.getWorker(workflow)
+        const poller1 = engine.getWorker([workflow])
+        const poller2 = engine.getWorker([workflow])
 
         poller1.start()
         poller2.start()
@@ -438,8 +438,8 @@ test("mongodb workflow engine", async function (t) {
             })
         })
 
-        poller1 = engine.getWorker(workflow)
-        const poller2 = engine.getWorker(workflow)
+        poller1 = engine.getWorker([workflow])
+        const poller2 = engine.getWorker([workflow])
 
         poller1.start()
         poller2.start()
@@ -504,7 +504,7 @@ test("mongodb workflow engine", async function (t) {
                 w.step("assign", ({ state }) => results.push(state))
             })
 
-            const poller = engine.getWorker(workflow)
+            const poller = engine.getWorker([workflow])
             const trigger = engine.getTrigger(workflow)
 
             poller.start()
@@ -547,7 +547,7 @@ test("mongodb workflow engine", async function (t) {
                 w.step("assign", ({ state }) => results.push(state))
             })
 
-            const poller = engine.getWorker(workflow)
+            const poller = engine.getWorker([workflow])
             const trigger = engine.getTrigger(workflow)
 
             // When
@@ -572,7 +572,7 @@ function getState(client: MongoClient, db: string, workflow: string, step: strin
     return new StepStateCollection(client.db(db).collection(collection)).findStepStates(workflow, step)
 }
 
-function collectErrors<T> (poller: WorkerInterface) {
+function collectErrors (poller: WorkerInterface) {
     let errors: unknown[] = []
 
     poller.on("error", e => errors.push(e))

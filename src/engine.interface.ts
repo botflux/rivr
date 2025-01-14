@@ -13,9 +13,9 @@ export interface EngineInterface {
   /**
    * Get the worker for the given workflow.
    *
-   * @param workflow
+   * @param workflows
    */
-  getWorker<State>(workflow: Workflow<State>): WorkerInterface
+  getWorker<State>(workflows: Workflow<State>[]): WorkerInterface
 
   /**
    * Stop any started workers and close any created connection pool.

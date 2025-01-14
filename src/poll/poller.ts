@@ -22,7 +22,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
     public readonly id: string,
     private readonly minTimeBetweenPollsMs: number,
     private readonly getStorage: () => Promise<StorageInterface<T>>,
-    private readonly workflow: Workflow<T>,
+    private readonly workflows: Workflow<T>[],
     private readonly pageSize: number,
     private readonly maxRetry: number,
     private readonly timeBetweenRetries: GetTimeToWait
@@ -51,12 +51,12 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
 
           const [isPaginationExhausted, records] = await storage.poll(
             this.id,
-            this.workflow,
+            this.workflows,
             this.pageSize,
             this.maxRetry
           )
 
-          const recordsByStep = this.groupRecordsByStep(this.workflow, records)
+          const recordsByStep = this.groupRecordsByStep(this.workflows, records)
 
           for (const [ step, records ] of recordsByStep) {
             const results = step.type === "single"
@@ -66,7 +66,8 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
             const writes: Write<T>[] = results.map(([ record, result ]) => {
               switch (result.type) {
                 case "success": {
-                  const mNextStep = this.workflow.getNextStep(step)
+                  const workflow = this.findWorkflowByName(record.belongsTo)
+                  const mNextStep = workflow?.getNextStep(step)
                   return mNextStep === undefined
                     ? [
                       {
@@ -83,7 +84,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                         type: "publish",
                         record: {
                           recipient: mNextStep.name,
-                          belongsTo: this.workflow.name,
+                          belongsTo: workflow!.name,
                           createdAt: new Date(),
                           state: result.value ?? record.state,
                           tenant: record.tenant,
@@ -102,7 +103,8 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                   ] satisfies Write<T>[]
                 }
                 case "skip": {
-                  const mNextStep = this.workflow.getNextStep(step, 2)
+                  const workflow = this.findWorkflowByName(record.belongsTo)
+                  const mNextStep = workflow?.getNextStep(step, 2)
                   return mNextStep === undefined
                     ? [
                       {
@@ -119,7 +121,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                         type: "publish",
                         record: {
                           recipient: mNextStep.name,
-                          belongsTo: this.workflow.name,
+                          belongsTo: workflow!.name,
                           createdAt: new Date(),
                           state: record.state,
                           attempt: 1,
@@ -176,9 +178,9 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
     this.stopped = true
   }
 
-  private groupRecordsByStep (workflow: Workflow<T>, records: PollerRecord<T>[]): [Step<T>, PollerRecord<T>[]][] {
+  private groupRecordsByStep (workflows: Workflow<T>[], records: PollerRecord<T>[]): [Step<T>, PollerRecord<T>[]][] {
     const pollerRecordsAndStep = records
-      .map(r => [r, workflow.getStepByName(r.recipient)] as const)
+      .map(r => [r, workflows.find (w => w.name === r.belongsTo)?.getStepByName(r.recipient)] as const)
       .filter(([, mStep]) => mStep !== undefined) as [ PollerRecord<T>, Step<T> ][]
 
     return pollerRecordsAndStep.reduce (
@@ -254,5 +256,9 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
     } catch (e) {
       return records.map(r => [ r, failure(e)])
     }
+  }
+
+  private findWorkflowByName(name: string): Workflow<T> | undefined {
+    return this.workflows.find (w => w.name === name)
   }
 }

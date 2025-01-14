@@ -9,7 +9,7 @@ import {WorkerInterface} from "../worker.interface";
 
 export type FastifyRivrOpts = {
   client: (instance: FastifyInstance) => MongoClient
-  workflow: Workflow<any>
+  workflows: Workflow<any>[]
 }
 
 declare module "fastify" {
@@ -29,7 +29,7 @@ const fastifyRivr = fastifyPlugin((instance, opts: FastifyRivrOpts, done) => {
   instance.decorate("worker", undefined)
 
   instance.addHook("onReady", function (this: FastifyInstance) {
-    this.worker = this.engine.getWorker(opts.workflow)
+    this.worker = this.engine.getWorker(opts.workflows)
     this.worker.start()
   })
 
@@ -63,7 +63,7 @@ export async function manualTest () {
     })
     .register(fastifyRivr, {
       client: instance => instance.mongo.client,
-      workflow
+      workflows: [  workflow ]
     })
     .route({
       url: "/foo",

@@ -117,7 +117,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
         this.opts.signal?.addEventListener("abort", () => this.stop().catch(console.error))
     }
 
-    getWorker<State> (workflow: Workflow<State>): WorkerInterface {
+    getWorker<State> (workflows: Workflow<State>[]): WorkerInterface {
         const { 
             pageSize = 50,
             pollingIntervalMs = 3_000,
@@ -132,7 +132,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
           randomUUID(),
           pollingIntervalMs,
           () => Promise.resolve(storage),
-          workflow,
+          workflows,
           pageSize,
           maxRetry,
           timeBetweenRetries
