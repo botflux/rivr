@@ -16,3 +16,14 @@ export class MongoDBConnectionPool extends ConnectionPool<MongoClient> {
     )
   }
 }
+
+export class NoOpPool extends ConnectionPool<MongoClient> {
+  constructor(client: MongoClient, signal?: AbortSignal) {
+    super(
+      () => Promise.resolve(client),
+      () => Promise.resolve(),
+      () => Promise.resolve(true),
+      signal
+    );
+  }
+}

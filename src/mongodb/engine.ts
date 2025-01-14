@@ -10,18 +10,12 @@ import {randomUUID} from "node:crypto";
 import {ReplicatedMongodbStorage} from "./replicated-mongodb-storage";
 import {EngineInterface} from "../engine.interface";
 import {WorkerInterface} from "../worker.interface";
-import {MongoDBConnectionPool} from "./connection-pool";
+import {MongoDBConnectionPool, NoOpPool} from "./connection-pool";
 import { setTimeout } from "node:timers/promises"
 import {once} from "node:events";
+import {ConnectionPool} from "../connection-pool";
 
 export type CreateOpts = {
-    /**
-     * Pass the MongoDB client that will be used.
-     */
-    url: string
-
-    clientOpts?: MongoClientOptions
-
     /**
      * The name of the MongoDB database that will be used to store the step states.
      */
@@ -99,16 +93,27 @@ export type CreateOpts = {
     pollerId?: string
 
     signal?: AbortSignal
-}
+} & ({
+    /**
+     * Pass the MongoDB client that will be used.
+     */
+    url: string
+
+    clientOpts?: MongoClientOptions
+} | {
+    client: MongoClient
+})
 
 export class MongoDBWorkflowEngine implements EngineInterface {
-    private readonly pool: MongoDBConnectionPool
+    private readonly pool: ConnectionPool<MongoClient>
     private readonly workers: WorkerInterface[] = []
 
     private constructor(
         private readonly opts: CreateOpts
     ) {
-        this.pool = new MongoDBConnectionPool(() => new MongoClient(opts.url, opts.clientOpts).connect())
+        this.pool = "client" in opts
+            ? new NoOpPool(opts.client)
+            : new MongoDBConnectionPool(() => new MongoClient(opts.url, opts.clientOpts).connect())
         this.opts.signal?.addEventListener("abort", () => this.stop().catch(console.error))
     }
 
