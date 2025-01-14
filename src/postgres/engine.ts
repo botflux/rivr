@@ -46,6 +46,9 @@ export class PostgresWorkflowEngine implements EngineInterface {
     })
   }
 
+  async stop(): Promise<void> {
+  }
+
   static create(opts: StartOpts): PostgresWorkflowEngine {
     return new PostgresWorkflowEngine(opts)
   }

@@ -127,6 +127,9 @@ export class MongoDBWorkflowEngine implements EngineInterface {
         return new StorageTrigger(workflow, () => Promise.resolve(storage))
     }
 
+    async stop(): Promise<void> {
+    }
+
     static create(opts: CreateOpts): MongoDBWorkflowEngine {
         return new MongoDBWorkflowEngine(opts)
     }

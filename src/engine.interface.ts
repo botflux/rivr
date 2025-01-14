@@ -16,4 +16,9 @@ export interface EngineInterface {
    * @param workflow
    */
   getWorker<State>(workflow: Workflow<State>): WorkerInterface
+
+  /**
+   * Stop any started workers and close any created connection pool.
+   */
+  stop(): Promise<void>
 }
