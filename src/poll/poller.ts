@@ -102,8 +102,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                   ] satisfies Write<T>[]
                 }
                 case "skip": {
-                  const workflow = this.findWorkflowByName(record.belongsTo)
-                  const mNextStep = workflow?.getNextStep(step, 2)
+                  const mNextStep = step.workflow.getNextStep(step, 2)
                   return mNextStep === undefined
                     ? [
                       {
@@ -120,7 +119,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                         type: "publish",
                         record: {
                           recipient: mNextStep.name,
-                          belongsTo: workflow!.name,
+                          belongsTo: step.workflow.name,
                           createdAt: new Date(),
                           state: record.state,
                           attempt: 1,
@@ -255,9 +254,5 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
     } catch (e) {
       return records.map(r => [ r, failure(e)])
     }
-  }
-
-  private findWorkflowByName(name: string): Workflow<T> | undefined {
-    return this.workflows.find (w => w.name === name)
   }
 }
