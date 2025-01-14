@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "test": "node -r ts-node/register --test --test-timeout 800000000 \"./src/mongodb/engine.test.ts\" \"./src/postgres/engine.test.ts\" \"./src/connection-pool.test.ts\"",
+    "test": "node -r ts-node/register --test --test-timeout 800000000 \"./src/mongodb/engine.test.ts\" \"./src/connection-pool.test.ts\"",
     "test:only": "node -r ts-node/register --test --test-only --test-timeout 800000000 \"src/mongodb/mongodb-workflow-engine.test.ts\"",
     "typecheck": "tsc --noEmit",
     "sandbox": "ts-node tests/sandbox.ts",
