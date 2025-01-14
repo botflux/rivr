@@ -309,7 +309,9 @@ test("mongodb workflow engine", async function (t) {
             dbName,
             pollingIntervalMs: 1_000,
             pageSize: 2,
-            replicated: true
+            replication: {
+                replicated: true
+            }
         })
 
         let results: number[] = []
@@ -361,10 +363,12 @@ test("mongodb workflow engine", async function (t) {
             dbName,
             pollingIntervalMs: 100,
             pageSize: 1,
-            replicated: true,
+            replication: {
+                replicated: true,
+                lockDurationMs: 500
+            },
             pollerId: "poller-1",
             maxAttempts: 100,
-            lockDurationMs: 500
         })
 
         let poller1: WorkerInterface | undefined

@@ -55,19 +55,35 @@ export type CreateOpts = {
     timeBetweenRetries?: GetTimeToWait
 
     /**
-     * True if multiple poller are started at the same time.
+     * Enable this option to start multiple worker handling the
+     * same workflow steps.
      *
-     * @default false
+     * In more practical term, workers will lock documents while reading
+     * them, in order to not process the same operation twice.
+     *
+     * MongoDB has no built-in mechanism to lock a document, so this package
+     * performs multiple `findOneAndUpdate` calls per poll to append the poller's id
+     * to documents.
+     *
+     * If replication is disabled, the engine performs one `find` call per poll, which is
+     * more efficient.
      */
-    replicated?: boolean
+    replication?: {
+        /**
+         * Enable replication
+         *
+         * @default false
+         */
+        replicated?: boolean
 
-    /**
-     * The duration of the lock.
-     * After this duration the job will be taken by another poller.
-     *
-     * @default pollingIntervalMs * 3_000
-     */
-    lockDurationMs?: number
+        /**
+         * The duration of the lock.
+         * After this duration the job will be taken by another poller.
+         *
+         * @default pollingIntervalMs * 3_000
+         */
+        lockDurationMs?: number
+    }
 
     /**
      * The id of the given poller.
@@ -90,8 +106,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
             pollingIntervalMs = 3_000,
             maxAttempts: maxRetry = 3,
             timeBetweenRetries = () => 0,
-            replicated = false,
-            lockDurationMs = pollingIntervalMs * 3
+            replication: { replicated = false, lockDurationMs = pollingIntervalMs * 3 } = {},
         } = this.opts
 
         const storage = this.createCollectionWrapper<State>(replicated, lockDurationMs)
