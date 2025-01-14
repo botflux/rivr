@@ -66,8 +66,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
             const writes: Write<T>[] = results.map(([ record, result ]) => {
               switch (result.type) {
                 case "success": {
-                  const workflow = this.findWorkflowByName(record.belongsTo)
-                  const mNextStep = workflow?.getNextStep(step)
+                  const mNextStep = step.workflow?.getNextStep(step)
                   return mNextStep === undefined
                     ? [
                       {
@@ -84,7 +83,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                         type: "publish",
                         record: {
                           recipient: mNextStep.name,
-                          belongsTo: workflow!.name,
+                          belongsTo: step.workflow.name,
                           createdAt: new Date(),
                           state: result.value ?? record.state,
                           tenant: record.tenant,
