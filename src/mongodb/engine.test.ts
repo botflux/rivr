@@ -40,7 +40,7 @@ test("mongodb workflow engine", async function (t) {
         await client?.close(true)
     })
 
-    await t.test("should be able to execute a workflow using mongodb as the workflow engine", async function (t) {
+    await t.test("should be able to execute a workflow using mongodb as the workflow engine", async function () {
         // Given
         let result: number | undefined = undefined
 
@@ -77,7 +77,7 @@ test("mongodb workflow engine", async function (t) {
         assert.deepEqual(getErrors(), [])
     })
 
-    await t.test("should be able to retry a step", async function (t) {
+    await t.test("should be able to retry a step", async function () {
         // Given
         let result: number | undefined = undefined
 
@@ -120,7 +120,7 @@ test("mongodb workflow engine", async function (t) {
         assert.deepEqual(getErrors(), [])
     })
 
-    await t.test("should be able to retry a step until the max retry is reached", async function (t) {
+    await t.test("should be able to retry a step until the max retry is reached", async function () {
         // Given
         const dbName = randomUUID()
 
@@ -157,7 +157,7 @@ test("mongodb workflow engine", async function (t) {
         assert.deepEqual(getErrors(), [])
     })
 
-    await t.test("should be able to return a state from each step to control the process flow", async function (t) {
+    await t.test("should be able to return a state from each step to control the process flow", async function () {
         // Given
         const dbName = randomUUID()
         let result: number | undefined
@@ -199,7 +199,7 @@ test("mongodb workflow engine", async function (t) {
         assert.deepEqual(getErrors(), [])
     })
 
-    await t.test("should be able to stop a process in the middle of it", async function (t) {
+    await t.test("should be able to stop a process in the middle of it", async function () {
         // Given
         const dbName = randomUUID()
 
@@ -250,7 +250,7 @@ test("mongodb workflow engine", async function (t) {
         assert.deepEqual(getErrors(), [])
     })
 
-    await t.test("should be able to skip a step", async function (t) {
+    await t.test("should be able to skip a step", async function () {
         // Given
         const dbName = randomUUID()
         const engine = MongoDBWorkflowEngine.create({
@@ -299,7 +299,7 @@ test("mongodb workflow engine", async function (t) {
         assert.deepEqual(getErrors(), [])
     })
 
-    await t.test("should be able to space attempt based on a time function", async function (t) {
+    await t.test("should be able to space attempt based on a time function", async function () {
         // Given
         let date: Date | undefined = undefined
         const dbName = randomUUID()
@@ -341,7 +341,7 @@ test("mongodb workflow engine", async function (t) {
         assert.deepEqual(getErrors(), [])
     })
 
-    await t.test("should be able to split work across multiple pollers", async function (t) {
+    await t.test("should be able to split work across multiple pollers", async function () {
         // Given
         const dbName = randomUUID()
         const engine = MongoDBWorkflowEngine.create({
@@ -399,7 +399,7 @@ test("mongodb workflow engine", async function (t) {
         }, 3_000)
     })
 
-    await t.test("should be able to pick locked jobs if a worker did not handle it on time", async function (t) {
+    await t.test("should be able to pick locked jobs if a worker did not handle it on time", async function () {
         // Given
         const dbName = randomUUID()
         const engine = MongoDBWorkflowEngine.create({
@@ -469,7 +469,7 @@ test("mongodb workflow engine", async function (t) {
     })
 
     await t.test("mongodb workflow engine - multi tenancy", async function (t) {
-        await t.test("should be able to support multiple tenant in the same collection", async function (t) {
+        await t.test("should be able to support multiple tenant in the same collection", async function () {
             // Given
             const dbName = randomUUID()
             const engine = MongoDBWorkflowEngine.create({
@@ -522,7 +522,7 @@ test("mongodb workflow engine", async function (t) {
     })
 
     await t.test("mongodb workflow engine - batch", async function (t) {
-        await t.test("should be able to handle a batch of step", async function (t) {
+        await t.test("should be able to handle a batch of step", async function () {
             // Given
             const dbName = randomUUID()
             const engine = MongoDBWorkflowEngine.create({
