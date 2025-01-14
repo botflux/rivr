@@ -66,8 +66,14 @@ export type StepExecutionContext<State> = {
      * Metadata about the step execution.
      */
     metadata: StepExecutionMetadata
+
+    /**
+     * Metadata about the worker
+     */
+    worker: WorkerMetadata
 }
-export type StepHandler<State> = (context: StepExecutionContext<State>, workerMetadata: WorkerMetadata) => void | State | StepResult<State> | Promise<void | State | StepResult<State>>
+
+export type StepHandler<State> = (context: StepExecutionContext<State>) => void | State | StepResult<State> | Promise<void | State | StepResult<State>>
 export type BatchStepHandler<State> = (contexts: StepExecutionContext<State>[], workerMetadata: WorkerMetadata) => void | State[] | StepResult<State>[] | Promise<void | State[] | StepResult<State>[]>
 
 export type Step<State> = SingleStep<State> | BatchStep<State>

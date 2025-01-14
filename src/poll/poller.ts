@@ -204,9 +204,10 @@ export class Poller<T> extends EventEmitter implements WorkerInterface {
             attempt: record.attempt,
             tenant: record.tenant,
             id: record.id
+          },
+          worker: {
+            workerId: this.id
           }
-        }, {
-          workerId: this.id
         })
         // const result = await step.handler(record.state, record.context, this.pollerId)
 
@@ -235,7 +236,8 @@ export class Poller<T> extends EventEmitter implements WorkerInterface {
     try {
       const contexts: StepExecutionContext<T>[] = records.map(record => ({
         metadata: { attempt: record.attempt, tenant: record.tenant, id: record.id },
-        state: record.state
+        state: record.state,
+        worker: { workerId: this.id }
       }))
       const results = await step.handler(contexts, {
         workerId: this.id
