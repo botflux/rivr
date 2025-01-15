@@ -1,5 +1,5 @@
 import {MongoClient, MongoClientOptions} from "mongodb"
-import {Workflow} from "../workflow"
+import {DefaultWorkerMetadata, Workflow} from "../workflow"
 import {TriggerInterface} from "../trigger.interface"
 import {GetTimeToWait} from "../retry"
 import {Poller} from "../poll/poller";
@@ -104,7 +104,11 @@ export type CreateOpts = {
     client: MongoClient
 })
 
-export class MongoDBWorkflowEngine implements EngineInterface {
+export type MongoDBWorkerMetadata = DefaultWorkerMetadata & {
+    foo: string
+}
+
+export class MongoDBWorkflowEngine implements EngineInterface<MongoDBWorkerMetadata> {
     private readonly pool: ConnectionPool<MongoClient>
     private readonly workers: WorkerInterface[] = []
 
@@ -117,7 +121,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
         this.opts.signal?.addEventListener("abort", () => this.stop().catch(console.error))
     }
 
-    getWorker<State> (workflows: Workflow<State>[]): WorkerInterface {
+    getWorker<State> (workflows: Workflow<State, MongoDBWorkerMetadata | DefaultWorkerMetadata>[]): WorkerInterface {
         const { 
             pageSize = 50,
             pollingIntervalMs = 3_000,
@@ -141,7 +145,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
         return poller
     }
 
-    getTrigger<State>(workflow: Workflow<State>): TriggerInterface<State> {
+    getTrigger<State>(workflow: Workflow<State, MongoDBWorkerMetadata | DefaultWorkerMetadata>): TriggerInterface<State> {
         const storage = this.createCollectionWrapper<State>(false, 0)
         return new StorageTrigger(workflow, () => Promise.resolve(storage))
     }
@@ -161,7 +165,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
         return new MongoDBWorkflowEngine(opts)
     }
 
-    private async createCollectionWrapper<State>(replicated: boolean, lockDurationMs: number): Promise<StorageInterface<State>> {
+    private async createCollectionWrapper<State>(replicated: boolean, lockDurationMs: number): Promise<StorageInterface<State, MongoDBWorkerMetadata | DefaultWorkerMetadata>> {
         const { dbName, collectionName = "workflows" } = this.opts
         const client = await this.pool.getConnection("")
         const collection = client.db(dbName).collection<MongodbRecord<State>>(collectionName)

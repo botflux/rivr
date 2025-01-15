@@ -10,17 +10,17 @@ export type FastifyRivrOpts = {
   /**
    * The workflow engine used, or a function that creates the engine.
    */
-  engine: EngineInterface | ((instance: FastifyInstance) => EngineInterface)
+  engine: EngineInterface<any> | ((instance: FastifyInstance) => EngineInterface<any>)
 
   /**
    * The list of workflow to start in the background.
    */
-  workflows: Workflow<any>[]
+  workflows: Workflow<any, any>[]
 }
 
 declare module "fastify" {
   interface FastifyInstance {
-    engine: EngineInterface
+    engine: EngineInterface<any>
     worker?: WorkerInterface | undefined
   }
 }

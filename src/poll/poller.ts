@@ -7,7 +7,7 @@ import {
   Step,
   StepExecutionContext,
   StepResult,
-  success,
+  success, DefaultWorkerMetadata,
   Workflow
 } from "../workflow";
 import {PollerRecord, StorageInterface, Write} from "./storage.interface";
@@ -15,14 +15,14 @@ import {GetTimeToWait} from "../retry";
 import EventEmitter, {once} from "node:events";
 import {StartOpts, WorkerInterface} from "../worker.interface";
 
-export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }> implements WorkerInterface {
+export class Poller<State, WorkerMetadata extends DefaultWorkerMetadata> extends EventEmitter<{ error: [ unknown ], stopped: [] }> implements WorkerInterface {
   private stopped = true
 
   constructor(
     public readonly id: string,
     private readonly minTimeBetweenPollsMs: number,
-    private readonly getStorage: () => Promise<StorageInterface<T>>,
-    private readonly workflows: Workflow<T>[],
+    private readonly getStorage: () => Promise<StorageInterface<State, WorkerMetadata>>,
+    private readonly workflows: Workflow<State, WorkerMetadata>[],
     private readonly pageSize: number,
     private readonly maxRetry: number,
     private readonly timeBetweenRetries: GetTimeToWait
@@ -63,7 +63,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
               ? await this.handleSingleStep(step, records)
               : await this.handleBatchStep(step, records)
 
-            const writes: Write<T>[] = results.map(([ record, result ]) => {
+            const writes: Write<State>[] = results.map(([ record, result ]) => {
               switch (result.type) {
                 case "success": {
                   const mNextStep = step.workflow?.getNextStep(step)
@@ -73,7 +73,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                         type: "ack",
                         record
                       }
-                    ] satisfies Write<T>[]
+                    ] satisfies Write<State>[]
                     : [
                       {
                         type: "ack",
@@ -90,7 +90,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                           attempt: 1
                         }
                       }
-                    ] satisfies Write<T>[]
+                    ] satisfies Write<State>[]
                 }
                 case "failure": {
                   return [
@@ -99,7 +99,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                       record,
                       timeBetweenRetries: this.timeBetweenRetries
                     }
-                  ] satisfies Write<T>[]
+                  ] satisfies Write<State>[]
                 }
                 case "skip": {
                   const mNextStep = step.workflow.getNextStep(step, 2)
@@ -109,7 +109,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                         type: "ack",
                         record
                       }
-                    ] satisfies Write<T>[]
+                    ] satisfies Write<State>[]
                     : [
                       {
                         type: "ack",
@@ -126,7 +126,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                           tenant: record.tenant
                         }
                       }
-                    ] satisfies Write<T>[]
+                    ] satisfies Write<State>[]
                 }
                 case "stop": {
                   return [
@@ -134,7 +134,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
                       type: "ack",
                       record,
                     }
-                  ] satisfies Write<T>[]
+                  ] satisfies Write<State>[]
                 }
               }
             }).flat()
@@ -164,13 +164,13 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
     this.stopped = true
   }
 
-  private groupRecordsByStep (workflows: Workflow<T>[], records: PollerRecord<T>[]): [Step<T>, PollerRecord<T>[]][] {
+  private groupRecordsByStep (workflows: Workflow<State, WorkerMetadata>[], records: PollerRecord<State>[]): [Step<State, WorkerMetadata>, PollerRecord<State>[]][] {
     const pollerRecordsAndStep = records
       .map(r => [r, workflows.find (w => w.name === r.belongsTo)?.getStepByName(r.recipient)] as const)
-      .filter(([, mStep]) => mStep !== undefined) as [ PollerRecord<T>, Step<T> ][]
+      .filter(([, mStep]) => mStep !== undefined) as [ PollerRecord<State>, Step<State, WorkerMetadata> ][]
 
     return pollerRecordsAndStep.reduce (
-      (acc: [Step<T>, PollerRecord<T>[]][], [ record, step ])=> {
+      (acc: [Step<State, WorkerMetadata>, PollerRecord<State>[]][], [ record, step ])=> {
         const [ , records ] = acc.find(([s]) => s.name === step.name) ?? [ undefined, [] ]
 
         return [
@@ -182,7 +182,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
     )
   }
 
-  private handleSingleStep(step: SingleStep<T>, records: PollerRecord<T>[]): Promise<[PollerRecord<T>, StepResult<T>][]> {
+  private handleSingleStep(step: SingleStep<State, WorkerMetadata>, records: PollerRecord<State>[]): Promise<[PollerRecord<State>, StepResult<State>][]> {
     return Promise.all(records.map(async record => {
       try {
         const result = await step.handler({
@@ -194,7 +194,7 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
           },
           worker: {
             workerId: this.id
-          }
+          } as unknown as WorkerMetadata
         })
 
         if (result === undefined) {
@@ -218,12 +218,12 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
     this.emit("stopped")
   }
 
-  private async handleBatchStep(step: BatchStep<T>, records: PollerRecord<T>[]): Promise<[PollerRecord<T>, StepResult<T>][]> {
+  private async handleBatchStep(step: BatchStep<State, WorkerMetadata>, records: PollerRecord<State>[]): Promise<[PollerRecord<State>, StepResult<State>][]> {
     try {
-      const contexts: StepExecutionContext<T>[] = records.map(record => ({
+      const contexts: StepExecutionContext<State, WorkerMetadata>[] = records.map(record => ({
         metadata: { attempt: record.attempt, tenant: record.tenant, id: record.id },
         state: record.state,
-        worker: { workerId: this.id }
+        worker: { workerId: this.id } as unknown as WorkerMetadata
       }))
       const results = await step.handler(contexts, {
         workerId: this.id

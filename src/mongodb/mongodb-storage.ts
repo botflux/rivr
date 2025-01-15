@@ -1,5 +1,5 @@
 import {PollerRecord, StorageInterface, WithoutIt, Write} from "../poll/storage.interface";
-import {Step, Workflow} from "../workflow";
+import {Step, DefaultWorkerMetadata, Workflow} from "../workflow";
 import {Collection, ObjectId} from "mongodb";
 import {GetTimeToWait} from "../retry";
 import {AnyBulkWriteOperation, InsertOneModel} from "mongodb/lib/beta";
@@ -11,12 +11,12 @@ export interface MongodbRecord<T> extends Omit<PollerRecord<T>, "id"> {
   handledByUntil: Date
 }
 
-export class MongodbStorage<T> implements StorageInterface<T> {
+export class MongodbStorage<State, WorkerMetadata extends DefaultWorkerMetadata> implements StorageInterface<State, WorkerMetadata> {
     constructor(
-      protected readonly collection: Collection<MongodbRecord<T>>,
+      protected readonly collection: Collection<MongodbRecord<State>>,
     ) {}
 
-    async poll(pollerId: string, workflows: Workflow<T>[], pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<T>[]]> {
+    async poll(pollerId: string, workflows: Workflow<State, WorkerMetadata>[], pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<State>[]]> {
       const workflowNames = workflows.map (w => w.name)
       const steps = workflows.map(w => w.getSteps()).flat()
       const stepNames = steps.map(s => s.name)
@@ -41,8 +41,8 @@ export class MongodbStorage<T> implements StorageInterface<T> {
       ]
     }
 
-    async batchWrite(writes: Write<T>[]): Promise<void> {
-      const ops: AnyBulkWriteOperation<MongodbRecord<T>>[] = writes.map(w => {
+    async batchWrite(writes: Write<State>[]): Promise<void> {
+      const ops: AnyBulkWriteOperation<MongodbRecord<State>>[] = writes.map(w => {
         switch (w.type) {
           case "ack":
             return {
@@ -56,7 +56,7 @@ export class MongodbStorage<T> implements StorageInterface<T> {
                   }
                 }
               }
-            } satisfies AnyBulkWriteOperation<MongodbRecord<T>>
+            } satisfies AnyBulkWriteOperation<MongodbRecord<State>>
           case "nack": {
             const minDateBeforeNextAttempt = new Date(new Date().getTime() + w.timeBetweenRetries(w.record.attempt))
 
@@ -76,7 +76,7 @@ export class MongodbStorage<T> implements StorageInterface<T> {
                   }
                 }
               }
-            } satisfies AnyBulkWriteOperation<MongodbRecord<T>>
+            } satisfies AnyBulkWriteOperation<MongodbRecord<State>>
           }
           case "publish":
             return {
@@ -89,7 +89,7 @@ export class MongodbStorage<T> implements StorageInterface<T> {
                   handledByUntil: new Date(0)
                 }
               }
-            } satisfies AnyBulkWriteOperation<MongodbRecord<T>>
+            } satisfies AnyBulkWriteOperation<MongodbRecord<State>>
         }
       })
 

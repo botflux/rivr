@@ -27,7 +27,7 @@ export function isStepResult (result: unknown): result is StepResult<unknown> {
         && "type" in result && (result["type"] === "failure" || result["type"] === "success" || result["type"] === "stop" || result["type"] === "skip")
 }
 
-export type WorkflowBuilder<State> = (w: Workflow<State>) => void
+export type WorkflowBuilder<State, WorkerMetadata extends DefaultWorkerMetadata> = (w: Workflow<State, WorkerMetadata>) => void
 
 /**
  * Worker metadata represents data about the poller.
@@ -35,7 +35,7 @@ export type WorkflowBuilder<State> = (w: Workflow<State>) => void
  * push based workflow engine will be called 'consumer'
  * rather than 'poller'.
  */
-export type WorkerMetadata = {
+export type DefaultWorkerMetadata = {
     /**
      * The id of the worker that is handling the step.
      */
@@ -56,7 +56,7 @@ export type StepExecutionMetadata = {
     id: string
 }
 
-export type StepExecutionContext<State> = {
+export type StepExecutionContext<State, WorkerMetadata extends DefaultWorkerMetadata> = {
     /**
      * The state of the workflow.
      */
@@ -73,34 +73,34 @@ export type StepExecutionContext<State> = {
     worker: WorkerMetadata
 }
 
-export type StepHandler<State> = (context: StepExecutionContext<State>) => void | State | StepResult<State> | Promise<void | State | StepResult<State>>
-export type BatchStepHandler<State> = (contexts: StepExecutionContext<State>[], workerMetadata: WorkerMetadata) => void | State[] | StepResult<State>[] | Promise<void | State[] | StepResult<State>[]>
+export type StepHandler<State, WorkerMetadata extends DefaultWorkerMetadata> = (context: StepExecutionContext<State, WorkerMetadata>) => void | State | StepResult<State> | Promise<void | State | StepResult<State>>
+export type BatchStepHandler<State, WorkerMetadata extends DefaultWorkerMetadata> = (contexts: StepExecutionContext<State, WorkerMetadata>[], workerMetadata: DefaultWorkerMetadata) => void | State[] | StepResult<State>[] | Promise<void | State[] | StepResult<State>[]>
 
-export type Step<State> = SingleStep<State> | BatchStep<State>
+export type Step<State, WorkerMetadata extends DefaultWorkerMetadata> = SingleStep<State, WorkerMetadata> | BatchStep<State, WorkerMetadata>
 
-export type SingleStep<State> = {
+export type SingleStep<State, WorkerMetadata extends DefaultWorkerMetadata> = {
     name: string
-    workflow: Workflow<State>
-    handler: StepHandler<State>
+    workflow: Workflow<State, WorkerMetadata>
+    handler: StepHandler<State, WorkerMetadata>
     type: "single"
 }
 
-export type BatchStep<State> = {
+export type BatchStep<State, WorkerMetadata extends DefaultWorkerMetadata> = {
     name: string
-    workflow: Workflow<State>
-    handler: BatchStepHandler<State>
+    workflow: Workflow<State, WorkerMetadata>
+    handler: BatchStepHandler<State, WorkerMetadata>
     type: "batch"
 }
 
-export class Workflow<State> {
+export class Workflow<State, WorkerMetadata extends DefaultWorkerMetadata> {
 
-    private readonly steps: Step<State>[] = []
+    private readonly steps: Step<State, WorkerMetadata>[] = []
 
     private constructor(
         public readonly name: string,
     ) {}
 
-    step(name: string, handler: StepHandler<State>): this {
+    step(name: string, handler: StepHandler<State, WorkerMetadata>): this {
         this.steps.push({
             name,
             handler,
@@ -111,7 +111,7 @@ export class Workflow<State> {
         return this
     }
 
-    batchStep(name: string, handler: BatchStepHandler<State>): this {
+    batchStep(name: string, handler: BatchStepHandler<State, WorkerMetadata>): this {
         this.steps.push({
             name,
             handler,
@@ -122,19 +122,19 @@ export class Workflow<State> {
         return this
     }
 
-    getStepByName(name: string): Step<State> | undefined {
+    getStepByName(name: string): Step<State, WorkerMetadata> | undefined {
         return this.steps.find(step => step.name === name)
     }
 
-    getSteps(): Step<State>[] {
+    getSteps(): Step<State, WorkerMetadata>[] {
         return this.steps
     }
 
-    getFirstStep(): Step<State> | undefined {
+    getFirstStep(): Step<State, WorkerMetadata> | undefined {
         return this.steps[0]
     }
 
-    getNextStep(step: Step<State>, offset: number = 1): Step<State> | undefined {
+    getNextStep(step: Step<State, WorkerMetadata>, offset: number = 1): Step<State, WorkerMetadata> | undefined {
         const stepIndex = this.steps.findIndex(s => s.name === step.name)
 
         if (stepIndex === -1)
@@ -148,8 +148,8 @@ export class Workflow<State> {
         return this.steps[nextStepIndex]
     }
 
-    static create<State>(name: string, builder: WorkflowBuilder<State>): Workflow<State> {
-        const w = new Workflow<State>(name)
+    static create<State, WorkerMetadata extends DefaultWorkerMetadata = DefaultWorkerMetadata>(name: string, builder: WorkflowBuilder<State, WorkerMetadata>): Workflow<State, WorkerMetadata> {
+        const w = new Workflow<State, WorkerMetadata>(name)
         builder(w)
         return w
     }

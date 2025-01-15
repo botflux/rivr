@@ -1,4 +1,4 @@
-import {Workflow} from "../workflow";
+import {DefaultWorkerMetadata, Workflow} from "../workflow";
 import {GetTimeToWait} from "../retry";
 
 export interface Ack<T> {
@@ -19,9 +19,9 @@ export interface Nack<T> {
 
 export type Write<T> = Ack<T> | Publish<T> | Nack<T>
 
-export interface StorageInterface<T> {
-  poll(pollerId: string, workflows: Workflow<T>[], pageSize: number, maxRetry: number): Promise<[ isPaginationExhausted: boolean, records: PollerRecord<T>[]]>
-  batchWrite(writes: Write<T>[]): Promise<void>
+export interface StorageInterface<State, WorkerMetadata extends DefaultWorkerMetadata> {
+  poll(pollerId: string, workflows: Workflow<State, WorkerMetadata>[], pageSize: number, maxRetry: number): Promise<[ isPaginationExhausted: boolean, records: PollerRecord<State>[]]>
+  batchWrite(writes: Write<State>[]): Promise<void>
 }
 
 export interface PollerRecord<T> {
