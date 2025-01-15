@@ -6,10 +6,10 @@ import { MongoClient } from "mongodb"
 import { MongoDBWorkflowEngine } from "./engine"
 import { randomUUID } from "node:crypto"
 import { tryUntilSuccess } from "../try-until-success"
-import { StepStateCollection } from "./step-state-collection"
 import {WorkerInterface} from "../worker.interface";
 import {waitAtLeastForSuccess} from "../wait-at-least-for-success";
 import {linear} from "../retry";
+import {MongodbRecord} from "./mongodb-storage";
 
 test("mongodb workflow engine", async function (t) {
     let mongo: StartedMongoDBContainer = undefined!
@@ -568,8 +568,8 @@ test("mongodb workflow engine", async function (t) {
     })
 })
 
-function getState(client: MongoClient, db: string, workflow: string, step: string, collection: string = "workflows") {
-    return new StepStateCollection(client.db(db).collection(collection)).findStepStates(workflow, step)
+function getState(client: MongoClient, db: string, workflow: string, step: string, collection: string = "workflows"): Promise<any[]> {
+    return client.db(db).collection<MongodbRecord<any>>(collection).find({ belongsTo: workflow, recipient: step }).toArray()
 }
 
 function collectErrors (poller: WorkerInterface) {

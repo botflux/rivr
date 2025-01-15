@@ -1,5 +1,5 @@
 import {PollerRecord, StorageInterface, WithoutIt, Write} from "../poll/storage.interface";
-import {Workflow} from "../workflow";
+import {Step, Workflow} from "../workflow";
 import {Collection, ObjectId} from "mongodb";
 import {GetTimeToWait} from "../retry";
 import {AnyBulkWriteOperation, InsertOneModel} from "mongodb/lib/beta";
@@ -94,5 +94,13 @@ export class MongodbStorage<T> implements StorageInterface<T> {
       })
 
       await this.collection.bulkWrite(ops)
+    }
+
+    async listStepStates(workflowName: string, stepName: string): Promise<PollerRecord<T>[]> {
+      const docs = await this.collection.find({ belongsTo: workflowName, recipient: stepName }).toArray()
+      return docs.map (({_id, ...doc}) => ({
+        ...doc,
+        id: _id.toString("hex")
+      }))
     }
 }
