@@ -95,12 +95,4 @@ export class MongodbStorage<T> implements StorageInterface<T> {
 
       await this.collection.bulkWrite(ops)
     }
-
-    async listStepStates(workflowName: string, stepName: string): Promise<PollerRecord<T>[]> {
-      const docs = await this.collection.find({ belongsTo: workflowName, recipient: stepName }).toArray()
-      return docs.map (({_id, ...doc}) => ({
-        ...doc,
-        id: _id.toString("hex")
-      }))
-    }
 }
