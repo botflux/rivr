@@ -155,18 +155,6 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
   }
 
   /**
-   * Stop the poller and wait for it to be stopped.
-   * The poller will finish its last poll before stopping.
-   *
-   * Use `stop()` if you don't need to wait for the poller to be stopped.
-   */
-  async stopAndWaitToBeStopped (): Promise<void> {
-    const p = once(this, "stopped")
-    this.stopped = true
-    await p
-  }
-
-  /**
    * Stop the poller.
    * The poller will finish its last poll before stopping.
    * You can wait for `stopped` event to be fired.
