@@ -11,6 +11,10 @@ export type FastifyRivrOpts = {
    * The workflow engine used, or a function that creates the engine.
    */
   engine: EngineInterface | ((instance: FastifyInstance) => EngineInterface)
+
+  /**
+   * The list of workflow to start in the background.
+   */
   workflows: Workflow<any>[]
 }
 
@@ -63,7 +67,7 @@ export async function manualTest () {
         client: instance.mongo.client,
         dbName: "foo"
       }),
-      workflows: [  workflow ]
+      workflows: [ workflow ]
     })
     .route({
       url: "/foo",
