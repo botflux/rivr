@@ -196,7 +196,6 @@ export class Poller<T> extends EventEmitter<{ error: [ unknown ], stopped: [] }>
             workerId: this.id
           }
         })
-        // const result = await step.handler(record.state, record.context, this.pollerId)
 
         if (result === undefined) {
           return [record, success(record.state)] as const
