@@ -1,6 +1,7 @@
 import {TriggerInterface} from "../trigger.interface";
 import {StorageInterface} from "./storage.interface";
-import {DefaultWorkerMetadata, Workflow} from "../workflow";
+import {Workflow} from "../workflow";
+import {DefaultWorkerMetadata} from "../types";
 
 export class StorageTrigger<State, WorkerMetadata extends DefaultWorkerMetadata> implements TriggerInterface<State> {
     constructor(

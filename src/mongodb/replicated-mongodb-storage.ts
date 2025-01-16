@@ -1,8 +1,9 @@
 import {MongodbRecord, MongodbStorage} from "./mongodb-storage";
-import {DefaultWorkerMetadata, Workflow} from "../workflow";
+import {Workflow} from "../workflow";
 import {PollerRecord} from "../poll/storage.interface";
 import {WithId} from "mongodb/lib/beta";
 import {Collection} from "mongodb";
+import {DefaultWorkerMetadata} from "../types";
 
 export class ReplicatedMongodbStorage<State> extends MongodbStorage<State>{
   constructor(

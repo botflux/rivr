@@ -1,6 +1,7 @@
-import {DefaultWorkerMetadata, Workflow} from "./workflow";
+import {Workflow} from "./workflow";
 import {TriggerInterface} from "./trigger.interface";
 import {WorkerInterface} from "./worker.interface";
+import {DefaultWorkerMetadata} from "./types";
 
 export interface EngineInterface<WorkerMetadata extends DefaultWorkerMetadata> {
   /**

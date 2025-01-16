@@ -1,19 +1,20 @@
 import { setTimeout } from "node:timers/promises"
 import {
-  BatchStep,
-  failure,
-  isStepResult,
-  SingleStep,
-  Step,
-  StepExecutionContext,
-  StepResult,
-  success, DefaultWorkerMetadata,
   Workflow
 } from "../workflow";
 import {PollerRecord, StorageInterface, Write} from "./storage.interface";
 import {GetTimeToWait} from "../retry";
 import EventEmitter, {once} from "node:events";
 import {StartOpts, WorkerInterface} from "../worker.interface";
+import {
+  BatchStep,
+  DefaultWorkerMetadata,
+  failure,
+  isStepResult,
+  SingleStep,
+  Step,
+  StepExecutionContext, StepResult, success
+} from "../types";
 
 export class Poller<State, WorkerMetadata extends DefaultWorkerMetadata> extends EventEmitter<{ error: [ unknown ], stopped: [] }> implements WorkerInterface {
   private stopped = true

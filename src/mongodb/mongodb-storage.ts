@@ -1,8 +1,9 @@
 import {PollerRecord, StorageInterface, WithoutIt, Write} from "../poll/storage.interface";
-import {Step, DefaultWorkerMetadata, Workflow} from "../workflow";
+import {Workflow} from "../workflow";
 import {Collection, ObjectId} from "mongodb";
 import {GetTimeToWait} from "../retry";
 import {AnyBulkWriteOperation, InsertOneModel} from "mongodb/lib/beta";
+import {DefaultWorkerMetadata, Step} from "../types";
 
 export interface MongodbRecord<T> extends Omit<PollerRecord<T>, "id"> {
   acknowledged: boolean

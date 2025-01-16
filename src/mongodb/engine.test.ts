@@ -1,7 +1,7 @@
 import {test} from "node:test"
 import assert from "node:assert"
 import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongodb"
-import {failure, skip, stop, success, Workflow} from "../workflow"
+import {Workflow} from "../workflow"
 import { MongoClient } from "mongodb"
 import {WorkerMetadata, MongoDBWorkflowEngine} from "./engine"
 import { randomUUID } from "node:crypto"
@@ -10,6 +10,8 @@ import {WorkerInterface} from "../worker.interface";
 import {waitAtLeastForSuccess} from "../wait-at-least-for-success";
 import {linear} from "../retry";
 import {MongodbRecord} from "./mongodb-storage";
+
+import {failure, skip, stop, success} from "../types";
 
 test("mongodb workflow engine", async function (t) {
     let mongo: StartedMongoDBContainer = undefined!

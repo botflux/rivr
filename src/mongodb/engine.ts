@@ -1,5 +1,5 @@
 import {Collection, MongoClient, MongoClientOptions} from "mongodb"
-import {DefaultWorkerMetadata, Workflow} from "../workflow"
+import {Workflow} from "../workflow"
 import {TriggerInterface} from "../trigger.interface"
 import {GetTimeToWait} from "../retry"
 import {Poller} from "../poll/poller";
@@ -15,6 +15,7 @@ import { setTimeout } from "node:timers/promises"
 import {once} from "node:events";
 import {ConnectionPool} from "../connection-pool";
 import {Db} from "mongodb/lib/beta";
+import {DefaultWorkerMetadata} from "../types";
 
 export type CreateOpts = {
     /**

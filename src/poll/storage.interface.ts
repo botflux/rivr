@@ -1,5 +1,6 @@
-import {DefaultWorkerMetadata, Workflow} from "../workflow";
+import {Workflow} from "../workflow";
 import {GetTimeToWait} from "../retry";
+import {DefaultWorkerMetadata} from "../types";
 
 export interface Ack<T> {
   type: "ack"
