@@ -1,4 +1,4 @@
-import {MongoClient, MongoClientOptions} from "mongodb"
+import {Collection, MongoClient, MongoClientOptions} from "mongodb"
 import {DefaultWorkerMetadata, Workflow} from "../workflow"
 import {TriggerInterface} from "../trigger.interface"
 import {GetTimeToWait} from "../retry"
@@ -130,12 +130,13 @@ export class MongoDBWorkflowEngine implements EngineInterface<MongoDBWorkerMetad
             replication: { replicated = false, lockDurationMs = pollingIntervalMs * 3 } = {},
         } = this.opts
 
-        const storage = this.createCollectionWrapper<State>(replicated, lockDurationMs)
-
-        const poller = new Poller(
+        const poller = new Poller<State, MongoDBWorkerMetadata | DefaultWorkerMetadata>(
           randomUUID(),
           pollingIntervalMs,
-          () => Promise.resolve(storage),
+          async () => {
+              const client = await this.pool.getConnection("default")
+              return this.getWorkerStorage(client, replicated, lockDurationMs)
+          },
           workflows,
           pageSize,
           maxRetry,
@@ -146,8 +147,7 @@ export class MongoDBWorkflowEngine implements EngineInterface<MongoDBWorkerMetad
     }
 
     getTrigger<State>(workflow: Workflow<State, MongoDBWorkerMetadata | DefaultWorkerMetadata>): TriggerInterface<State> {
-        const storage = this.createCollectionWrapper<State>(false, 0)
-        return new StorageTrigger(workflow, () => Promise.resolve(storage))
+        return new StorageTrigger(workflow, async () => this.getTriggerStorage(await this.pool.getConnection("default")))
     }
 
     async stop(): Promise<void> {
@@ -165,13 +165,36 @@ export class MongoDBWorkflowEngine implements EngineInterface<MongoDBWorkerMetad
         return new MongoDBWorkflowEngine(opts)
     }
 
-    private async createCollectionWrapper<State>(replicated: boolean, lockDurationMs: number): Promise<StorageInterface<State, MongoDBWorkerMetadata | DefaultWorkerMetadata>> {
-        const { dbName, collectionName = "workflows" } = this.opts
-        const client = await this.pool.getConnection("")
-        const collection = client.db(dbName).collection<MongodbRecord<State>>(collectionName)
+    /**
+     * Build the worker's storage implementation.
+     * A special implementation using `findOneAndUpdate` to fetch
+     * documents will be used if replication is enabled.
+     *
+     * @param client
+     * @param replicated
+     * @param lockDurationMs
+     * @private
+     */
+    private getWorkerStorage<State>(client: MongoClient, replicated: boolean, lockDurationMs: number): StorageInterface<State, MongoDBWorkerMetadata | DefaultWorkerMetadata> {
+        const collection = this.getCollection<State>(client)
 
         return replicated
-            ? new ReplicatedMongodbStorage(collection, lockDurationMs)
-            : new MongodbStorage(collection)
+          ? new ReplicatedMongodbStorage(collection, lockDurationMs)
+          : new MongodbStorage(collection)
+    }
+
+    /**
+     * Build the trigger's storage implementation.
+     *
+     * @param client
+     * @private
+     */
+    private getTriggerStorage<State>(client: MongoClient): StorageInterface<State, MongoDBWorkerMetadata | DefaultWorkerMetadata> {
+        return new MongodbStorage(this.getCollection(client))
+    }
+
+    private getCollection<State> (client: MongoClient): Collection<MongodbRecord<State>> {
+        const { dbName, collectionName = "workflows" } = this.opts
+        return client.db(dbName).collection<MongodbRecord<State>>(collectionName)
     }
 }

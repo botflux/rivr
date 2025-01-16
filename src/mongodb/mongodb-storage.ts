@@ -11,12 +11,12 @@ export interface MongodbRecord<T> extends Omit<PollerRecord<T>, "id"> {
   handledByUntil: Date
 }
 
-export class MongodbStorage<State, WorkerMetadata extends DefaultWorkerMetadata> implements StorageInterface<State, WorkerMetadata> {
+export class MongodbStorage<State> implements StorageInterface<State, DefaultWorkerMetadata> {
     constructor(
       protected readonly collection: Collection<MongodbRecord<State>>,
     ) {}
 
-    async poll(pollerId: string, workflows: Workflow<State, WorkerMetadata>[], pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<State>[]]> {
+    async poll(pollerId: string, workflows: Workflow<State, DefaultWorkerMetadata>[], pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<State>[]]> {
       const workflowNames = workflows.map (w => w.name)
       const steps = workflows.map(w => w.getSteps()).flat()
       const stepNames = steps.map(s => s.name)

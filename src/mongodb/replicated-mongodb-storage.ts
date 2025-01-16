@@ -4,7 +4,7 @@ import {PollerRecord} from "../poll/storage.interface";
 import {WithId} from "mongodb/lib/beta";
 import {Collection} from "mongodb";
 
-export class ReplicatedMongodbStorage<State, WorkerMetadata extends DefaultWorkerMetadata> extends MongodbStorage<State, WorkerMetadata>{
+export class ReplicatedMongodbStorage<State> extends MongodbStorage<State>{
   constructor(
     collection: Collection<MongodbRecord<State>>,
     private readonly lockDurationMs: number
@@ -12,7 +12,7 @@ export class ReplicatedMongodbStorage<State, WorkerMetadata extends DefaultWorke
     super(collection);
   }
 
-  override async poll(pollerId: string, workflows: Workflow<State, WorkerMetadata>[], pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<State>[]]> {
+  override async poll(pollerId: string, workflows: Workflow<State, DefaultWorkerMetadata>[], pageSize: number, maxRetry: number): Promise<[isPaginationExhausted: boolean, records: PollerRecord<State>[]]> {
     const workflowNames = workflows.map(w => w.name)
     const steps = workflows.map(w => w.getSteps()).flat()
     const names = steps.map(s => s.name)
