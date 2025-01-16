@@ -3,7 +3,7 @@ import assert from "node:assert"
 import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongodb"
 import {failure, skip, stop, success, Workflow} from "../workflow"
 import { MongoClient } from "mongodb"
-import {MongoDBWorkerMetadata, MongoDBWorkflowEngine} from "./engine"
+import {WorkerMetadata, MongoDBWorkflowEngine} from "./engine"
 import { randomUUID } from "node:crypto"
 import { tryUntilSuccess } from "../try-until-success"
 import {WorkerInterface} from "../worker.interface";
@@ -582,7 +582,7 @@ test("mongodb workflow engine", async function (t) {
 
             defer(() => engine.stop())
 
-            const workflow = Workflow.create<number, MongoDBWorkerMetadata>("workflow", w => {
+            const workflow = Workflow.create<number, WorkerMetadata>("workflow", w => {
                 w.step("add_1", ({ state }) => state + 1)
                 w.step("persist", async ({ state, worker }) => {
                     await worker.client.db(dbName).collection("mydb").insertOne({ state })
@@ -618,7 +618,7 @@ test("mongodb workflow engine", async function (t) {
 
             defer(() => engine.stop())
 
-            const workflow = Workflow.create<number, MongoDBWorkerMetadata>("workflow", w => {
+            const workflow = Workflow.create<number, WorkerMetadata>("workflow", w => {
                 w.step("add_1", ({ state }) => state + 1)
                 w.step("persist", async ({ state, worker }) => {
                     await worker.db.collection("mydb").insertOne({ state })
