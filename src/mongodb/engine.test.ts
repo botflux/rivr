@@ -3,7 +3,7 @@ import assert from "node:assert"
 import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongodb"
 import {failure, skip, stop, success, Workflow} from "../workflow"
 import { MongoClient } from "mongodb"
-import { MongoDBWorkflowEngine } from "./engine"
+import {MongoDBWorkerMetadata, MongoDBWorkflowEngine} from "./engine"
 import { randomUUID } from "node:crypto"
 import { tryUntilSuccess } from "../try-until-success"
 import {WorkerInterface} from "../worker.interface";
@@ -563,6 +563,80 @@ test("mongodb workflow engine", async function (t) {
             // Then
             await tryUntilSuccess(async () => {
                 assert.deepStrictEqual(results, [ 4, 4, 4, 4, 4, 4 ])
+            }, 3_000)
+        })
+    })
+
+    await t.test("mongodb workflow engine - worker metadata", async function (t) {
+        await t.test("should be able to access mongo client used by the worker", async function () {
+            // Given
+            const dbName = randomUUID()
+            const engine = MongoDBWorkflowEngine.create({
+                url: mongo.getConnectionString(),
+                clientOpts: {
+                    directConnection: true
+                },
+                dbName,
+                pollingIntervalMs: 100
+            })
+
+            defer(() => engine.stop())
+
+            const workflow = Workflow.create<number, MongoDBWorkerMetadata>("workflow", w => {
+                w.step("add_1", ({ state }) => state + 1)
+                w.step("persist", async ({ state, worker }) => {
+                    await worker.client.db(dbName).collection("mydb").insertOne({ state })
+                })
+            })
+
+            // @ts-expect-error
+            const trigger = engine.getTrigger(workflow)
+            // @ts-expect-error
+            const worker = engine.getWorker([workflow])
+
+            // When
+            await trigger.trigger(9)
+            worker.start()
+
+            // Then
+            await tryUntilSuccess(async () => {
+                assert.strictEqual((await client.db(dbName).collection("mydb").findOne())?.state, 10)
+            }, 3_000)
+        })
+
+        await t.test("should be able to use the same db used by the worker", async function () {
+            // Given
+            const dbName = randomUUID()
+            const engine = MongoDBWorkflowEngine.create({
+                url: mongo.getConnectionString(),
+                clientOpts: {
+                    directConnection: true
+                },
+                dbName,
+                pollingIntervalMs: 100
+            })
+
+            defer(() => engine.stop())
+
+            const workflow = Workflow.create<number, MongoDBWorkerMetadata>("workflow", w => {
+                w.step("add_1", ({ state }) => state + 1)
+                w.step("persist", async ({ state, worker }) => {
+                    await worker.db.collection("mydb").insertOne({ state })
+                })
+            })
+
+            // @ts-expect-error
+            const trigger = engine.getTrigger(workflow)
+            // @ts-expect-error
+            const worker = engine.getWorker([workflow])
+
+            // When
+            await trigger.trigger(9)
+            worker.start()
+
+            // Then
+            await tryUntilSuccess(async () => {
+                assert.strictEqual((await client.db(dbName).collection("mydb").findOne())?.state, 10)
             }, 3_000)
         })
     })

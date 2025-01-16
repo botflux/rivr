@@ -14,6 +14,7 @@ import {MongoDBConnectionPool, NoOpPool} from "./connection-pool";
 import { setTimeout } from "node:timers/promises"
 import {once} from "node:events";
 import {ConnectionPool} from "../connection-pool";
+import {Db} from "mongodb/lib/beta";
 
 export type CreateOpts = {
     /**
@@ -105,7 +106,15 @@ export type CreateOpts = {
 })
 
 export type MongoDBWorkerMetadata = DefaultWorkerMetadata & {
-    foo: string
+    /**
+     * The client used to read and write step states.
+     */
+    client: MongoClient
+
+    /**
+     * The database in which step states are stored.
+     */
+    db: Db
 }
 
 export class MongoDBWorkflowEngine implements EngineInterface<MongoDBWorkerMetadata> {
@@ -130,12 +139,21 @@ export class MongoDBWorkflowEngine implements EngineInterface<MongoDBWorkerMetad
             replication: { replicated = false, lockDurationMs = pollingIntervalMs * 3 } = {},
         } = this.opts
 
+        const pollerId = randomUUID()
+
         const poller = new Poller<State, MongoDBWorkerMetadata | DefaultWorkerMetadata>(
-          randomUUID(),
+          pollerId,
           pollingIntervalMs,
           async () => {
               const client = await this.pool.getConnection("default")
-              return this.getWorkerStorage(client, replicated, lockDurationMs)
+              return [
+                  this.getWorkerStorage(client, replicated, lockDurationMs),
+                  {
+                      workerId: pollerId,
+                      client,
+                      db: client.db(this.opts.dbName)
+                  }
+              ]
           },
           workflows,
           pageSize,
