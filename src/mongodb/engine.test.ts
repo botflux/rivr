@@ -176,7 +176,7 @@ test("mongodb workflow engine", async function (t) {
         const workflow = Workflow.create<number>("workflow", w => {
             w.step("add-5", ({state}) => success(state + 5))
             w.step("multiply-by-attempt", ({ state, metadata: { attempt } }) => attempt === 1
-              ? failure(new Error("oops"), { retry: linear(1_000) })
+              ? failure(new Error("oops"))
               : success(state * attempt))
             w.step("assign", ({state}) => {
                 result = state

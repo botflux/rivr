@@ -8,9 +8,7 @@ export function success<T> (result: T): Success<T> {
     return { type: "success", value: result }
 }
 
-export type FailureOpts = {}
-
-export function failure(error: unknown, opts: FailureOpts = {}): Failure {
+export function failure(error: unknown): Failure {
     return { type: "failure", error }
 }
 
