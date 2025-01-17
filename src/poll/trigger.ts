@@ -1,12 +1,12 @@
 import {TriggerInterface} from "../trigger.interface";
 import {StorageInterface} from "./storage.interface";
 import {Workflow} from "../workflow";
-import {DefaultWorkerMetadata} from "../types";
+import {DefaultCustomWorkerMetadata} from "../types";
 
-export class StorageTrigger<State, WorkerMetadata extends DefaultWorkerMetadata> implements TriggerInterface<State> {
+export class StorageTrigger<State, CustomMetadata extends DefaultCustomWorkerMetadata> implements TriggerInterface<State> {
     constructor(
-      private readonly workflow: Workflow<State, WorkerMetadata>,
-      private readonly getStorage: () => Promise<StorageInterface<State, WorkerMetadata>>,
+      private readonly workflow: Workflow<State, CustomMetadata>,
+      private readonly getStorage: () => Promise<StorageInterface<State, CustomMetadata>>,
     ) {
     }
 
