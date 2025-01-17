@@ -177,7 +177,7 @@ export class MongoDBWorkflowEngine implements EngineInterface<WorkerMetadata> {
         await this.pool.clear()
     }
 
-    static create(opts: CreateOpts): MongoDBWorkflowEngine {
+    static create(opts: CreateOpts): EngineInterface<WorkerMetadata> {
         return new MongoDBWorkflowEngine(opts)
     }
 
