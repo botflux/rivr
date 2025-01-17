@@ -1,5 +1,6 @@
 import {
     BatchStepHandler,
+    WorkerMetadata,
     Step,
     StepHandler,
     WorkflowBuilder,
