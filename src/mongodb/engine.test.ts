@@ -591,7 +591,9 @@ test("mongodb workflow engine", async function (t) {
                 })
             })
 
+            // @ts-expect-error
             const trigger = engine.getTrigger(workflow)
+            // @ts-expect-error
             const worker = engine.getWorker([workflow])
 
             // When
@@ -625,7 +627,9 @@ test("mongodb workflow engine", async function (t) {
                 })
             })
 
+            // @ts-expect-error
             const trigger = engine.getTrigger(workflow)
+            // @ts-expect-error
             const worker = engine.getWorker([workflow])
 
             // When

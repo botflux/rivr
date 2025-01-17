@@ -1,21 +1,14 @@
-import {
-    BatchStepHandler,
-    WorkerMetadata,
-    Step,
-    StepHandler,
-    WorkflowBuilder,
-    DefaultCustomWorkerMetadata
-} from "./types";
+import {BatchStepHandler, DefaultWorkerMetadata, Step, StepHandler, WorkflowBuilder} from "./types";
 
-export class Workflow<State, CustomMetadata extends DefaultCustomWorkerMetadata> {
+export class Workflow<State, WorkerMetadata extends DefaultWorkerMetadata> {
 
-    private readonly steps: Step<State, CustomMetadata>[] = []
+    private readonly steps: Step<State, WorkerMetadata>[] = []
 
     private constructor(
         public readonly name: string,
     ) {}
 
-    step(name: string, handler: StepHandler<State, CustomMetadata>): this {
+    step(name: string, handler: StepHandler<State, WorkerMetadata>): this {
         this.steps.push({
             name,
             handler,
@@ -26,7 +19,7 @@ export class Workflow<State, CustomMetadata extends DefaultCustomWorkerMetadata>
         return this
     }
 
-    batchStep(name: string, handler: BatchStepHandler<State, CustomMetadata>): this {
+    batchStep(name: string, handler: BatchStepHandler<State, WorkerMetadata>): this {
         this.steps.push({
             name,
             handler,
@@ -37,19 +30,19 @@ export class Workflow<State, CustomMetadata extends DefaultCustomWorkerMetadata>
         return this
     }
 
-    getStepByName(name: string): Step<State, CustomMetadata> | undefined {
+    getStepByName(name: string): Step<State, WorkerMetadata> | undefined {
         return this.steps.find(step => step.name === name)
     }
 
-    getSteps(): Step<State, CustomMetadata>[] {
+    getSteps(): Step<State, WorkerMetadata>[] {
         return this.steps
     }
 
-    getFirstStep(): Step<State, CustomMetadata> | undefined {
+    getFirstStep(): Step<State, WorkerMetadata> | undefined {
         return this.steps[0]
     }
 
-    getNextStep(step: Step<State, CustomMetadata>, offset: number = 1): Step<State, CustomMetadata> | undefined {
+    getNextStep(step: Step<State, WorkerMetadata>, offset: number = 1): Step<State, WorkerMetadata> | undefined {
         const stepIndex = this.steps.findIndex(s => s.name === step.name)
 
         if (stepIndex === -1)
@@ -63,8 +56,8 @@ export class Workflow<State, CustomMetadata extends DefaultCustomWorkerMetadata>
         return this.steps[nextStepIndex]
     }
 
-    static create<State, CustomMetadata extends DefaultCustomWorkerMetadata = DefaultCustomWorkerMetadata>(name: string, builder: WorkflowBuilder<State, CustomMetadata>): Workflow<State, CustomMetadata> {
-        const w = new Workflow<State, CustomMetadata>(name)
+    static create<State, WorkerMetadata extends DefaultWorkerMetadata = DefaultWorkerMetadata>(name: string, builder: WorkflowBuilder<State, WorkerMetadata>): Workflow<State, WorkerMetadata> {
+        const w = new Workflow<State, WorkerMetadata>(name)
         builder(w)
         return w
     }
