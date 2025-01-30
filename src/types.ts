@@ -1,6 +1,6 @@
 import {Workflow} from "./workflow";
 
-export type WorkflowBuilder<State, WorkerMetadata extends DefaultWorkerMetadata> = (w: Workflow<State, WorkerMetadata>) => void
+export type WorkflowBuilder<State> = (w: Workflow<State>) => void
 /**
  * Worker metadata represents data about the poller.
  * I've chosen 'worker' instead of 'poller' because
@@ -26,7 +26,7 @@ export type StepExecutionMetadata = {
    */
   id: string
 }
-export type StepExecutionContext<State, WorkerMetadata extends DefaultWorkerMetadata> = {
+export type StepExecutionContext<State> = {
   /**
    * The state of the workflow.
    */
@@ -40,7 +40,7 @@ export type StepExecutionContext<State, WorkerMetadata extends DefaultWorkerMeta
   /**
    * Metadata about the worker
    */
-  worker: WorkerMetadata
+  worker: DefaultWorkerMetadata
 }
 export type Stop = { type: "stop" }
 export type Skip = { type: "skip" }
@@ -69,20 +69,20 @@ export function isStepResult(result: unknown): result is StepResult<unknown> {
     && "type" in result && (result["type"] === "failure" || result["type"] === "success" || result["type"] === "stop" || result["type"] === "skip")
 }
 
-export type StepHandler<State, WorkerMetadata extends DefaultWorkerMetadata> = (context: StepExecutionContext<State, WorkerMetadata>) => void | State | StepResult<State> | Promise<void | State | StepResult<State>>
-export type BatchStepHandler<State, WorkerMetadata extends DefaultWorkerMetadata> = (contexts: StepExecutionContext<State, WorkerMetadata>[], workerMetadata: DefaultWorkerMetadata) => void | State[] | StepResult<State>[] | Promise<void | State[] | StepResult<State>[]>
-export type Step<State, WorkerMetadata extends DefaultWorkerMetadata> =
-  SingleStep<State, WorkerMetadata>
-  | BatchStep<State, WorkerMetadata>
-export type SingleStep<State, WorkerMetadata extends DefaultWorkerMetadata> = {
+export type StepHandler<State> = (context: StepExecutionContext<State>) => void | State | StepResult<State> | Promise<void | State | StepResult<State>>
+export type BatchStepHandler<State> = (contexts: StepExecutionContext<State>[], workerMetadata: DefaultWorkerMetadata) => void | State[] | StepResult<State>[] | Promise<void | State[] | StepResult<State>[]>
+export type Step<State> =
+  SingleStep<State>
+  | BatchStep<State>
+export type SingleStep<State> = {
   name: string
-  workflow: Workflow<State, WorkerMetadata>
-  handler: StepHandler<State, WorkerMetadata>
+  workflow: Workflow<State>
+  handler: StepHandler<State>
   type: "single"
 }
-export type BatchStep<State, WorkerMetadata extends DefaultWorkerMetadata> = {
+export type BatchStep<State> = {
   name: string
-  workflow: Workflow<State, WorkerMetadata>
-  handler: BatchStepHandler<State, WorkerMetadata>
+  workflow: Workflow<State>
+  handler: BatchStepHandler<State>
   type: "batch"
 }

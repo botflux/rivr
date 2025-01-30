@@ -22,8 +22,8 @@ export class Poller<State, WorkerMetadata extends DefaultWorkerMetadata> extends
   constructor(
     public readonly id: string,
     private readonly minTimeBetweenPollsMs: number,
-    private readonly getStorage: () => Promise<[StorageInterface<State, WorkerMetadata>, WorkerMetadata]>,
-    private readonly workflows: Workflow<State, WorkerMetadata>[],
+    private readonly getStorage: () => Promise<[StorageInterface<State>, Omit<WorkerMetadata, "workerId">]>,
+    private readonly workflows: Workflow<State>[],
     private readonly pageSize: number,
     private readonly maxRetry: number,
     private readonly timeBetweenRetries: GetTimeToWait
@@ -165,13 +165,13 @@ export class Poller<State, WorkerMetadata extends DefaultWorkerMetadata> extends
     this.stopped = true
   }
 
-  private groupRecordsByStep (workflows: Workflow<State, WorkerMetadata>[], records: PollerRecord<State>[]): [Step<State, WorkerMetadata>, PollerRecord<State>[]][] {
+  private groupRecordsByStep (workflows: Workflow<State>[], records: PollerRecord<State>[]): [Step<State>, PollerRecord<State>[]][] {
     const pollerRecordsAndStep = records
       .map(r => [r, workflows.find (w => w.name === r.belongsTo)?.getStepByName(r.recipient)] as const)
-      .filter(([, mStep]) => mStep !== undefined) as [ PollerRecord<State>, Step<State, WorkerMetadata> ][]
+      .filter(([, mStep]) => mStep !== undefined) as [ PollerRecord<State>, Step<State> ][]
 
     return pollerRecordsAndStep.reduce (
-      (acc: [Step<State, WorkerMetadata>, PollerRecord<State>[]][], [ record, step ])=> {
+      (acc: [Step<State>, PollerRecord<State>[]][], [ record, step ])=> {
         const [ , records ] = acc.find(([s]) => s.name === step.name) ?? [ undefined, [] ]
 
         return [
@@ -183,7 +183,7 @@ export class Poller<State, WorkerMetadata extends DefaultWorkerMetadata> extends
     )
   }
 
-  private handleSingleStep(step: SingleStep<State, WorkerMetadata>, records: PollerRecord<State>[], workerMetadata: WorkerMetadata): Promise<[PollerRecord<State>, StepResult<State>][]> {
+  private handleSingleStep(step: SingleStep<State>, records: PollerRecord<State>[], workerMetadata: Omit<WorkerMetadata, "workerId">): Promise<[PollerRecord<State>, StepResult<State>][]> {
     return Promise.all(records.map(async record => {
       try {
         const result = await step.handler({
@@ -193,7 +193,7 @@ export class Poller<State, WorkerMetadata extends DefaultWorkerMetadata> extends
             tenant: record.tenant,
             id: record.id
           },
-          worker: workerMetadata
+          worker: {...workerMetadata, workerId: this.id} as WorkerMetadata
         })
 
         if (result === undefined) {
@@ -217,12 +217,15 @@ export class Poller<State, WorkerMetadata extends DefaultWorkerMetadata> extends
     this.emit("stopped")
   }
 
-  private async handleBatchStep(step: BatchStep<State, WorkerMetadata>, records: PollerRecord<State>[], workerMetadata: WorkerMetadata): Promise<[PollerRecord<State>, StepResult<State>][]> {
+  private async handleBatchStep(step: BatchStep<State>, records: PollerRecord<State>[], workerMetadata: Omit<WorkerMetadata, "workerId">): Promise<[PollerRecord<State>, StepResult<State>][]> {
     try {
-      const contexts: StepExecutionContext<State, WorkerMetadata>[] = records.map(record => ({
+      const contexts: StepExecutionContext<State>[] = records.map(record => ({
         metadata: { attempt: record.attempt, tenant: record.tenant, id: record.id },
         state: record.state,
-        worker: workerMetadata
+        worker: {
+          ...workerMetadata,
+          workerId: this.id,
+        } as WorkerMetadata
       }))
       const results = await step.handler(contexts, {
         workerId: this.id

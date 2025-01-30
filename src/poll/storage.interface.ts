@@ -20,8 +20,8 @@ export interface Nack<T> {
 
 export type Write<T> = Ack<T> | Publish<T> | Nack<T>
 
-export interface StorageInterface<State, WorkerMetadata extends DefaultWorkerMetadata> {
-  poll(pollerId: string, workflows: Workflow<State, WorkerMetadata>[], pageSize: number, maxRetry: number): Promise<[ isPaginationExhausted: boolean, records: PollerRecord<State>[]]>
+export interface StorageInterface<State> {
+  poll(pollerId: string, workflows: Workflow<State>[], pageSize: number, maxRetry: number): Promise<[ isPaginationExhausted: boolean, records: PollerRecord<State>[]]>
   batchWrite(writes: Write<State>[]): Promise<void>
 }
 

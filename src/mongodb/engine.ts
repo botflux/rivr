@@ -1,4 +1,4 @@
-import {Collection, MongoClient, MongoClientOptions} from "mongodb"
+import {Collection, MongoClient, MongoClientOptions, Db} from "mongodb"
 import {Workflow} from "../workflow"
 import {TriggerInterface} from "../trigger.interface"
 import {GetTimeToWait} from "../retry"
@@ -14,7 +14,6 @@ import {MongoDBConnectionPool, NoOpPool} from "./connection-pool";
 import { setTimeout } from "node:timers/promises"
 import {once} from "node:events";
 import {ConnectionPool} from "../connection-pool";
-import {Db} from "mongodb/lib/beta";
 import {DefaultWorkerMetadata} from "../types";
 
 export type CreateOpts = {
@@ -118,7 +117,7 @@ export type WorkerMetadata = DefaultWorkerMetadata & {
     db: Db
 }
 
-export class MongoDBWorkflowEngine implements EngineInterface<WorkerMetadata> {
+export class MongoDBWorkflowEngine implements EngineInterface {
     private readonly pool: ConnectionPool<MongoClient>
     private readonly workers: WorkerInterface[] = []
 
@@ -131,7 +130,7 @@ export class MongoDBWorkflowEngine implements EngineInterface<WorkerMetadata> {
         this.opts.signal?.addEventListener("abort", () => this.stop().catch(console.error))
     }
 
-    getWorker<State> (workflows: Workflow<State, WorkerMetadata | DefaultWorkerMetadata>[]): WorkerInterface {
+    getWorker<State> (workflows: Workflow<State>[]): WorkerInterface {
         const { 
             pageSize = 50,
             pollingIntervalMs = 3_000,
@@ -142,7 +141,7 @@ export class MongoDBWorkflowEngine implements EngineInterface<WorkerMetadata> {
 
         const pollerId = randomUUID()
 
-        const poller = new Poller<State, WorkerMetadata | DefaultWorkerMetadata>(
+        const poller = new Poller<State, WorkerMetadata>(
           pollerId,
           pollingIntervalMs,
           async () => {
@@ -150,11 +149,10 @@ export class MongoDBWorkflowEngine implements EngineInterface<WorkerMetadata> {
               return [
                   this.getWorkerStorage(client, replicated, lockDurationMs),
                   {
-                      workerId: pollerId,
                       client,
                       db: client.db(this.opts.dbName)
-                  }
-              ]
+                  } satisfies Omit<WorkerMetadata, "workerId">
+              ] as const
           },
           workflows,
           pageSize,
@@ -165,7 +163,7 @@ export class MongoDBWorkflowEngine implements EngineInterface<WorkerMetadata> {
         return poller
     }
 
-    getTrigger<State>(workflow: Workflow<State, WorkerMetadata | DefaultWorkerMetadata>): TriggerInterface<State> {
+    getTrigger<State>(workflow: Workflow<State>): TriggerInterface<State> {
         return new StorageTrigger(workflow, async () => this.getTriggerStorage(await this.pool.getConnection("default")))
     }
 
@@ -180,7 +178,7 @@ export class MongoDBWorkflowEngine implements EngineInterface<WorkerMetadata> {
         await this.pool.clear()
     }
 
-    static create(opts: CreateOpts): MongoDBWorkflowEngine {
+    static create(opts: CreateOpts): EngineInterface {
         return new MongoDBWorkflowEngine(opts)
     }
 
@@ -194,7 +192,7 @@ export class MongoDBWorkflowEngine implements EngineInterface<WorkerMetadata> {
      * @param lockDurationMs
      * @private
      */
-    private getWorkerStorage<State>(client: MongoClient, replicated: boolean, lockDurationMs: number): StorageInterface<State, WorkerMetadata | DefaultWorkerMetadata> {
+    private getWorkerStorage<State>(client: MongoClient, replicated: boolean, lockDurationMs: number): StorageInterface<State> {
         const collection = this.getCollection<State>(client)
 
         return replicated
@@ -208,7 +206,7 @@ export class MongoDBWorkflowEngine implements EngineInterface<WorkerMetadata> {
      * @param client
      * @private
      */
-    private getTriggerStorage<State>(client: MongoClient): StorageInterface<State, WorkerMetadata | DefaultWorkerMetadata> {
+    private getTriggerStorage<State>(client: MongoClient): StorageInterface<State> {
         return new MongodbStorage(this.getCollection(client))
     }
 
