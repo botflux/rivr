@@ -1,14 +1,14 @@
-import {BatchStepHandler, Step, StepHandler, WorkflowBuilder} from "./types";
+import {BatchStepHandler, DefaultWorkerMetadata, Step, StepHandler, WorkflowBuilder} from "./types";
 
-export class Workflow<State> {
+export class Workflow<State, WorkerMetadata extends DefaultWorkerMetadata> {
 
-    private readonly steps: Step<State>[] = []
+    private readonly steps: Step<State, WorkerMetadata>[] = []
 
     private constructor(
         public readonly name: string,
     ) {}
 
-    step(name: string, handler: StepHandler<State>): this {
+    step(name: string, handler: StepHandler<State, WorkerMetadata>): this {
         this.steps.push({
             name,
             handler,
@@ -19,7 +19,7 @@ export class Workflow<State> {
         return this
     }
 
-    batchStep(name: string, handler: BatchStepHandler<State>): this {
+    batchStep(name: string, handler: BatchStepHandler<State, WorkerMetadata>): this {
         this.steps.push({
             name,
             handler,
@@ -30,19 +30,19 @@ export class Workflow<State> {
         return this
     }
 
-    getStepByName(name: string): Step<State> | undefined {
+    getStepByName(name: string): Step<State, WorkerMetadata> | undefined {
         return this.steps.find(step => step.name === name)
     }
 
-    getSteps(): Step<State>[] {
+    getSteps(): Step<State, WorkerMetadata>[] {
         return this.steps
     }
 
-    getFirstStep(): Step<State> | undefined {
+    getFirstStep(): Step<State, WorkerMetadata> | undefined {
         return this.steps[0]
     }
 
-    getNextStep(step: Step<State>, offset: number = 1): Step<State> | undefined {
+    getNextStep(step: Step<State, WorkerMetadata>, offset: number = 1): Step<State, WorkerMetadata> | undefined {
         const stepIndex = this.steps.findIndex(s => s.name === step.name)
 
         if (stepIndex === -1)
@@ -56,8 +56,8 @@ export class Workflow<State> {
         return this.steps[nextStepIndex]
     }
 
-    static create<State>(name: string, builder: WorkflowBuilder<State>): Workflow<State> {
-        const w = new Workflow<State>(name)
+    static create<State, WorkerMetadata extends DefaultWorkerMetadata = DefaultWorkerMetadata>(name: string, builder: WorkflowBuilder<State, WorkerMetadata>): Workflow<State, WorkerMetadata> {
+        const w = new Workflow<State, WorkerMetadata>(name)
         builder(w)
         return w
     }

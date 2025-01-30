@@ -569,79 +569,75 @@ test("mongodb workflow engine", async function (t) {
         })
     })
 
-    // await t.test("mongodb workflow engine - worker metadata", async function (t) {
-    //     await t.test("should be able to access mongo client used by the worker", async function () {
-    //         // Given
-    //         const dbName = randomUUID()
-    //         const engine = MongoDBWorkflowEngine.create({
-    //             url: mongo.getConnectionString(),
-    //             clientOpts: {
-    //                 directConnection: true
-    //             },
-    //             dbName,
-    //             pollingIntervalMs: 100
-    //         })
-    //
-    //         defer(() => engine.stop())
-    //
-    //         const workflow = Workflow.create<number, WorkerMetadata>("workflow", w => {
-    //             w.step("add_1", ({ state }) => state + 1)
-    //             w.step("persist", async ({ state, worker }) => {
-    //                 await worker.client.db(dbName).collection("mydb").insertOne({ state })
-    //             })
-    //         })
-    //
-    //         // @ts-expect-error
-    //         const trigger = engine.getTrigger(workflow)
-    //         // @ts-expect-error
-    //         const worker = engine.getWorker([workflow])
-    //
-    //         // When
-    //         await trigger.trigger(9)
-    //         worker.start()
-    //
-    //         // Then
-    //         await tryUntilSuccess(async () => {
-    //             assert.strictEqual((await client.db(dbName).collection("mydb").findOne())?.state, 10)
-    //         }, 3_000)
-    //     })
-    //
-    //     await t.test("should be able to use the same db used by the worker", async function () {
-    //         // Given
-    //         const dbName = randomUUID()
-    //         const engine = MongoDBWorkflowEngine.create({
-    //             url: mongo.getConnectionString(),
-    //             clientOpts: {
-    //                 directConnection: true
-    //             },
-    //             dbName,
-    //             pollingIntervalMs: 100
-    //         })
-    //
-    //         defer(() => engine.stop())
-    //
-    //         const workflow = Workflow.create<number, WorkerMetadata>("workflow", w => {
-    //             w.step("add_1", ({ state }) => state + 1)
-    //             w.step("persist", async ({ state, worker }) => {
-    //                 await worker.db.collection("mydb").insertOne({ state })
-    //             })
-    //         })
-    //
-    //         // @ts-expect-error
-    //         const trigger = engine.getTrigger(workflow)
-    //         // @ts-expect-error
-    //         const worker = engine.getWorker([workflow])
-    //
-    //         // When
-    //         await trigger.trigger(9)
-    //         worker.start()
-    //
-    //         // Then
-    //         await tryUntilSuccess(async () => {
-    //             assert.strictEqual((await client.db(dbName).collection("mydb").findOne())?.state, 10)
-    //         }, 3_000)
-    //     })
-    // })
+    await t.test("mongodb workflow engine - worker metadata", async function (t) {
+        await t.test("should be able to access mongo client used by the worker", async function () {
+            // Given
+            const dbName = randomUUID()
+            const engine = MongoDBWorkflowEngine.create({
+                url: mongo.getConnectionString(),
+                clientOpts: {
+                    directConnection: true
+                },
+                dbName,
+                pollingIntervalMs: 100
+            })
+
+            defer(() => engine.stop())
+
+            const workflow = Workflow.create<number, WorkerMetadata>("workflow", w => {
+                w.step("add_1", ({ state }) => state + 1)
+                w.step("persist", async ({ state, worker }) => {
+                    await worker.client.db(dbName).collection("mydb").insertOne({ state })
+                })
+            })
+
+            const trigger = engine.getTrigger(workflow)
+            const worker = engine.getWorker([workflow])
+
+            // When
+            await trigger.trigger(9)
+            worker.start()
+
+            // Then
+            await tryUntilSuccess(async () => {
+                assert.strictEqual((await client.db(dbName).collection("mydb").findOne())?.state, 10)
+            }, 3_000)
+        })
+
+        await t.test("should be able to use the same db used by the worker", async function () {
+            // Given
+            const dbName = randomUUID()
+            const engine = MongoDBWorkflowEngine.create({
+                url: mongo.getConnectionString(),
+                clientOpts: {
+                    directConnection: true
+                },
+                dbName,
+                pollingIntervalMs: 100
+            })
+
+            defer(() => engine.stop())
+
+            const workflow = Workflow.create<number, WorkerMetadata>("workflow", w => {
+                w.step("add_1", ({ state }) => state + 1)
+                w.step("persist", async ({ state, worker }) => {
+                    await worker.db.collection("mydb").insertOne({ state })
+                })
+            })
+
+            const trigger = engine.getTrigger(workflow)
+            const worker = engine.getWorker([workflow])
+
+            // When
+            await trigger.trigger(9)
+            worker.start()
+
+            // Then
+            await tryUntilSuccess(async () => {
+                assert.strictEqual((await client.db(dbName).collection("mydb").findOne())?.state, 10)
+            }, 3_000)
+        })
+    })
 })
 
 function getState(client: MongoClient, db: string, workflow: string, step: string, collection: string = "workflows"): Promise<any[]> {

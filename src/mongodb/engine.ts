@@ -130,7 +130,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
         this.opts.signal?.addEventListener("abort", () => this.stop().catch(console.error))
     }
 
-    getWorker<State> (workflows: Workflow<State>[]): WorkerInterface {
+    getWorker<State> (workflows: Workflow<State, WorkerMetadata>[]): WorkerInterface {
         const { 
             pageSize = 50,
             pollingIntervalMs = 3_000,
@@ -163,7 +163,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
         return poller
     }
 
-    getTrigger<State>(workflow: Workflow<State>): TriggerInterface<State> {
+    getTrigger<State>(workflow: Workflow<State, WorkerMetadata>): TriggerInterface<State> {
         return new StorageTrigger(workflow, async () => this.getTriggerStorage(await this.pool.getConnection("default")))
     }
 
@@ -192,7 +192,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
      * @param lockDurationMs
      * @private
      */
-    private getWorkerStorage<State>(client: MongoClient, replicated: boolean, lockDurationMs: number): StorageInterface<State> {
+    private getWorkerStorage<State>(client: MongoClient, replicated: boolean, lockDurationMs: number): StorageInterface<State, WorkerMetadata> {
         const collection = this.getCollection<State>(client)
 
         return replicated
@@ -206,7 +206,7 @@ export class MongoDBWorkflowEngine implements EngineInterface {
      * @param client
      * @private
      */
-    private getTriggerStorage<State>(client: MongoClient): StorageInterface<State> {
+    private getTriggerStorage<State>(client: MongoClient): StorageInterface<State, WorkerMetadata> {
         return new MongodbStorage(this.getCollection(client))
     }
 
