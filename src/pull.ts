@@ -27,7 +27,7 @@ export interface Storage<State> {
     write(writes: JobWrite<State>[]): Promise<void>
 }
 
-export class InifiniteLoop {
+export class InfiniteLoop {
     #stop: boolean = false;
 
     *[Symbol.iterator]() {

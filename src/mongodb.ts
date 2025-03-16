@@ -1,7 +1,7 @@
 import { setTimeout } from "node:timers/promises";
 import { Engine, Trigger, Worker, Workflow } from "./core";
 import { AnyBulkWriteOperation, Collection, MongoClient } from "mongodb"
-import { InifiniteLoop as InfiniteLoop, InifiniteLoop, JobRecord as JRecord, JobWrite as JWrite, PullOpts, Storage } from "./pull"
+import { InfiniteLoop, JobRecord as JRecord, JobWrite as JWrite, PullOpts, Storage } from "./pull"
 
 type MongoJobRecord<State> = Omit<JRecord<State>, "id">
 
@@ -70,7 +70,7 @@ export class MongoWorker implements Worker {
 
     constructor(opts: CreateEngineOpts) {
         this.#opts = opts
-        this.#loop = new InifiniteLoop()
+        this.#loop = new InfiniteLoop()
         this.#client = new MongoClient(this.#opts.url, {
             directConnection: true
         })
