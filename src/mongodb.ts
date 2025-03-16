@@ -1,7 +1,7 @@
 import { setTimeout } from "node:timers/promises";
 import { Engine, HandlerResult, StepOpts, SuccessResult, Trigger, Worker, Workflow } from "./core";
 import { AnyBulkWriteOperation, Collection, MongoClient } from "mongodb"
-import { InfiniteLoop, JobRecord as JRecord, JobWrite as JWrite, PullOpts, Storage } from "./pull"
+import { InfiniteLoop, InsertJob, JobRecord as JRecord, JobWrite as JWrite, PullOpts, Storage } from "./pull"
 
 type MongoJobRecord<State> = Omit<JRecord<State>, "id">
 
@@ -101,34 +101,30 @@ export class MongoWorker implements Worker {
                         console.log("handling...", mStep.name)
                         const result = this.#executeHandler(mStep, job.state)
                         const mNextStep = mWorkflow.getNextStep(job.step)
-
-                        if (mNextStep === undefined) {
-                            console.log("emitted")
-                            await this.#storage.write([
-                                {
-                                    type: "ack",
-                                    record: job
-                                }
-                            ])
-                            mWorkflow.emit("workflowCompleted", { state: result.newState })
-                            return
-                        }
                         
                         await this.#storage.write([
                             {
                                 type: "ack",
                                 record: job
                             },
-                            {
-                                type: "insert",
-                                record: {
-                                    workflow: mWorkflow.name,
-                                    step: mNextStep.name,
-                                    ack: false,
-                                    state: result.newState
-                                }
-                            }
+                            ...mNextStep !== undefined
+                                ? [
+                                    {
+                                        type: "insert",
+                                        record: {
+                                            workflow: mWorkflow.name,
+                                            step: mNextStep.name,
+                                            ack: false,
+                                            state: result.newState
+                                        }
+                                    } satisfies InsertJob<unknown>
+                                ]
+                                : []
                         ])
+
+                        if (mNextStep === undefined) {
+                            mWorkflow.emit("workflowCompleted", { state: result.newState })
+                        }
                     }
 
                     await setTimeout(200)
