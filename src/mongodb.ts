@@ -1,23 +1,7 @@
 import { setTimeout } from "node:timers/promises";
 import { Engine, Trigger, Worker, Workflow } from "./core";
 import { AnyBulkWriteOperation, Collection, MongoClient } from "mongodb"
-import { EventEmitter } from "node:stream";
-import { once } from "node:events";
-import { JobRecord as JRecord, JobWrite as JWrite, PullOpts, Storage } from "./pull"
-
-function stoppableIterator () {
-    let stopped = false
-
-    return {
-        iterator: function* () {
-            while (!stopped)
-                yield 0
-        },
-        stop() {
-            stopped = true
-        }
-    }
-}
+import { InifiniteLoop as InfiniteLoop, InifiniteLoop, JobRecord as JRecord, JobWrite as JWrite, PullOpts, Storage } from "./pull"
 
 type MongoJobRecord<State> = Omit<JRecord<State>, "id">
 
@@ -80,16 +64,13 @@ export class MongoStorage<State> implements Storage<State> {
 export class MongoWorker implements Worker {
     #opts: CreateEngineOpts
     #client: MongoClient
-    #stop: () => void
-    #iterator: Generator<number, any, any>
+    #loop: InfiniteLoop
     #storage: MongoStorage<unknown>
     #isStopped: boolean = false
 
     constructor(opts: CreateEngineOpts) {
         this.#opts = opts
-        const { iterator, stop } = stoppableIterator()
-        this.#stop = stop
-        this.#iterator = iterator()
+        this.#loop = new InifiniteLoop()
         this.#client = new MongoClient(this.#opts.url, {
             directConnection: true
         })
@@ -102,7 +83,7 @@ export class MongoWorker implements Worker {
         console.log("starting worker");
         (async () => {
             try {
-                for (const _ of this.#iterator) {
+                for (const _ of this.#loop) {
                     const jobs = await this.#storage.pull({ workflows })
                     console.log("jobs", jobs.length)
 
@@ -162,7 +143,7 @@ export class MongoWorker implements Worker {
     }
 
     async stop(): Promise<void> {
-        this.#stop()
+        this.#loop.stop()
         
         while (!this.#isStopped) {
             await setTimeout(10)

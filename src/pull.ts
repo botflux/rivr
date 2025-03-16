@@ -26,3 +26,17 @@ export interface Storage<State> {
     pull(opts: PullOpts<State>): Promise<JobRecord<State>[]>
     write(writes: JobWrite<State>[]): Promise<void>
 }
+
+export class InifiniteLoop {
+    #stop: boolean = false;
+
+    *[Symbol.iterator]() {
+        while (!this.#stop) {
+            yield
+        }
+    }
+
+    stop(): void {
+        this.#stop = true
+    }
+}
