@@ -29,6 +29,7 @@ export type PullOpts<State> = {
 export interface Storage<State> {
     pull(opts: PullOpts<State>): Promise<JobRecord<State>[]>
     write(writes: JobWrite<State>[]): Promise<void>
+    disconnect(): Promise<void>
 }
 
 export class InfiniteLoop {

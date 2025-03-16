@@ -6,9 +6,14 @@ import { InfiniteLoop, InsertJob, JobRecord as JRecord, JobWrite as JWrite, Pull
 type MongoJobRecord<State> = Omit<JRecord<State>, "id">
 
 export class MongoStorage<State> implements Storage<State> {
+    #client: MongoClient
     #collection: Collection<MongoJobRecord<State>>
 
-    constructor(collection: Collection<MongoJobRecord<State>>) {
+    constructor(
+        client: MongoClient,
+        collection: Collection<MongoJobRecord<State>>
+    ) {
+        this.#client = client
         this.#collection = collection
     }
 
@@ -59,24 +64,20 @@ export class MongoStorage<State> implements Storage<State> {
 
         await this.#collection.bulkWrite(mongoWrites)
     }
+
+    async disconnect(): Promise<void> {
+        this.#client.close(true)
+    }
 }
 
-export class MongoWorker implements Worker {
-    #opts: CreateEngineOpts
-    #client: MongoClient
-    #loop: InfiniteLoop
-    #storage: MongoStorage<unknown>
+export class Poller implements Worker {
+    #loop = new InfiniteLoop()
     #isStopped: boolean = false
+    #storage: Storage<unknown>
 
-    constructor(opts: CreateEngineOpts) {
-        this.#opts = opts
+    constructor(storage: Storage<unknown>) {
         this.#loop = new InfiniteLoop()
-        this.#client = new MongoClient(this.#opts.url, {
-            directConnection: true
-        })
-        this.#storage = new MongoStorage(
-            this.#client.db(this.#opts.dbName).collection("jobs")
-        )
+        this.#storage = storage
     }
 
     start(workflows: Workflow<unknown>[]): void {
@@ -158,7 +159,7 @@ export class MongoWorker implements Worker {
             await setTimeout(10)
         }
 
-        await this.#client.close(true)
+        await this.#storage.disconnect()
     }
 
     #executeHandler(step: StepOpts<unknown>, state: unknown): HandlerResult<unknown> {
@@ -208,15 +209,17 @@ export class MongoWorker implements Worker {
 
 export class MongoTrigger implements Trigger {
     #opts: CreateEngineOpts
-    #client: MongoClient
     #storage: MongoStorage<unknown>
 
     constructor(opts: CreateEngineOpts) {
         this.#opts = opts
-        this.#client = new MongoClient(this.#opts.url, {
+        const client = new MongoClient(this.#opts.url, {
             directConnection: true
         })
-        this.#storage = new MongoStorage(this.#client.db(this.#opts.dbName).collection<MongoJobRecord<unknown>>("jobs"))
+        this.#storage = new MongoStorage(
+            client,
+            client.db(this.#opts.dbName).collection<MongoJobRecord<unknown>>("jobs")
+        )
     }
 
     async trigger<State>(workflow: Workflow<State>, state: State): Promise<void> {
@@ -239,13 +242,13 @@ export class MongoTrigger implements Trigger {
     }
 
     async disconnect(): Promise<void> {
-        await this.#client.close(true)
+        await this.#storage.disconnect()
     }
 }
 
 export class MongoEngine implements Engine {
     #opts: CreateEngineOpts
-    #workers: MongoWorker[] = []
+    #workers: Poller[] = []
     #triggers: MongoTrigger[] = []
 
     constructor(opts: CreateEngineOpts) {
@@ -262,7 +265,16 @@ export class MongoEngine implements Engine {
     }
 
     createWorker(): Worker {
-        const w = new MongoWorker(this.#opts)
+        const client = new MongoClient(this.#opts.url, {
+            directConnection: true
+        })
+
+        const w = new Poller(
+            new MongoStorage(
+                client,
+                client.db(this.#opts.dbName).collection("jobs")
+            )
+        )
         this.#workers.push(w)
         return w
     }
