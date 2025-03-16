@@ -1,4 +1,5 @@
-import { Workflow } from "./core"
+import { setTimeout } from "timers/promises"
+import { FailureResult, HandlerResult, StepOpts, SuccessResult, Worker, Workflow } from "./core"
 
 export type JobRecord<State> = {
     id: string
@@ -43,5 +44,142 @@ export class InfiniteLoop {
 
     stop(): void {
         this.#stop = true
+    }
+}
+
+export class Poller implements Worker {
+    #loop = new InfiniteLoop();
+    #isStopped: boolean = false;
+    #storage: Storage<unknown>;
+
+    constructor(storage: Storage<unknown>) {
+        this.#loop = new InfiniteLoop();
+        this.#storage = storage;
+    }
+
+    start(workflows: Workflow<unknown>[]): void {
+        console.log("starting worker");
+        (async () => {
+            try {
+                for (const _ of this.#loop) {
+                    const jobs = await this.#storage.pull({ workflows });
+                    console.log("jobs", jobs.length);
+
+                    for (const job of jobs) {
+                        const mWorkflow = workflows.find(w => w.name === job.workflow);
+
+                        if (!mWorkflow)
+                            continue;
+
+                        const mStep = mWorkflow.getStep(job.step);
+
+                        if (!mStep)
+                            continue;
+
+                        console.log("handling...", mStep.name);
+                        const result = this.#executeHandler(mStep, job.state);
+                        const mNextStep = mWorkflow.getNextStep(job.step);
+
+                        if (result.type === "failure") {
+                            await this.#storage.write([
+                                {
+                                    type: "nack",
+                                    record: job
+                                },
+                            ]);
+
+                            mWorkflow.emit("stepFailed", { error: result.error });
+
+                            return;
+                        }
+
+                        await this.#storage.write([
+                            {
+                                type: "ack",
+                                record: job
+                            },
+                            ...mNextStep !== undefined
+                                ? [
+                                    {
+                                        type: "insert",
+                                        record: {
+                                            workflow: mWorkflow.name,
+                                            step: mNextStep.name,
+                                            ack: false,
+                                            state: result.newState
+                                        }
+                                    } satisfies InsertJob<unknown>
+                                ]
+                                : []
+                        ]);
+
+                        if (mNextStep === undefined) {
+                            mWorkflow.emit("workflowCompleted", { state: result.newState });
+                        }
+                    }
+
+                    await setTimeout(200);
+                }
+            } catch (error: unknown) {
+                console.log(error);
+            } finally {
+                this.#isStopped = true;
+            }
+        })();
+        console.log("worker started");
+    }
+
+    async stop(): Promise<void> {
+        this.#loop.stop();
+
+        while (!this.#isStopped) {
+            await setTimeout(10);
+        }
+
+        await this.#storage.disconnect();
+    }
+
+    #executeHandler(step: StepOpts<unknown>, state: unknown): HandlerResult<unknown> {
+        try {
+            const newStateOrResult = step.handler({
+                state,
+                success: (newState: unknown) => ({
+                    type: "success",
+                    newState
+                }),
+                fail: (error: unknown) => ({
+                    type: "failure",
+                    error
+                })
+            });
+
+            if (this.#isSuccessResult(newStateOrResult) || this.#isFailureResult(newStateOrResult)) {
+                return newStateOrResult;
+            }
+
+            return {
+                type: "success",
+                newState: newStateOrResult
+            };
+        } catch (error: unknown) {
+            return {
+                type: "failure",
+                error
+            };
+        }
+    }
+
+    #isSuccessResult(state: unknown): state is SuccessResult<unknown> {
+        return typeof state === "object" &&
+            state !== null &&
+            "type" in state &&
+            state.type === "success";
+    }
+
+    #isFailureResult(state: unknown): state is FailureResult {
+        return typeof state === "object" &&
+            state !== null &&
+            "type" in state &&
+            state.type === "failure";
     }
 }
