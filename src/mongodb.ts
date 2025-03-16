@@ -1,8 +1,9 @@
 import { setTimeout } from "node:timers/promises";
 import { Engine, Trigger, Worker, Workflow } from "./core";
-import { AnyBulkWriteOperation, MongoClient, WithId } from "mongodb"
+import { AnyBulkWriteOperation, Collection, MongoClient } from "mongodb"
 import { EventEmitter } from "node:stream";
 import { once } from "node:events";
+import { JobRecord as JRecord, JobWrite as JWrite, PullOpts, Storage } from "./pull"
 
 function stoppableIterator () {
     let stopped = false
@@ -18,41 +19,91 @@ function stoppableIterator () {
     }
 }
 
-type JobRecord<S> = {
-    state: S
-    workflow: string
-    step: string
-    ack: boolean
-}
+type MongoJobRecord<State> = Omit<JRecord<State>, "id">
 
-type AckJob<S> = { type: "ack", record: WithId<JobRecord<S>> }
-type InsertJob<S> = { type: "insert", record: JobRecord<S> }
-type JobWrite<S> = AckJob<S> | InsertJob<S>
+export class MongoStorage<State> implements Storage<State> {
+    #collection: Collection<MongoJobRecord<State>>
+
+    constructor(collection: Collection<MongoJobRecord<State>>) {
+        this.#collection = collection
+    }
+
+    async pull(opts: PullOpts<State>): Promise<JRecord<State>[]> {
+        const { workflows } = opts
+        const names = workflows.map(w => w.name)
+
+        const list = await this.#collection
+            .find({ 
+                workflow: { $in: names },
+                ack: false
+            })
+            .toArray()
+
+        return list.map(({ _id, ...rest }) => ({
+            ...rest,
+            id: _id.toHexString()
+        }))
+    }
+
+    async write(writes: JWrite<State>[]): Promise<void> {
+        const mongoWrites = writes.map(write => {
+            if (write.type === "ack") {
+                return {
+                    updateOne: {
+                        filter: {
+                            id: write.record.id
+                        },
+                        update: {
+                            $set: {
+                                ack: true
+                            }
+                        }
+                    }
+                } satisfies AnyBulkWriteOperation<MongoJobRecord<State>>
+            }
+
+            if (write.type === "insert") {
+                return {
+                    insertOne: {
+                        document: write.record
+                    }
+                } satisfies AnyBulkWriteOperation<MongoJobRecord<State>>
+            }
+
+            throw new Error("not implemented")
+        })
+
+        await this.#collection.bulkWrite(mongoWrites)
+    }
+}
 
 export class MongoWorker implements Worker {
     #opts: CreateEngineOpts
-    #client: MongoClient | undefined
+    #client: MongoClient
     #stop: () => void
     #iterator: Generator<number, any, any>
-    #emitted = new EventEmitter()
+    #storage: MongoStorage<unknown>
+    #isStopped: boolean = false
 
     constructor(opts: CreateEngineOpts) {
         this.#opts = opts
         const { iterator, stop } = stoppableIterator()
         this.#stop = stop
         this.#iterator = iterator()
+        this.#client = new MongoClient(this.#opts.url, {
+            directConnection: true
+        })
+        this.#storage = new MongoStorage(
+            this.#client.db(this.#opts.dbName).collection("jobs")
+        )
     }
 
     start(workflows: Workflow<unknown>[]): void {
-        // for (const w of workflows) {
-        //     w.emit("workflowCompleted")
-        // }
-
         console.log("starting worker");
         (async () => {
             try {
                 for (const _ of this.#iterator) {
-                    const jobs = await this.#listJobs(workflows)
+                    const jobs = await this.#storage.pull({ workflows })
                     console.log("jobs", jobs.length)
 
                     for (const job of jobs) {
@@ -71,18 +122,18 @@ export class MongoWorker implements Worker {
                         const mNextStep = mWorkflow.getNextStep(job.step)
 
                         if (mNextStep === undefined) {
-                            mWorkflow.emit("workflowCompleted", { state: newState })
                             console.log("emitted")
-                            await this.#write([
+                            await this.#storage.write([
                                 {
                                     type: "ack",
                                     record: job
                                 }
                             ])
+                            mWorkflow.emit("workflowCompleted", { state: newState })
                             return
                         }
                         
-                        await this.#write([
+                        await this.#storage.write([
                             {
                                 type: "ack",
                                 record: job
@@ -104,111 +155,57 @@ export class MongoWorker implements Worker {
             } catch (error: unknown) {
                 console.log(error)
             } finally {
-                this.#emitted.emit("done")
+                this.#isStopped = true
             }
         })()
         console.log("worker started");
     }
 
     async stop(): Promise<void> {
-        const done = once(this.#emitted, "done")
         this.#stop()
-        await done
-        await this.#client?.close(true)
-    }
+        
+        while (!this.#isStopped) {
+            await setTimeout(10)
+        }
 
-    async #listJobs(workflows: Workflow<unknown>[]) {
-        const client = this.#getClient()
-        const collection = client.db(this.#opts.dbName).collection<JobRecord<unknown>>("jobs")
-        const workflowNames = workflows.map(workflow => workflow.name)
-
-        const records = await collection
-            .find({ workflow: { $in: workflowNames } })
-            .toArray()
-
-        return records
-    }
-
-    async #write(writes: JobWrite<unknown>[]): Promise<void> {
-        const mongoWrites = writes.map(w => {
-            if (w.type === "ack") {
-                return {
-                    updateOne: {
-                        filter: {
-                            _id: w.record._id
-                        },
-                        update: {
-                            $set: {
-                                ack: true
-                            }
-                        }
-                    }
-                } satisfies AnyBulkWriteOperation<JobRecord<unknown>>
-            }
-
-            if (w.type === "insert") {
-                return {
-                    insertOne: {
-                        document: w.record
-                    }
-                } satisfies AnyBulkWriteOperation<JobRecord<unknown>>
-            }
-
-            throw new Error("not implemented")
-        })
-
-        await this.#getClient().db(this.#opts.dbName).collection<JobRecord<unknown>>("jobs").bulkWrite(mongoWrites)
-    }
-
-    #getClient(): MongoClient {
-        if (this.#client !== undefined)
-            return this.#client
-
-        this.#client = new MongoClient(this.#opts.url, {
-            directConnection: true
-        })
-        return this.#client
+        await this.#client.close(true)
     }
 }
 
 export class MongoTrigger implements Trigger {
     #opts: CreateEngineOpts
-    #client: MongoClient | undefined
+    #client: MongoClient
+    #storage: MongoStorage<unknown>
 
     constructor(opts: CreateEngineOpts) {
         this.#opts = opts
+        this.#client = new MongoClient(this.#opts.url, {
+            directConnection: true
+        })
+        this.#storage = new MongoStorage(this.#client.db(this.#opts.dbName).collection<MongoJobRecord<unknown>>("jobs"))
     }
 
     async trigger<State>(workflow: Workflow<State>, state: State): Promise<void> {
-        const client = this.#getClient()
-        const collection = client.db(this.#opts.dbName).collection<JobRecord<State>>("jobs")
-
         const mFirstStep = workflow.steps[0]
 
         if (mFirstStep === undefined)
             throw new Error("not implemented")
 
-        await collection.insertOne({
-            state,
-            workflow: workflow.name,
-            step: mFirstStep.name,
-            ack: false
-        })
+        await this.#storage.write([
+            {
+                type: "insert",
+                record: {
+                    state,
+                    workflow: workflow.name,
+                    step: mFirstStep.name,
+                    ack: false
+                }
+            }
+        ])
     }
 
     async disconnect(): Promise<void> {
-        await this.#client?.close(true)
-    }
-
-    #getClient(): MongoClient {
-        if (this.#client) {
-            return this.#client
-        }
-
-        this.#client = new MongoClient(this.#opts.url, {
-            directConnection: true
-        })
-        return this.#client
+        await this.#client.close(true)
     }
 }
 
