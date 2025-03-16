@@ -1,5 +1,5 @@
 import { setTimeout } from "node:timers/promises";
-import { Engine, HandlerResult, StepOpts, SuccessResult, Trigger, Worker, Workflow } from "./core";
+import { Engine, FailureResult, HandlerResult, StepOpts, SuccessResult, Trigger, Worker, Workflow } from "./core";
 import { AnyBulkWriteOperation, Collection, MongoClient } from "mongodb"
 import { InfiniteLoop, InsertJob, JobRecord as JRecord, JobWrite as JWrite, PullOpts, Storage } from "./pull"
 
@@ -168,10 +168,14 @@ export class MongoWorker implements Worker {
                 success: (newState: unknown) => ({
                     type: "success",
                     newState
+                }),
+                fail: (error: unknown) => ({
+                    type: "failure",
+                    error
                 })
             })
     
-            if (this.#isSuccessResult(newStateOrResult)) {
+            if (this.#isSuccessResult(newStateOrResult) || this.#isFailureResult(newStateOrResult)) {
                 return newStateOrResult
             }
     
@@ -192,6 +196,13 @@ export class MongoWorker implements Worker {
             state !== null && 
             "type" in state &&
             state.type === "success"
+    }
+
+    #isFailureResult(state: unknown): state is FailureResult {
+        return typeof state === "object" && 
+            state !== null && 
+            "type" in state &&
+            state.type === "failure"
     }
 }
 

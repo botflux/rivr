@@ -26,6 +26,7 @@ export type HandlerResult<State> = SuccessResult<State> | FailureResult
 export type HandlerContext<State> = { 
     state: State
     success: (newState: State) => HandlerResult<State>
+    fail: (error: unknown) => HandlerResult<State>
 }
 
 export type Handler<State> = (ctx: HandlerContext<State>) => State | HandlerResult<State>
