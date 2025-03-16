@@ -75,6 +75,34 @@ test("test execute a workflow composed of multiple steps", async (t: TestContext
     t.assert.deepStrictEqual(getEvents(), [[{state: 15}]])
 })
 
+test("should be able to return a step result instead of the new state directly", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        signal: t.signal,
+        dbName: randomUUID()
+    })
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+            name: "add-5",
+            handler: ctx => ctx.success(ctx.state + 5)
+        })
+
+    const getEvents = collectEvents(workflow, "workflowCompleted", t.signal)
+    const completed = once(workflow, "workflowCompleted")
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 5)
+
+    // Then
+    await completed
+    t.assert.deepEqual(getEvents().length, 1)
+    t.assert.deepStrictEqual(getEvents(), [[{ state: 10 }]])
+})
+
 function collectEvents (emitter: EventEmitter, event: string, signal: AbortSignal) {
     let events: unknown[][] = []
 

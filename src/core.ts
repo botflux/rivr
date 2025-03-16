@@ -13,8 +13,18 @@ export interface Engine {
     createTrigger(): Trigger
 }
 
-export type HandlerContext<State> = { state: State }
-export type Handler<State> = (ctx: HandlerContext<State>) => State
+export type SuccessResult<State> = {
+    type: "success"
+    newState: State
+}
+export type HandlerResult<State> = SuccessResult<State>
+
+export type HandlerContext<State> = { 
+    state: State
+    success: (newState: State) => HandlerResult<State>
+}
+
+export type Handler<State> = (ctx: HandlerContext<State>) => State | HandlerResult<State>
 
 export type StepOpts<State> = {
     name: string

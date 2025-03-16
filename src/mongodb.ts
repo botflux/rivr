@@ -1,5 +1,5 @@
 import { setTimeout } from "node:timers/promises";
-import { Engine, Trigger, Worker, Workflow } from "./core";
+import { Engine, HandlerResult, StepOpts, SuccessResult, Trigger, Worker, Workflow } from "./core";
 import { AnyBulkWriteOperation, Collection, MongoClient } from "mongodb"
 import { InfiniteLoop, JobRecord as JRecord, JobWrite as JWrite, PullOpts, Storage } from "./pull"
 
@@ -99,7 +99,7 @@ export class MongoWorker implements Worker {
                             continue
 
                         console.log("handling...", mStep.name)
-                        const newState = mStep.handler({ state: job.state })
+                        const result = this.#executeHandler(mStep, job.state)
                         const mNextStep = mWorkflow.getNextStep(job.step)
 
                         if (mNextStep === undefined) {
@@ -110,7 +110,7 @@ export class MongoWorker implements Worker {
                                     record: job
                                 }
                             ])
-                            mWorkflow.emit("workflowCompleted", { state: newState })
+                            mWorkflow.emit("workflowCompleted", { state: result.newState })
                             return
                         }
                         
@@ -125,7 +125,7 @@ export class MongoWorker implements Worker {
                                     workflow: mWorkflow.name,
                                     step: mNextStep.name,
                                     ack: false,
-                                    state: newState
+                                    state: result.newState
                                 }
                             }
                         ])
@@ -150,6 +150,32 @@ export class MongoWorker implements Worker {
         }
 
         await this.#client.close(true)
+    }
+
+    #executeHandler(step: StepOpts<unknown>, state: unknown): HandlerResult<unknown> {
+        const newStateOrResult = step.handler({
+            state,
+            success: (newState: unknown) => ({
+                type: "success",
+                newState
+            })
+        })
+
+        if (this.#isSuccessResult(newStateOrResult)) {
+            return newStateOrResult
+        }
+
+        return {
+            type: "success",
+            newState: newStateOrResult
+        }
+    }
+
+    #isSuccessResult(state: unknown): state is SuccessResult<unknown> {
+        return typeof state === "object" && 
+            state !== null && 
+            "type" in state &&
+            state.type === "success"
     }
 }
 
