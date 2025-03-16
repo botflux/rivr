@@ -103,6 +103,36 @@ test("should be able to return a step result instead of the new state directly",
     t.assert.deepStrictEqual(getEvents(), [[{ state: 10 }]])
 })
 
+test("should be able to catch step errors", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        signal: t.signal,
+        dbName: randomUUID()
+    })
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+            name: "throw",
+            handler: ctx => {
+                throw "oops"
+            }
+        })
+
+    const getEvents = collectEvents(workflow, "stepFailed", t.signal)
+    const failure = once(workflow, "stepFailed")
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 5)
+
+    // Then
+    await failure
+    t.assert.deepEqual(getEvents().length, 1)
+    t.assert.deepStrictEqual(getEvents(), [[{ error: "oops" }]])
+})
+
 function collectEvents (emitter: EventEmitter, event: string, signal: AbortSignal) {
     let events: unknown[][] = []
 

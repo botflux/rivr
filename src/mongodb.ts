@@ -31,7 +31,7 @@ export class MongoStorage<State> implements Storage<State> {
 
     async write(writes: JWrite<State>[]): Promise<void> {
         const mongoWrites = writes.map(write => {
-            if (write.type === "ack") {
+            if (write.type === "ack" || write.type === "nack") {
                 return {
                     updateOne: {
                         filter: {
@@ -102,6 +102,19 @@ export class MongoWorker implements Worker {
                         const result = this.#executeHandler(mStep, job.state)
                         const mNextStep = mWorkflow.getNextStep(job.step)
                         
+                        if (result.type === "failure") {
+                            await this.#storage.write([
+                                {
+                                    type: "nack",
+                                    record: job
+                                },
+                            ])
+
+                            mWorkflow.emit("stepFailed", { error: result.error })
+
+                            return
+                        }
+
                         await this.#storage.write([
                             {
                                 type: "ack",
@@ -149,21 +162,28 @@ export class MongoWorker implements Worker {
     }
 
     #executeHandler(step: StepOpts<unknown>, state: unknown): HandlerResult<unknown> {
-        const newStateOrResult = step.handler({
-            state,
-            success: (newState: unknown) => ({
-                type: "success",
-                newState
+        try {
+            const newStateOrResult = step.handler({
+                state,
+                success: (newState: unknown) => ({
+                    type: "success",
+                    newState
+                })
             })
-        })
-
-        if (this.#isSuccessResult(newStateOrResult)) {
-            return newStateOrResult
-        }
-
-        return {
-            type: "success",
-            newState: newStateOrResult
+    
+            if (this.#isSuccessResult(newStateOrResult)) {
+                return newStateOrResult
+            }
+    
+            return {
+                type: "success",
+                newState: newStateOrResult
+            }
+        } catch(error: unknown) {
+            return {
+                type: "failure",
+                error
+            }
         }
     }
 

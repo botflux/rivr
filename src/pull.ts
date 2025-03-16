@@ -12,11 +12,15 @@ export type AckJob<State> = {
     type: "ack"
     record: JobRecord<State>
 }
+export type NackJob<State> = {
+    type: "nack"
+    record: JobRecord<State>
+}
 export type InsertJob<State> = {
     type: "insert",
     record: Omit<JobRecord<State>, "id">
 }
-export type JobWrite<State> = AckJob<State> | InsertJob<State>
+export type JobWrite<State> = AckJob<State> | NackJob<State> | InsertJob<State>
 
 export type PullOpts<State> = {
     workflows: Workflow<State>[]

@@ -17,7 +17,11 @@ export type SuccessResult<State> = {
     type: "success"
     newState: State
 }
-export type HandlerResult<State> = SuccessResult<State>
+export type FailureResult = {
+    type: "failure"
+    error: unknown
+}
+export type HandlerResult<State> = SuccessResult<State> | FailureResult
 
 export type HandlerContext<State> = { 
     state: State
