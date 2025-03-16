@@ -1,6 +1,6 @@
 import { setTimeout } from "node:timers/promises";
 import { Engine, Trigger, Worker, Workflow } from "./core";
-import { MongoClient } from "mongodb"
+import { AnyBulkWriteOperation, MongoClient, WithId } from "mongodb"
 import { EventEmitter } from "node:stream";
 import { once } from "node:events";
 
@@ -22,7 +22,12 @@ type JobRecord<S> = {
     state: S
     workflow: string
     step: string
+    ack: boolean
 }
+
+type AckJob<S> = { type: "ack", record: WithId<JobRecord<S>> }
+type InsertJob<S> = { type: "insert", record: JobRecord<S> }
+type JobWrite<S> = AckJob<S> | InsertJob<S>
 
 export class MongoWorker implements Worker {
     #opts: CreateEngineOpts
@@ -63,9 +68,35 @@ export class MongoWorker implements Worker {
 
                         console.log("handling...", mStep.name)
                         const newState = mStep.handler({ state: job.state })
+                        const mNextStep = mWorkflow.getNextStep(job.step)
+
+                        if (mNextStep === undefined) {
+                            mWorkflow.emit("workflowCompleted", { state: newState })
+                            console.log("emitted")
+                            await this.#write([
+                                {
+                                    type: "ack",
+                                    record: job
+                                }
+                            ])
+                            return
+                        }
                         
-                        mWorkflow.emit("workflowCompleted", { state: newState })
-                        console.log("emitted")
+                        await this.#write([
+                            {
+                                type: "ack",
+                                record: job
+                            },
+                            {
+                                type: "insert",
+                                record: {
+                                    workflow: mWorkflow.name,
+                                    step: mNextStep.name,
+                                    ack: false,
+                                    state: newState
+                                }
+                            }
+                        ])
                     }
 
                     await setTimeout(200)
@@ -96,6 +127,37 @@ export class MongoWorker implements Worker {
             .toArray()
 
         return records
+    }
+
+    async #write(writes: JobWrite<unknown>[]): Promise<void> {
+        const mongoWrites = writes.map(w => {
+            if (w.type === "ack") {
+                return {
+                    updateOne: {
+                        filter: {
+                            _id: w.record._id
+                        },
+                        update: {
+                            $set: {
+                                ack: true
+                            }
+                        }
+                    }
+                } satisfies AnyBulkWriteOperation<JobRecord<unknown>>
+            }
+
+            if (w.type === "insert") {
+                return {
+                    insertOne: {
+                        document: w.record
+                    }
+                } satisfies AnyBulkWriteOperation<JobRecord<unknown>>
+            }
+
+            throw new Error("not implemented")
+        })
+
+        await this.#getClient().db(this.#opts.dbName).collection<JobRecord<unknown>>("jobs").bulkWrite(mongoWrites)
     }
 
     #getClient(): MongoClient {
@@ -129,7 +191,8 @@ export class MongoTrigger implements Trigger {
         await collection.insertOne({
             state,
             workflow: workflow.name,
-            step: mFirstStep.name
+            step: mFirstStep.name,
+            ack: false
         })
     }
 

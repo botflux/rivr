@@ -32,19 +32,47 @@ test("test execute a workflow", async (t: TestContext) => {
     const getEvents = collectEvents(workflow, "workflowCompleted", t.signal)
     const completed = once(workflow, "workflowCompleted")
 
-    console.log("starting")
     engine.createWorker().start([ workflow ])
-    console.log("started")
 
     // When
     await engine.createTrigger().trigger(workflow, 2)
 
     // Then
-    console.log("then")
     await completed
     t.assert.deepEqual(getEvents().length, 1)
     t.assert.deepStrictEqual(getEvents(), [[{state: 3}]])
-    console.log("done")
+})
+
+test("test execute a workflow composed of multiple steps", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        signal: t.signal,
+        dbName: randomUUID()
+    })
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+            name: "add-1",
+            handler: ({ state }) => state + 1
+        })
+        .step({
+            name: "multiply-by-5",
+            handler: ({ state }) => state * 5
+        })
+    
+    const getEvents = collectEvents(workflow, "workflowCompleted", t.signal)
+    const completed = once(workflow, "workflowCompleted")
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 2)
+
+    // Then
+    await completed
+    t.assert.deepEqual(getEvents().length, 1)
+    t.assert.deepStrictEqual(getEvents(), [[{state: 15}]])
 })
 
 function collectEvents (emitter: EventEmitter, event: string, signal: AbortSignal) {
