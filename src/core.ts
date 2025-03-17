@@ -23,35 +23,44 @@ export type FailureResult = {
 }
 export type HandlerResult<State> = SuccessResult<State> | FailureResult
 
-export type HandlerContext<State> = { 
+export type HandlerContext<State, W extends Workflow<State>> = { 
     state: State
+    workflow: W
     success: (newState: State) => HandlerResult<State>
     fail: (error: unknown) => HandlerResult<State>
 }
 
-export type Handler<State> = (ctx: HandlerContext<State>) => State | HandlerResult<State>
+export type Handler<State, W extends Workflow<State>> = (ctx: HandlerContext<State, W>) => State | HandlerResult<State>
 
-export type StepOpts<State> = {
+export type StepOpts<State, W extends Workflow<State>> = {
     name: string
-    handler: Handler<State>
+    handler: Handler<State, W>
 }
 
 export class Workflow<State, Ctx extends Record<string, unknown> = Record<string, unknown>> extends EventEmitter {
     name: string
 
-    #steps: StepOpts<State>[] = []
+    #steps: StepOpts<State, Workflow<State>>[] = []
 
     constructor(name: string) {
         super()
         this.name = name
     }
 
-    step(opts: StepOpts<State>): this {
-        this.#steps.push(opts)
+    step(opts: StepOpts<State, this>): this {
+        this.#steps.push(opts as StepOpts<State, Workflow<State>>)
         return this
     }
 
-    getStep(name: string): StepOpts<State> | undefined {
+    decorate<K extends string, V>(key: K, value: V): Workflow<State, Ctx> & Record<K, V> {
+        // @ts-expect-error
+        Workflow.prototype[key] = undefined
+        // @ts-expect-error
+        this[key] = value
+        return this as unknown as Workflow<State, Ctx> & Record<K, V>
+    }
+
+    getStep(name: string): StepOpts<State, this> | undefined {
         return this.#steps.find(s => s.name === name)
     }
 
@@ -65,7 +74,7 @@ export class Workflow<State, Ctx extends Record<string, unknown> = Record<string
         return last.name === name
     }
 
-    getNextStep(name: string): StepOpts<State> | undefined {
+    getNextStep(name: string): StepOpts<State, this> | undefined {
         const index = this.#steps.findIndex(s => s.name === name)
 
         if (index === -1) {
@@ -81,7 +90,7 @@ export class Workflow<State, Ctx extends Record<string, unknown> = Record<string
         return this.#steps[index + 1]
     }
 
-    get steps (): StepOpts<State>[] {
+    get steps (): StepOpts<State, this>[] {
         return this.#steps
     }
 }

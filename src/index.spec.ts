@@ -161,6 +161,35 @@ test("should be able to declare a step error using the step result", async (t: T
     t.assert.deepStrictEqual(getEvents(), [[{error: "oops"}]])
 })
 
+test("should be able to decorate the workflow", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+        dbName: randomUUID(),
+        url: container.getConnectionString(),
+        signal: t.signal
+    })
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .decorate("add", (x: number, y: number) => x + y)
+        .step({
+            name: "add-5",
+            handler: ({ workflow, state }) => workflow.add(state, 5)
+        })
+
+    const getEvents = collectEvents(workflow, "workflowCompleted", t.signal)
+    const completed = once(workflow, "workflowCompleted")
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 5)
+
+    // Then
+    await completed
+    t.assert.deepEqual(getEvents().length, 1)
+    t.assert.deepStrictEqual(getEvents(), [[{ state: 10 }]])
+})
+
 function collectEvents (emitter: EventEmitter, event: string, signal: AbortSignal) {
     let events: unknown[][] = []
 

@@ -77,7 +77,7 @@ export class Poller implements Worker {
                             continue;
 
                         console.log("handling...", mStep.name);
-                        const result = this.#executeHandler(mStep, job.state);
+                        const result = this.#executeHandler(mStep, job.state, mWorkflow);
                         const mNextStep = mWorkflow.getNextStep(job.step);
 
                         if (result.type === "failure") {
@@ -139,7 +139,7 @@ export class Poller implements Worker {
         await this.#storage.disconnect();
     }
 
-    #executeHandler(step: StepOpts<unknown>, state: unknown): HandlerResult<unknown> {
+    #executeHandler(step: StepOpts<unknown, Workflow<unknown>>, state: unknown, workflow: Workflow<unknown>): HandlerResult<unknown> {
         try {
             const newStateOrResult = step.handler({
                 state,
@@ -150,7 +150,8 @@ export class Poller implements Worker {
                 fail: (error: unknown) => ({
                     type: "failure",
                     error
-                })
+                }),
+                workflow
             });
 
             if (this.#isSuccessResult(newStateOrResult) || this.#isFailureResult(newStateOrResult)) {
