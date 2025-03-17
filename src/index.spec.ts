@@ -232,6 +232,42 @@ test("should be able to skip a step", async (t: TestContext) => {
     t.assert.deepStrictEqual(getWorkflowCompleted(), [[{ state: 4 }]])
 })
 
+test("should be able to stop a workflow", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        signal: t.signal
+    })
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+            name: "add-2",
+            handler: ctx => ctx.state + 2
+        })
+        .step({
+            name: "stop",
+            handler: ctx => ctx.stop()
+        })
+        .step({
+            name: "add-4",
+            handler: ctx => ctx.state + 4
+        })
+
+    const completed = once(workflow, "workflowCompleted")
+    const getCompletedEvents = collectEvents(workflow, "workflowCompleted", t.signal)
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 1)
+
+    // Then
+    await completed
+    t.assert.deepEqual(getCompletedEvents().length, 1)
+    t.assert.deepStrictEqual(getCompletedEvents(), [[{state: 3}]])
+})
+
 function collectEvents (emitter: EventEmitter, event: string, signal: AbortSignal) {
     let events: unknown[][] = []
 

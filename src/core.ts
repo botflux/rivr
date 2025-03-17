@@ -24,7 +24,10 @@ export type FailureResult = {
 export type SkipResult = {
     type: "skip"
 }
-export type HandlerResult<State> = SuccessResult<State> | FailureResult | SkipResult
+export type StopResult = {
+    type: "stop"
+}
+export type HandlerResult<State> = SuccessResult<State> | FailureResult | SkipResult | StopResult
 
 export type HandlerContext<State, W extends Workflow<State>> = { 
     state: State
@@ -32,6 +35,7 @@ export type HandlerContext<State, W extends Workflow<State>> = {
     success: (newState: State) => HandlerResult<State>
     fail: (error: unknown) => HandlerResult<State>
     skip: () => HandlerResult<State>
+    stop: () => HandlerResult<State>
 }
 
 export type Handler<State, W extends Workflow<State>> = (ctx: HandlerContext<State, W>) => State | HandlerResult<State>

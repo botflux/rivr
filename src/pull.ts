@@ -1,5 +1,5 @@
 import { setTimeout } from "timers/promises"
-import { FailureResult, HandlerResult, SkipResult, StepOpts, SuccessResult, Worker, Workflow } from "./core"
+import { FailureResult, HandlerResult, SkipResult, StepOpts, StopResult, SuccessResult, Worker, Workflow } from "./core"
 
 export type JobRecord<State> = {
     id: string
@@ -79,6 +79,19 @@ export class Poller implements Worker {
                         console.log("handling...", mStep.name);
                         const result = this.#executeHandler(mStep, job.state, mWorkflow);
                         const mNextStep = mWorkflow.getNextStep(job.step);
+
+                        if (result.type === "stop") {
+                            await this.#storage.write([
+                                {
+                                    type: "ack",
+                                    record: job
+                                }
+                            ])
+
+                            mWorkflow.emit("workflowCompleted", { state: job.state })
+
+                            continue
+                        }
 
                         if (result.type === "failure") {
                             await this.#storage.write([
@@ -187,11 +200,14 @@ export class Poller implements Worker {
                 skip: () => ({
                     type: "skip"
                 }),
+                stop: () => ({
+                    type: "stop"
+                }),
                 workflow
             });
 
             if (this.#isSuccessResult(newStateOrResult) || this.#isFailureResult(newStateOrResult) ||
-                this.#isSkipResult(newStateOrResult)) {
+                this.#isSkipResult(newStateOrResult) || this.#isStopResult(newStateOrResult)) {
                 return newStateOrResult;
             }
 
@@ -226,5 +242,12 @@ export class Poller implements Worker {
         state !== null &&
         "type" in state &&
         state.type === "skip";
+    }
+
+    #isStopResult(state: unknown): state is StopResult {
+        return typeof state === "object" &&
+            state !== null &&
+            "type" in state &&
+            state.type === "stop";
     }
 }
