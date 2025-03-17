@@ -38,7 +38,7 @@ export type HandlerContext<State, W extends Workflow<State>> = {
     stop: () => HandlerResult<State>
 }
 
-export type Handler<State, W extends Workflow<State>> = (ctx: HandlerContext<State, W>) => State | HandlerResult<State>
+export type Handler<State, W extends Workflow<State>> = (ctx: HandlerContext<State, W>) => State | HandlerResult<State> | Promise<State> | Promise<HandlerResult<State>>
 
 export type StepOpts<State, W extends Workflow<State>> = {
     name: string

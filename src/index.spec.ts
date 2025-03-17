@@ -268,6 +268,62 @@ test("should be able to stop a workflow", async (t: TestContext) => {
     t.assert.deepStrictEqual(getCompletedEvents(), [[{state: 3}]])
 })
 
+test("should be able to execute callback returning promises", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        signal: t.signal
+    })
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+            name: "add-2",
+            handler: async ctx => ctx.state + 2
+        })
+
+    const completed = once(workflow, "workflowCompleted")
+    const getEvents = collectEvents(workflow, "workflowCompleted", t.signal)
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 4)
+
+    // Then
+    await completed
+    t.assert.deepEqual(getEvents().length, 1)
+    t.assert.deepStrictEqual(getEvents(), [[{ state: 6 }]])
+})
+
+test("should be able to execute callback returning a promise of a result", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        signal: t.signal
+    })
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+            name: "add-2",
+            handler: async ctx => ctx.success(ctx.state + 2)
+        })
+
+    const completed = once(workflow, "workflowCompleted")
+    const getEvents = collectEvents(workflow, "workflowCompleted", t.signal)
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 4)
+
+    // Then
+    await completed
+    t.assert.deepEqual(getEvents().length, 1)
+    t.assert.deepStrictEqual(getEvents(), [[{ state: 6 }]])
+})
+
 function collectEvents (emitter: EventEmitter, event: string, signal: AbortSignal) {
     let events: unknown[][] = []
 

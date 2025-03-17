@@ -77,7 +77,7 @@ export class Poller implements Worker {
                             continue;
 
                         console.log("handling...", mStep.name);
-                        const result = this.#executeHandler(mStep, job.state, mWorkflow);
+                        const result = await this.#executeHandler(mStep, job.state, mWorkflow);
                         const mNextStep = mWorkflow.getNextStep(job.step);
 
                         if (result.type === "stop") {
@@ -185,9 +185,9 @@ export class Poller implements Worker {
         await this.#storage.disconnect();
     }
 
-    #executeHandler(step: StepOpts<unknown, Workflow<unknown>>, state: unknown, workflow: Workflow<unknown>): HandlerResult<unknown> {
+    async #executeHandler(step: StepOpts<unknown, Workflow<unknown>>, state: unknown, workflow: Workflow<unknown>): Promise<HandlerResult<unknown>> {
         try {
-            const newStateOrResult = step.handler({
+            const resultOrPromise = step.handler({
                 state,
                 success: (newState: unknown) => ({
                     type: "success",
@@ -205,6 +205,10 @@ export class Poller implements Worker {
                 }),
                 workflow
             });
+
+            const newStateOrResult = this.#isPromise(resultOrPromise)
+                ? await resultOrPromise
+                : resultOrPromise
 
             if (this.#isSuccessResult(newStateOrResult) || this.#isFailureResult(newStateOrResult) ||
                 this.#isSkipResult(newStateOrResult) || this.#isStopResult(newStateOrResult)) {
@@ -249,5 +253,9 @@ export class Poller implements Worker {
             state !== null &&
             "type" in state &&
             state.type === "stop";
+    }
+
+    #isPromise(value: unknown): value is PromiseLike<unknown> {
+        return typeof value === "object" && value !== null && "then" in value
     }
 }
