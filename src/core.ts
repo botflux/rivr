@@ -21,13 +21,17 @@ export type FailureResult = {
     type: "failure"
     error: unknown
 }
-export type HandlerResult<State> = SuccessResult<State> | FailureResult
+export type SkipResult = {
+    type: "skip"
+}
+export type HandlerResult<State> = SuccessResult<State> | FailureResult | SkipResult
 
 export type HandlerContext<State, W extends Workflow<State>> = { 
     state: State
     workflow: W
     success: (newState: State) => HandlerResult<State>
     fail: (error: unknown) => HandlerResult<State>
+    skip: () => HandlerResult<State>
 }
 
 export type Handler<State, W extends Workflow<State>> = (ctx: HandlerContext<State, W>) => State | HandlerResult<State>
@@ -74,20 +78,20 @@ export class Workflow<State, Ctx extends Record<string, unknown> = Record<string
         return last.name === name
     }
 
-    getNextStep(name: string): StepOpts<State, this> | undefined {
+    getNextStep(name: string, offset = 1): StepOpts<State, this> | undefined {
         const index = this.#steps.findIndex(s => s.name === name)
 
         if (index === -1) {
             throw new Error(`No step matching '${name}'`)
         }
 
-        const newIndex = index + 1
+        const newIndex = index + offset
 
         if (newIndex >= this.#steps.length) {
             return undefined
         }
 
-        return this.#steps[index + 1]
+        return this.#steps[newIndex]
     }
 
     get steps (): StepOpts<State, this>[] {

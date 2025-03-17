@@ -1,6 +1,6 @@
 import { test, before, after, TestContext } from "node:test"
 import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongodb"
-import EventEmitter, { once } from "node:events"
+import EventEmitter, { on, once } from "node:events"
 import { rivr } from "./core"
 import { createEngine } from "./mongodb"
 import { randomUUID } from "node:crypto"
@@ -188,6 +188,48 @@ test("should be able to decorate the workflow", async (t: TestContext) => {
     await completed
     t.assert.deepEqual(getEvents().length, 1)
     t.assert.deepStrictEqual(getEvents(), [[{ state: 10 }]])
+})
+
+test("should be able to skip a step", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        signal: t.signal
+    })
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+            name: "add-1",
+            handler: ctx => ctx.state + 1
+        })
+        .step({
+            name: "skipped",
+            handler: ctx => ctx.skip()
+        })
+        .step({
+            name: "multiply-by-2",
+            handler: ctx => ctx.state * 2
+        })
+
+    const skipped = once(workflow, "stepSkipped")
+    const completed = once(workflow, "workflowCompleted")
+    
+    const getSkipped = collectEvents(workflow, "stepSkipped", t.signal)
+    const getWorkflowCompleted = collectEvents(workflow, "workflowCompleted", t.signal)
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 1)
+
+    // Then
+    await skipped
+    await completed
+
+    t.assert.deepEqual(getSkipped().length, 1)
+    t.assert.deepEqual(getWorkflowCompleted().length, 1)
+    t.assert.deepStrictEqual(getWorkflowCompleted(), [[{ state: 4 }]])
 })
 
 function collectEvents (emitter: EventEmitter, event: string, signal: AbortSignal) {

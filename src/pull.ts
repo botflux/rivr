@@ -1,5 +1,5 @@
 import { setTimeout } from "timers/promises"
-import { FailureResult, HandlerResult, StepOpts, SuccessResult, Worker, Workflow } from "./core"
+import { FailureResult, HandlerResult, SkipResult, StepOpts, SuccessResult, Worker, Workflow } from "./core"
 
 export type JobRecord<State> = {
     id: string
@@ -90,7 +90,40 @@ export class Poller implements Worker {
 
                             mWorkflow.emit("stepFailed", { error: result.error });
 
-                            return;
+                            continue;
+                        }
+
+                        if (result.type === "skip") {
+                            const mNextStep = mWorkflow.getNextStep(job.step)
+
+                            console.log("mNextStep", mNextStep)
+
+                            await this.#storage.write([
+                                {
+                                    type: "ack",
+                                    record: job
+                                },
+                                ...mNextStep !== undefined
+                                ? [
+                                    {
+                                        type: "insert",
+                                        record: {
+                                            workflow: mWorkflow.name,
+                                            step: mNextStep.name,
+                                            ack: false,
+                                            state: job.state
+                                        }
+                                    } satisfies InsertJob<unknown>
+                                ]
+                                : []
+                            ])   
+
+                            mWorkflow.emit("stepSkipped")
+
+                            if (mNextStep === undefined) {
+                                mWorkflow.emit("workflowCompleted", { state: job.state });
+                            }
+                            continue
                         }
 
                         await this.#storage.write([
@@ -151,10 +184,14 @@ export class Poller implements Worker {
                     type: "failure",
                     error
                 }),
+                skip: () => ({
+                    type: "skip"
+                }),
                 workflow
             });
 
-            if (this.#isSuccessResult(newStateOrResult) || this.#isFailureResult(newStateOrResult)) {
+            if (this.#isSuccessResult(newStateOrResult) || this.#isFailureResult(newStateOrResult) ||
+                this.#isSkipResult(newStateOrResult)) {
                 return newStateOrResult;
             }
 
@@ -182,5 +219,12 @@ export class Poller implements Worker {
             state !== null &&
             "type" in state &&
             state.type === "failure";
+    }
+
+    #isSkipResult(state: unknown): state is SkipResult {
+        return typeof state === "object" &&
+        state !== null &&
+        "type" in state &&
+        state.type === "skip";
     }
 }

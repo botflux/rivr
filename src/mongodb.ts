@@ -1,5 +1,5 @@
 import { Engine, Trigger, Worker, Workflow } from "./core";
-import { AnyBulkWriteOperation, Collection, MongoClient } from "mongodb"
+import { AnyBulkWriteOperation, Collection, MongoClient, ObjectId } from "mongodb"
 import { JobRecord as JRecord, JobWrite as JWrite, Poller, PullOpts, Storage } from "./pull"
 
 type MongoJobRecord<State> = Omit<JRecord<State>, "id">
@@ -35,11 +35,11 @@ export class MongoStorage<State> implements Storage<State> {
 
     async write(writes: JWrite<State>[]): Promise<void> {
         const mongoWrites = writes.map(write => {
-            if (write.type === "ack" || write.type === "nack") {
+            if (write.type === "ack" || write.type === "nack") {
                 return {
                     updateOne: {
                         filter: {
-                            id: write.record.id
+                            _id: ObjectId.createFromHexString(write.record.id)
                         },
                         update: {
                             $set: {
