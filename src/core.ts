@@ -80,16 +80,6 @@ export class Workflow<State, Ctx extends Record<string, unknown> = Record<string
         return this.#steps.find(s => s.name === name)
     }
 
-    isLastStep(name: string): boolean {
-        const last = this.#steps[this.#steps.length - 1]
-
-        if (last === undefined) {
-            throw new Error("No steps in the workflow")
-        }
-
-        return last.name === name
-    }
-
     getNextStep(name: string, offset = 1): StepOpts<State, this> | undefined {
         const index = this.#steps.findIndex(s => s.name === name)
 
