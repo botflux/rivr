@@ -45,14 +45,22 @@ export type StepOpts<State, W extends Workflow<State>> = {
     handler: Handler<State, W>
 }
 
+export type OnStepHandler<State, W extends Workflow<State>> = (workflow: W, state: State) => void
+
 export class Workflow<State, Ctx extends Record<string, unknown> = Record<string, unknown>> extends EventEmitter {
     name: string
 
+    #onStep: OnStepHandler<State, this>[] = []
     #steps: StepOpts<State, Workflow<State>>[] = []
 
     constructor(name: string) {
         super()
         this.name = name
+    }
+
+    addHook (hook: "onStep", handler: OnStepHandler<State, this>): this {
+        this.#onStep.push(handler)
+        return this
     }
 
     step(opts: StepOpts<State, this>): this {
@@ -100,6 +108,10 @@ export class Workflow<State, Ctx extends Record<string, unknown> = Record<string
 
     get steps (): StepOpts<State, this>[] {
         return this.#steps
+    }
+
+    get onStep(): OnStepHandler<State, this>[] {
+        return this.#onStep
     }
 }
 

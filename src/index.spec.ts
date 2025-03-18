@@ -324,6 +324,36 @@ test("should be able to execute callback returning a promise of a result", async
     t.assert.deepStrictEqual(getEvents(), [[{ state: 6 }]])
 })
 
+test("should be able to execute a hook before handling a job", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        signal: t.signal
+    })
+
+    let executed = false
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .addHook("onStep", () => {
+            executed = true
+        })
+        .step({
+            name: "add-2",
+            handler: ({ state }) => state + 2
+        })
+        
+    const completed = once(workflow, "workflowCompleted")
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 2)
+
+    // Then
+    await completed
+    t.assert.deepEqual(executed, true)
+})
+
 function collectEvents (emitter: EventEmitter, event: string, signal: AbortSignal) {
     let events: unknown[][] = []
 

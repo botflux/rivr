@@ -77,6 +77,11 @@ export class Poller implements Worker {
                             continue;
 
                         console.log("handling...", mStep.name);
+
+                        for (const handler of mWorkflow.onStep) {
+                            handler(mWorkflow, job.state)
+                        }
+
                         const result = await this.#executeHandler(mStep, job.state, mWorkflow);
                         const mNextStep = mWorkflow.getNextStep(job.step);
 
