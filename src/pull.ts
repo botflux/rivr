@@ -1,6 +1,6 @@
 import { setTimeout } from "node:timers/promises"
-import { Trigger, Worker } from "./core"
-import { Workflow } from "./workflow"
+import { type Trigger, type Worker } from "./core.ts"
+import { type Workflow } from "./workflow.ts"
 
 export type Task<State> = {
     id: string
@@ -22,7 +22,7 @@ export type Insert<State> = {
 export type Write<State> = Ack<State> | Insert<State>
 
 export interface Storage {
-    pull<State>(workflows: Workflow<State>[]): Promise<Task<State>[]>
+    pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<Task<State>[]>
     write<State>(writes: Write<State>[]): Promise<void>
     disconnect(): Promise<void>
 }
@@ -48,7 +48,7 @@ export class PullTrigger implements Trigger {
         this.#storage = storage
     }
 
-    async trigger<State>(workflow: Workflow<State>, state: State): Promise<void> {
+    async trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State): Promise<void> {
         const mFirstStep = workflow.getFirstStep()
 
         if (!mFirstStep) {
@@ -79,7 +79,7 @@ export class Poller implements Worker {
         this.#storage = storage
     }
 
-    start<State>(workflows: Workflow<State>[]): void {
+    start<State, Decorators>(workflows: Workflow<State, Decorators>[]): void {
         (async () => {
             for (const _ of this.#loop) {
                 const tasks = await this.#storage.pull(workflows)
@@ -96,7 +96,8 @@ export class Poller implements Worker {
                         continue
 
                     const nextState = mStep.handler({
-                        state: task.state
+                        state: task.state,
+                        workflow: mWorkflow
                     })
 
                     const mNextStep = mWorkflow.getNextStep(task.step)

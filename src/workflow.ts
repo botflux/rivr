@@ -1,55 +1,64 @@
-export type HandlerOpts<State> = {
+export type HandlerOpts<State, Decorators> = {
     state: State
+    workflow: Workflow<State, Decorators>
 }
 
-export type Handler<State> = (opts: HandlerOpts<State>) => State
+export type Handler<State, Decorators> = (opts: HandlerOpts<State, Decorators>) => State
 
-export type StepOpts<State> = {
+export type StepOpts<State, Decorators> = {
     name: string
-    handler: Handler<State>
+    handler: Handler<State, Decorators>
 }
 
-export type OnWorkflowCompletedHook<State> = (workflow: Workflow<State>, state: State) => void
+export type OnWorkflowCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, state: State) => void
 
-export interface Workflow<State> {
+export type Workflow<State, Decorators> = {
     name: string
 
-    steps: StepOpts<State>[]
-    onWorkflowCompleted: OnWorkflowCompletedHook<State>[]
+    steps: StepOpts<State, Decorators>[]
+    onWorkflowCompleted: OnWorkflowCompletedHook<State, Decorators>[]
 
-    getFirstStep(): StepOpts<State> | undefined
-    getStep(name: string): StepOpts<State> | undefined
-    getNextStep(name: string): StepOpts<State> | undefined
+    getFirstStep(): StepOpts<State, Decorators> | undefined
+    getStep(name: string): StepOpts<State, Decorators> | undefined
+    getNextStep(name: string): StepOpts<State, Decorators> | undefined
 
-    step(opts: StepOpts<State>): Workflow<State>
-    addHook(hook: "onWorkflowCompleted", handler: OnWorkflowCompletedHook<State>): Workflow<State>
-}
+    decorate<K extends string, V>(key: K, value: V): Workflow<State, Decorators & Record<K, V>>
 
-function WorkflowConstructor<State> (this: Workflow<State>, name: string) {
+    step(opts: StepOpts<State, Decorators>): Workflow<State, Decorators>
+    addHook(hook: "onWorkflowCompleted", handler: OnWorkflowCompletedHook<State, Decorators>): Workflow<State, Decorators>
+} & Decorators
+
+function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorators>, name: string) {
     this.name = name
     this.steps = []
     this.onWorkflowCompleted = []
 }
 
-WorkflowConstructor.prototype.step = function step(this: Workflow<unknown>, opts: StepOpts<unknown>) {
+WorkflowConstructor.prototype.step = function step(this: Workflow<unknown, unknown>, opts: StepOpts<unknown, unknown>) {
     this.steps.push(opts)
     return this
 }
 
-WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown>, hook: string, handler: OnWorkflowCompletedHook<unknown>) {
+WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown, unknown>, hook: string, handler: OnWorkflowCompletedHook<unknown, unknown>) {
     this.onWorkflowCompleted.push(handler)
     return this
 }
 
-WorkflowConstructor.prototype.getFirstStep = function getFirstStep(this: Workflow<unknown>) {
+WorkflowConstructor.prototype.decorate = function decorate(this: Workflow<unknown, unknown>, key: string, value: unknown) {
+    // @ts-expect-error
+    this[key] = value
+    return this
+}
+
+WorkflowConstructor.prototype.getFirstStep = function getFirstStep(this: Workflow<unknown, unknown>) {
     return this.steps[0]
 }
 
-WorkflowConstructor.prototype.getStep = function getStep(this: Workflow<unknown>, name: string) {
+WorkflowConstructor.prototype.getStep = function getStep(this: Workflow<unknown, unknown>, name: string) {
     return this.steps.find(s => s.name === name)
 }
 
-WorkflowConstructor.prototype.getNextStep = function getNextStep(this: Workflow<unknown>, name: string) {
+WorkflowConstructor.prototype.getNextStep = function getNextStep(this: Workflow<unknown, unknown>, name: string) {
     const stepIndex = this.steps.findIndex(s => s.name === name)
     
     if (stepIndex === -1) {
@@ -66,7 +75,7 @@ WorkflowConstructor.prototype.getNextStep = function getNextStep(this: Workflow<
 }
 
 export const rivr = {
-    workflow<State>(name: string): Workflow<State> {
+    workflow<State>(name: string): Workflow<State, Record<string, unknown>> {
         return new (WorkflowConstructor as any)(name)
     }
 }

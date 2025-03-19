@@ -1,7 +1,7 @@
-import { Engine, Trigger, Worker } from "./core";
-import { Poller, PullTrigger, Storage, Task, Write } from "./pull";
-import { Workflow } from "./workflow";
-import { AnyBulkWriteOperation, Collection, MongoClient, ObjectId } from "mongodb"
+import { type Engine, type Trigger, type Worker } from "./core.ts";
+import { Poller, PullTrigger, type Storage, type Task, type Write } from "./pull.ts";
+import { type Workflow } from "./workflow.ts";
+import { type AnyBulkWriteOperation, type Collection, MongoClient, ObjectId } from "mongodb"
 
 type MongoTask<State> = Omit<Task<State>, "id"> & {
     ack: boolean
@@ -20,7 +20,7 @@ class MongoStorage implements Storage {
         this.#collection = this.#client.db(dbName).collection(collectionName)
     }
 
-    async pull<State>(workflows: Workflow<State>[]): Promise<Task<State>[]> {
+    async pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<Task<State>[]> {
         const names = workflows.map(w => w.name)
 
         const tasks = await this.#collection.find({ workflow: { $in: names }, ack: false })
