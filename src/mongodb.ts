@@ -35,7 +35,8 @@ class MongoStorage implements Storage {
     async write<State>(writes: Write<State>[]): Promise<void> {
         const mongoWrites = writes.map(write => {
             switch(write.type) {
-                case "ack": return {
+                case "ack": 
+                case "nack": return {
                     updateOne: {
                         filter: {
                             _id: ObjectId.createFromHexString(write.task.id)

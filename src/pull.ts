@@ -1,6 +1,6 @@
 import { setTimeout } from "node:timers/promises"
 import { type Trigger, type Worker } from "./core.ts"
-import { type Workflow } from "./workflow.ts"
+import { StepOpts, StepResult, type Workflow } from "./workflow.ts"
 
 export type Task<State> = {
     id: string
@@ -19,7 +19,12 @@ export type Insert<State> = {
     task: Omit<Task<State>, "id">
 }
 
-export type Write<State> = Ack<State> | Insert<State>
+export type Nack<State> = {
+    type: "nack"
+    task: Task<State>
+}
+
+export type Write<State> = Ack<State> | Insert<State> | Nack<State>
 
 export interface Storage {
     pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<Task<State>[]>
@@ -95,35 +100,63 @@ export class Poller implements Worker {
                     if (!mStep)
                         continue
 
-                    const nextState = mStep.handler({
-                        state: task.state,
-                        workflow: mWorkflow
-                    })
+                    // const nextState = mStep.handler({
+                    //     state: task.state,
+                    //     workflow: mWorkflow,
+                    //     ok: state => ({
+                    //         type: "success",
+                    //         state
+                    //     }),
+                    //     err: error => ({
+                    //         type: "failure",
+                    //         error
+                    //     })
+                    // })
+                    const result = this.#handleStep(mStep, task.state, mWorkflow)
 
-                    const mNextStep = mWorkflow.getNextStep(task.step)
+                    switch(result.type) {
+                        case "success": {
+                            const mNextStep = mWorkflow.getNextStep(task.step)
 
-                    await this.#storage.write([
-                        {
-                            type: "ack",
-                            task
-                        },
-                        ...mNextStep !== undefined
-                            ? [
+                            await this.#storage.write([
                                 {
-                                    type: "insert",
-                                    task: {
-                                        state: nextState,
-                                        step: mNextStep.name,
-                                        workflow: mWorkflow.name
-                                    }
-                                } satisfies Insert<State>
-                            ]
-                            : []
-                    ])
+                                    type: "ack",
+                                    task
+                                },
+                                ...mNextStep !== undefined
+                                    ? [
+                                        {
+                                            type: "insert",
+                                            task: {
+                                                state: result.state,
+                                                step: mNextStep.name,
+                                                workflow: mWorkflow.name
+                                            }
+                                        } satisfies Insert<State>
+                                    ]
+                                    : []
+                            ])
 
-                    if (mNextStep === undefined) {
-                        for (const handler of mWorkflow.onWorkflowCompleted) {
-                            handler.call(mWorkflow, mWorkflow, nextState)
+                            if (mNextStep === undefined) {
+                                for (const handler of mWorkflow.onWorkflowCompleted) {
+                                    handler.call(mWorkflow, mWorkflow, result.state)
+                                }
+                            }
+
+                            break
+                        }
+
+                        case "failure": {
+                            await this.#storage.write([
+                                {
+                                    type: "nack",
+                                    task
+                                }
+                            ])
+
+                            for (const hook of mWorkflow.onStepError) {
+                                hook(result.error, mWorkflow, task.state)
+                            }
                         }
                     }
                 }
@@ -141,5 +174,33 @@ export class Poller implements Worker {
         }
 
         await this.#storage.disconnect()
+    }
+
+    #handleStep<State, Decorators>(
+        step: StepOpts<State, Decorators>, 
+        state: State, 
+        workflow: Workflow<State, Decorators>
+    ): StepResult<State> {
+        try {
+            const nextState = step.handler({
+                state,
+                workflow,
+                ok: state => ({
+                    type: "success",
+                    state
+                }),
+                err: error => ({
+                    type: "failure",
+                    error
+                })
+            })
+
+            return ({
+                type: "success",
+                state: nextState
+            })
+        } catch(error: unknown) {
+            return ({ type: "failure", error })
+        }
     }
 }

@@ -1,6 +1,22 @@
+export type Success<State> = {
+    type: "success"
+    state: State
+}
+
+export type Failure = {
+    type: "failure"
+    error: unknown
+}
+
+export type StepResult<State> = 
+    | Success<State>
+    | Failure
+
 export type HandlerOpts<State, Decorators> = {
     state: State
     workflow: Workflow<State, Decorators>
+    ok: (state: State) => Success<State>
+    err: (error: unknown) => Failure
 }
 
 export type Handler<State, Decorators> = (opts: HandlerOpts<State, Decorators>) => State
@@ -11,6 +27,7 @@ export type StepOpts<State, Decorators> = {
 }
 
 export type OnWorkflowCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, state: State) => void
+export type OnStepErrorHook<State, Decorators> = (error: unknown, workflow: Workflow<State, Decorators>, state: State) => void
 
 export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State, Decorators>) => Workflow<State, NewDecorators>
 
@@ -41,6 +58,11 @@ export type Workflow<State, Decorators> = {
      * Hooks to execute once a workflow is completed.
      */
     onWorkflowCompleted: OnWorkflowCompletedHook<State, Decorators>[]
+
+    /**
+     * Hooks to execute for each step error.
+     */
+    onStepError: OnStepErrorHook<State, Decorators>[]
 
     /**
      * Get this workflow's first step.
@@ -94,18 +116,27 @@ export type Workflow<State, Decorators> = {
     step(opts: StepOpts<State, Decorators>): Workflow<State, Decorators>
 
     /**
-     * Add a hook
+     * Hook on workflow completed.
      * 
      * @param hook 
      * @param handler 
      */
     addHook(hook: "onWorkflowCompleted", handler: OnWorkflowCompletedHook<State, Decorators>): Workflow<State, Decorators>
+
+    /**
+     * Hook on step error.
+     * 
+     * @param hook 
+     * @param handler 
+     */
+    addHook(hook: "onStepError", handler: OnStepErrorHook<State, Decorators>): Workflow<State, Decorators>
 } & Decorators
 
 function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorators>, name: string) {
     this[kWorkflow] = true
     this.name = name
     this.onWorkflowCompleted = []
+    this.onStepError = []
     this.graph = []
 }
 
@@ -114,8 +145,18 @@ WorkflowConstructor.prototype.step = function step(this: Workflow<unknown, unkno
     return this
 }
 
-WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown, unknown>, hook: string, handler: OnWorkflowCompletedHook<unknown, unknown>) {
-    this.onWorkflowCompleted.push(handler)
+WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown, unknown>, hook: string, handler: Function) {
+    switch(hook) {
+        case "onWorkflowCompleted":
+            this.onWorkflowCompleted.push(handler as OnWorkflowCompletedHook<unknown, unknown>)
+            break
+        case "onStepError":
+            this.onStepError.push(handler as OnStepErrorHook<unknown, unknown>)
+            break
+
+        default:
+            throw new Error(`Hook type '${hook}' is not supported`)
+    }
     return this
 }
 
@@ -215,4 +256,3 @@ export const rivr = {
         return new (WorkflowConstructor as any)(name)
     }
 }
-

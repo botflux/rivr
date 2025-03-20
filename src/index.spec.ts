@@ -201,3 +201,42 @@ test("register step in a plugin", async (t) => {
     }
     t.assert.deepEqual(state, 10)
 })
+
+test("handle step errors", async (t) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        signal: t.signal
+    })
+
+    let hookExecuted = false
+    let state
+    let error
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+            name: "add-3",
+            handler: () => {
+                throw "oops"
+            }
+        })
+        .addHook("onStepError", (e, w, s) => {
+            hookExecuted = true
+            state = s
+            error = e
+        })
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 4)
+
+    // Then
+    let now = new Date().getTime()
+    while (!hookExecuted && new Date().getTime() - now < 5_000) {
+        await setTimeout(20)
+    }
+    t.assert.deepEqual(error, "oops")
+    t.assert.deepEqual(state, 4)
+})
