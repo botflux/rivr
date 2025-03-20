@@ -12,8 +12,20 @@ export type StepOpts<State, Decorators> = {
 
 export type OnWorkflowCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, state: State) => void
 
+export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State, Decorators>) => Workflow<State, NewDecorators>
+
+export type ExecutionGraph<State, Decorators> = 
+    | { type: "step", step: StepOpts<State, Decorators> }
+    | { type: "context", context: Workflow<State, Decorators> }
+
+const kWorkflow = Symbol("kWorkflow")
+
 export type Workflow<State, Decorators> = {
+    [kWorkflow]: true
+
     name: string
+
+    graph: ExecutionGraph<State, Decorators>[]
 
     steps: StepOpts<State, Decorators>[]
     onWorkflowCompleted: OnWorkflowCompletedHook<State, Decorators>[]
@@ -24,54 +36,127 @@ export type Workflow<State, Decorators> = {
 
     decorate<K extends string, V>(key: K, value: V): Workflow<State, Decorators & Record<K, V>>
 
+    register<NewDecorators>(plugin: Plugin<State, Decorators, NewDecorators>): Workflow<State, NewDecorators>
+
+    stepIterator(): Iterable<[ step: StepOpts<State, Decorators>, context: Workflow<State, Decorators> ]>
+
     step(opts: StepOpts<State, Decorators>): Workflow<State, Decorators>
     addHook(hook: "onWorkflowCompleted", handler: OnWorkflowCompletedHook<State, Decorators>): Workflow<State, Decorators>
 } & Decorators
 
-function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorators>, name: string) {
+type InternalWorkflow<State, Decorators> = {
+    listStep(): [ step: StepOpts<State, Decorators>, context: Workflow<State, Decorators> ][]
+} & Workflow<State, Decorators>
+
+function WorkflowConstructor<State, Decorators> (this: InternalWorkflow<State, Decorators>, name: string) {
+    this[kWorkflow] = true
     this.name = name
     this.steps = []
     this.onWorkflowCompleted = []
+    this.graph = []
 }
 
-WorkflowConstructor.prototype.step = function step(this: Workflow<unknown, unknown>, opts: StepOpts<unknown, unknown>) {
+WorkflowConstructor.prototype.step = function step(this: InternalWorkflow<unknown, unknown>, opts: StepOpts<unknown, unknown>) {
     this.steps.push(opts)
+    this.graph.push({ type: "step", step: opts })
     return this
 }
 
-WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown, unknown>, hook: string, handler: OnWorkflowCompletedHook<unknown, unknown>) {
+WorkflowConstructor.prototype.addHook = function addHook(this: InternalWorkflow<unknown, unknown>, hook: string, handler: OnWorkflowCompletedHook<unknown, unknown>) {
     this.onWorkflowCompleted.push(handler)
     return this
 }
 
-WorkflowConstructor.prototype.decorate = function decorate(this: Workflow<unknown, unknown>, key: string, value: unknown) {
+function getRootWorkflow (w: InternalWorkflow<unknown, unknown>): InternalWorkflow<unknown, unknown> {
+    const proto = Object.getPrototypeOf(w)
+    const isRoot = !(kWorkflow in proto)
+
+    if (isRoot) {
+        return w
+    }
+
+    return getRootWorkflow(proto)
+}
+
+WorkflowConstructor.prototype.listStep = function* listStep (this: InternalWorkflow<unknown, unknown>) {
+    for (const element of this.graph) {
+        if (element.type === "step") {
+            yield [element.step, this]
+        } else {
+            for (const elem of (element.context as InternalWorkflow<unknown, unknown>).listStep()) {
+                yield elem
+            }
+        }
+    }
+}
+
+// WorkflowConstructor.prototype.stepIterator = function *stepIterator (this: Workflow<unknown, unknown>) {
+WorkflowConstructor.prototype.stepIterator = function *stepIterator (this: InternalWorkflow<unknown, unknown>) {
+    const root = getRootWorkflow(this)
+
+    for (const step of root.listStep()) {
+        yield step
+    }
+}
+
+WorkflowConstructor.prototype.register = function register(this: InternalWorkflow<unknown, unknown>, plugin: (workflow: Workflow<unknown, unknown>) => Workflow<unknown, unknown>) {
+    const newContext = new (WorkflowConstructor as any)(this.name)
+    Object.setPrototypeOf(newContext, this)
+    plugin(newContext)
+    this.graph.push({ type: "context", context: newContext })
+    return newContext
+}
+
+WorkflowConstructor.prototype.decorate = function decorate(this: InternalWorkflow<unknown, unknown>, key: string, value: unknown) {
     // @ts-expect-error
     this[key] = value
     return this
 }
 
-WorkflowConstructor.prototype.getFirstStep = function getFirstStep(this: Workflow<unknown, unknown>) {
-    return this.steps[0]
+WorkflowConstructor.prototype.getFirstStep = function getFirstStep(this: InternalWorkflow<unknown, unknown>) {
+    for (const [ step ] of this.stepIterator()) {
+        return step
+    }
 }
 
-WorkflowConstructor.prototype.getStep = function getStep(this: Workflow<unknown, unknown>, name: string) {
-    return this.steps.find(s => s.name === name)
+WorkflowConstructor.prototype.getStep = function getStep(this: InternalWorkflow<unknown, unknown>, name: string) {
+    for (const [ step ] of this.stepIterator()) {
+        if (name === step.name)
+            return step
+    }
 }
 
-WorkflowConstructor.prototype.getNextStep = function getNextStep(this: Workflow<unknown, unknown>, name: string) {
-    const stepIndex = this.steps.findIndex(s => s.name === name)
-    
-    if (stepIndex === -1) {
+WorkflowConstructor.prototype.getNextStep = function getNextStep(this: InternalWorkflow<unknown, unknown>, name: string) {
+    let found = false
+
+    for (const [ step ] of this.stepIterator()) {
+        if (name === step.name) {
+            found = true
+            continue
+        }
+
+        if (found) {
+            return step
+        }
+    }
+
+    if (!found) {
         throw new Error(`Cannot find the next step of '${name}' because there is no step named '${name}'`)
     }
 
-    const newIndex = stepIndex + 1
-
-    if (newIndex >= this.steps.length) {
-        return undefined
-    }
-
-    return this.steps[newIndex]
+    // const stepIndex = this.steps.findIndex(s => s.name === name)
+    //
+    // if (stepIndex === -1) {
+    //     throw new Error(`Cannot find the next step of '${name}' because there is no step named '${name}'`)
+    // }
+    //
+    // const newIndex = stepIndex + 1
+    // 
+    // if (newIndex >= this.steps.length) {
+    //     return undefined
+    // }
+    // 
+    // return this.steps[newIndex]
 }
 
 export const rivr = {
