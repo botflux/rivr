@@ -26,6 +26,6 @@ const workflow = rivr.workflow<number>("complex-calculation")
 console.log(workflow.getFirstStep())
 console.log(workflow.getStep("add-3"))
 console.log(workflow.getNextStep("add-3"))
-console.log(Array.from(workflow.stepIterator()))
+console.log(Array.from(workflow.steps()))
 // console.log(workflow.graph)
 
