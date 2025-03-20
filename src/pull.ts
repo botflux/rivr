@@ -182,7 +182,7 @@ export class Poller implements Worker {
         workflow: Workflow<State, Decorators>
     ): StepResult<State> {
         try {
-            const nextState = step.handler({
+            const nextStateOrResult = step.handler({
                 state,
                 workflow,
                 ok: state => ({
@@ -195,12 +195,21 @@ export class Poller implements Worker {
                 })
             })
 
+            if (this.#isStepResult(nextStateOrResult)) {
+                return nextStateOrResult
+            }
+
             return ({
                 type: "success",
-                state: nextState
+                state: nextStateOrResult
             })
         } catch(error: unknown) {
             return ({ type: "failure", error })
         }
+    }
+
+    #isStepResult (value: unknown): value is StepResult<unknown> {
+        return typeof value === "object" && value !== null &&
+            "type" in value && typeof value["type"] === "string"
     }
 }

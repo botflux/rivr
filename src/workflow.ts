@@ -19,7 +19,7 @@ export type HandlerOpts<State, Decorators> = {
     err: (error: unknown) => Failure
 }
 
-export type Handler<State, Decorators> = (opts: HandlerOpts<State, Decorators>) => State
+export type Handler<State, Decorators> = (opts: HandlerOpts<State, Decorators>) => State | StepResult<State>
 
 export type StepOpts<State, Decorators> = {
     name: string
