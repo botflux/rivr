@@ -21,25 +21,84 @@ export type ExecutionGraph<State, Decorators> =
 const kWorkflow = Symbol("kWorkflow")
 
 export type Workflow<State, Decorators> = {
+    /**
+     * A flag to discriminates if an object is a workflow.
+     */
     [kWorkflow]: true
 
+    /**
+     * The name of the workflow.
+     */
     name: string
 
+    /**
+     * A tree containing the steps and sub-workflow in order.
+     * Iterating through this tree depth-first would yield the steps in order.
+     */
     graph: ExecutionGraph<State, Decorators>[]
 
+    /**
+     * Hooks to execute once a workflow is completed.
+     */
     onWorkflowCompleted: OnWorkflowCompletedHook<State, Decorators>[]
 
+    /**
+     * Get this workflow's first step.
+     * Returns `undefined` if the workflow is empty.
+     */
     getFirstStep(): StepOpts<State, Decorators> | undefined
+
+    /**
+     * Search a step by its name.
+     * Returns `undefined` if there is no step matching the given name.
+     * 
+     * @param name 
+     */
     getStep(name: string): StepOpts<State, Decorators> | undefined
+
+    /**
+     * Search the step succeding the step matching the given name.
+     * `undefined` is returned if there is no next step.
+     * An error is thrown if there is no step matching the given name.
+     * 
+     * @param name 
+     */
     getNextStep(name: string): StepOpts<State, Decorators> | undefined
 
+    /**
+     * Add a property to the current workflow.
+     * 
+     * @param key 
+     * @param value 
+     */
     decorate<K extends string, V>(key: K, value: V): Workflow<State, Decorators & Record<K, V>>
 
+    /**
+     * Register a plugin.
+     * 
+     * @param plugin
+     */
     register<NewDecorators>(plugin: Plugin<State, Decorators, NewDecorators>): Workflow<State, NewDecorators>
 
+    /**
+     * Iterate over each step.
+     * The iterator yields a tuple containing the step, and the context within which the step must be executed.
+     */
     steps(): Iterable<[ step: StepOpts<State, Decorators>, context: Workflow<State, Decorators> ]>
 
+    /**
+     * Add a step
+     * 
+     * @param opts
+     */
     step(opts: StepOpts<State, Decorators>): Workflow<State, Decorators>
+
+    /**
+     * Add a hook
+     * 
+     * @param hook 
+     * @param handler 
+     */
     addHook(hook: "onWorkflowCompleted", handler: OnWorkflowCompletedHook<State, Decorators>): Workflow<State, Decorators>
 } & Decorators
 
