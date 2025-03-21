@@ -49,6 +49,55 @@ test("execute a workflow step", async (t) => {
     t.assert.deepEqual(state, 7)
 })
 
+test("skip a step", async (t) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        signal: t.signal
+    })
+
+    let skipped = false
+    let skippedState
+    let finished = false
+    let state
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+            name: "add-3",
+            handler: ({ state }) => state + 3
+        })
+        .step({
+            name: "skipped",
+            handler: ctx => ctx.skip()
+        })
+        .step({
+            name: "minus-1",
+            handler: ({ state }) => state - 1
+        })
+        .addHook("onStepSkipped", (w, step, state) => {
+            skipped = true
+            skippedState = state
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+            finished = true
+            state = s
+        })
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 3)
+
+    // Then
+    let now = new Date().getTime()
+    while (!finished && new Date().getTime() - now < 5_000) {
+        await setTimeout(20)
+    }
+    t.assert.deepEqual(skippedState, 6)
+    t.assert.deepEqual(state, 5)
+})
+
 test("execute a workflow made of multiple steps", async (t) => {
     // Given
     const engine = createEngine({

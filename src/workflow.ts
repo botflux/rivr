@@ -8,15 +8,21 @@ export type Failure = {
     error: unknown
 }
 
+export type Skipped = {
+    type: "skipped"
+}
+
 export type StepResult<State> = 
     | Success<State>
     | Failure
+    | Skipped
 
 export type HandlerOpts<State, Decorators> = {
     state: State
     workflow: Workflow<State, Decorators>
     ok: (state: State) => Success<State>
     err: (error: unknown) => Failure
+    skip: () => Skipped
 }
 
 export type Handler<State, Decorators> = (opts: HandlerOpts<State, Decorators>) => State | StepResult<State>
@@ -28,6 +34,7 @@ export type StepOpts<State, Decorators> = {
 
 export type OnWorkflowCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, state: State) => void
 export type OnStepErrorHook<State, Decorators> = (error: unknown, workflow: Workflow<State, Decorators>, state: State) => void
+export type OnStepSkippedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: StepOpts<State, Decorators>, state: State) => void
 
 export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State, Decorators>) => Workflow<State, NewDecorators>
 
@@ -63,6 +70,11 @@ export type Workflow<State, Decorators> = {
      * Hooks to execute for each step error.
      */
     onStepError: OnStepErrorHook<State, Decorators>[]
+
+    /**
+     * Hooks to execute for each skipped step.
+     */
+    onStepSkipped: OnStepSkippedHook<State, Decorators>[]
 
     /**
      * Get this workflow's first step.
@@ -130,6 +142,11 @@ export type Workflow<State, Decorators> = {
      * @param handler 
      */
     addHook(hook: "onStepError", handler: OnStepErrorHook<State, Decorators>): Workflow<State, Decorators>
+
+    /**
+     * Hook on skipped steps.
+     */
+    addHook(hook: "onStepSkipped", handler: OnStepSkippedHook<State, Decorators>): Workflow<State, Decorators>
 } & Decorators
 
 function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorators>, name: string) {
@@ -137,6 +154,7 @@ function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorator
     this.name = name
     this.onWorkflowCompleted = []
     this.onStepError = []
+    this.onStepSkipped = []
     this.graph = []
 }
 
@@ -152,6 +170,10 @@ WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown,
             break
         case "onStepError":
             this.onStepError.push(handler as OnStepErrorHook<unknown, unknown>)
+            break
+
+        case "onStepSkipped":
+            this.onStepSkipped.push(handler as OnStepSkippedHook<unknown, unknown>)
             break
 
         default:

@@ -100,22 +100,14 @@ export class Poller implements Worker {
                     if (!mStep)
                         continue
 
-                    // const nextState = mStep.handler({
-                    //     state: task.state,
-                    //     workflow: mWorkflow,
-                    //     ok: state => ({
-                    //         type: "success",
-                    //         state
-                    //     }),
-                    //     err: error => ({
-                    //         type: "failure",
-                    //         error
-                    //     })
-                    // })
                     const result = this.#handleStep(mStep, task.state, mWorkflow)
 
                     switch(result.type) {
-                        case "success": {
+                        case "success": 
+                        case "skipped": {
+                            const newState = result.type === "skipped"
+                                ? task.state
+                                : result.state
                             const mNextStep = mWorkflow.getNextStep(task.step)
 
                             await this.#storage.write([
@@ -128,7 +120,7 @@ export class Poller implements Worker {
                                         {
                                             type: "insert",
                                             task: {
-                                                state: result.state,
+                                                state: newState,
                                                 step: mNextStep.name,
                                                 workflow: mWorkflow.name
                                             }
@@ -137,9 +129,15 @@ export class Poller implements Worker {
                                     : []
                             ])
 
+                            if (result.type === "skipped") {
+                                for (const handler of mWorkflow.onStepSkipped) {
+                                    handler(mWorkflow, mStep, task.state)
+                                }                                
+                            }
+
                             if (mNextStep === undefined) {
                                 for (const handler of mWorkflow.onWorkflowCompleted) {
-                                    handler.call(mWorkflow, mWorkflow, result.state)
+                                    handler.call(mWorkflow, mWorkflow, newState)
                                 }
                             }
 
@@ -192,6 +190,9 @@ export class Poller implements Worker {
                 err: error => ({
                     type: "failure",
                     error
+                }),
+                skip: () => ({
+                    type: "skipped"
                 })
             })
 
