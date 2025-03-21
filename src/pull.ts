@@ -103,6 +103,21 @@ export class Poller implements Worker {
                     const result = this.#handleStep(mStep, task.state, mWorkflow)
 
                     switch(result.type) {
+                        case "stopped": {
+                            await this.#storage.write([
+                                {
+                                    type: "ack",
+                                    task
+                                }
+                            ])
+
+                            for (const handler of mWorkflow.onWorkflowStopped) {
+                                handler(mWorkflow, mStep, task.state)
+                            }
+
+                            break
+                        }
+
                         case "success": 
                         case "skipped": {
                             const newState = result.type === "skipped"
@@ -193,6 +208,9 @@ export class Poller implements Worker {
                 }),
                 skip: () => ({
                     type: "skipped"
+                }),
+                stop: () => ({
+                    type: "stopped"
                 })
             })
 
