@@ -42,6 +42,7 @@ export type OnWorkflowCompletedHook<State, Decorators> = (workflow: Workflow<Sta
 export type OnStepErrorHook<State, Decorators> = (error: unknown, workflow: Workflow<State, Decorators>, state: State) => void
 export type OnStepSkippedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: StepOpts<State, Decorators>, state: State) => void
 export type OnWorkflowStoppedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: StepOpts<State, Decorators>, state: State) => void
+export type OnStepCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: StepOpts<State, Decorators>, state: State) => void
 
 export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State, Decorators>) => Workflow<State, NewDecorators>
 
@@ -87,6 +88,11 @@ export type Workflow<State, Decorators> = {
      * Hooks to execute for each stopped workflow.
      */
     onWorkflowStopped: OnWorkflowStoppedHook<State, Decorators>[]
+
+    /**
+     * Hooks to execute each time a step is completed.
+     */
+    onStepCompleted: OnStepCompletedHook<State, Decorators>[]
 
     /**
      * Get this workflow's first step.
@@ -170,6 +176,14 @@ export type Workflow<State, Decorators> = {
      * @param handler 
      */
     addHook(hook: "onWorkflowStopped", handler: OnWorkflowStoppedHook<State, Decorators>): Workflow<State, Decorators>
+
+    /**
+     * Hook on step completed.
+     * 
+     * @param hook 
+     * @param handler 
+     */
+    addHook(hook: "onStepCompleted", handler: OnStepCompletedHook<State, Decorators>): Workflow<State, Decorators>
 } & Decorators
 
 function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorators>, name: string) {
@@ -179,6 +193,7 @@ function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorator
     this.onStepError = []
     this.onStepSkipped = []
     this.onWorkflowStopped = []
+    this.onStepCompleted = []
     this.graph = []
 }
 
@@ -202,6 +217,10 @@ WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown,
 
         case "onWorkflowStopped":
             this.onWorkflowStopped.push(handler as OnWorkflowCompletedHook<unknown, unknown>)
+            break
+
+        case "onStepCompleted":
+            this.onStepCompleted.push(handler as OnStepCompletedHook<unknown, unknown>)
             break
 
         default:

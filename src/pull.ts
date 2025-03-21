@@ -150,6 +150,10 @@ export class Poller implements Worker {
                                 }                                
                             }
 
+                            for (const handler of mWorkflow.onStepCompleted) {
+                                handler.call(this, mWorkflow, mStep, newState)
+                            }
+
                             if (mNextStep === undefined) {
                                 for (const handler of mWorkflow.onWorkflowCompleted) {
                                     handler.call(mWorkflow, mWorkflow, newState)

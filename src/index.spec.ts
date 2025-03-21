@@ -1,4 +1,4 @@
-import { test, before, after } from "node:test"
+import { test, before, after, type TestContext } from "node:test"
 import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongodb"
 import { randomUUID } from "crypto"
 import { setTimeout } from "timers/promises"
@@ -401,4 +401,51 @@ test("return a error step result", async (t) => {
     }
     t.assert.deepEqual(error, "oops")
     t.assert.deepEqual(state, 4)
+})
+
+test("execute all the handler", { skip: true }, async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        signal: t.signal
+    })
+
+    const stepCompletedStates: number[] = []
+    let finished = false
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+        .addHook("onStepCompleted", (w, s, state) => {
+            stepCompletedStates.push(state)
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+            finished = true
+        })
+        .step({
+            name: "add-3",
+            handler: ({ state }) => state + 3
+        })
+        .register(w => {
+            return w
+                .addHook("onStepCompleted", (w, s, state) => {
+                    stepCompletedStates.push(state)
+                })
+                .step({
+                    name: "add-4",
+                    handler: ({ state }) => state + 4
+                })
+        })
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 3)
+
+    // Then
+    let now = new Date().getTime()
+    while (!finished && new Date().getTime() - now < 5_000) {
+        await setTimeout(20)
+    }
+
+    t.assert.deepStrictEqual(stepCompletedStates, [ 6, 6, 10, 10 ])
 })
