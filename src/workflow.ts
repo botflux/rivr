@@ -3,7 +3,7 @@ import {
     OnStepCompletedHook,
     OnStepErrorHook,
     OnStepSkippedHook,
-    OnWorkflowCompletedHook,
+    OnWorkflowCompletedHook, StepCompletedElement, StepElement,
     StepOpts,
     Workflow
 } from "./types.ts";
@@ -24,6 +24,28 @@ WorkflowConstructor.prototype.step = function step(this: Workflow<unknown, unkno
     return this
 }
 
+function* iterateDepthFirst(w: Workflow<unknown, unknown>): Iterable<StepElement<unknown, unknown> | StepCompletedElement<unknown, unknown>> {
+    for (const element of w.graph) {
+        if (element.type === "context") {
+            for (const nested of iterateDepthFirst(element.context)) {
+                yield nested
+            }
+        } else {
+            yield element
+        }
+    }
+}
+
+WorkflowConstructor.prototype.getHook = function* getHook(this: Workflow<unknown, unknown>, hook: "onStepCompleted") {
+    const root = getRootWorkflow(this)
+
+    for (const element of iterateDepthFirst(root)) {
+        if (element.type === hook) {
+            yield element.hook
+        }
+    }
+}
+
 WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown, unknown>, hook: string, handler: Function) {
     switch(hook) {
         case "onWorkflowCompleted":
@@ -42,6 +64,7 @@ WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown,
             break
 
         case "onStepCompleted":
+            this.graph.push({ type: "onStepCompleted", hook: handler as OnStepCompletedHook<unknown, unknown> })
             this.onStepCompleted.push(handler as OnStepCompletedHook<unknown, unknown>)
             break
 
@@ -66,7 +89,7 @@ function* listStepDepthFirst(w: Workflow<unknown, unknown>): Iterable<[ step: St
     for (const element of w.graph) {
         if (element.type === "step") {
             yield [element.step, w]
-        } else {
+        } else if (element.type === "context") {
             for (const elem of listStepDepthFirst(element.context)) {
                 yield elem
             }

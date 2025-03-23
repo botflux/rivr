@@ -35,10 +35,18 @@ export type OnStepErrorHook<State, Decorators> = (error: unknown, workflow: Work
 export type OnStepSkippedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: StepOpts<State, Decorators>, state: State) => void
 export type OnWorkflowStoppedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: StepOpts<State, Decorators>, state: State) => void
 export type OnStepCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: StepOpts<State, Decorators>, state: State) => void
+
 export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State, Decorators>) => Workflow<State, NewDecorators>
+
+export type StepElement<State, Decorators> = { type: "step", step: StepOpts<State, Decorators> }
+export type ContextElement<State, Decorators> = { type: "context", context: Workflow<State, Decorators> }
+export type StepCompletedElement<State, Decorators> = { type: "onStepCompleted", hook: OnStepCompletedHook<State, Decorators> }
+
 export type ExecutionGraph<State, Decorators> =
-  | { type: "step", step: StepOpts<State, Decorators> }
-  | { type: "context", context: Workflow<State, Decorators> }
+  | StepElement<State, Decorators>
+  | ContextElement<State, Decorators>
+  | StepCompletedElement<State, Decorators>
+
 export const kWorkflow = Symbol("kWorkflow")
 export type Workflow<State, Decorators> = {
   /**
@@ -172,4 +180,6 @@ export type Workflow<State, Decorators> = {
    * @param handler
    */
   addHook(hook: "onStepCompleted", handler: OnStepCompletedHook<State, Decorators>): Workflow<State, Decorators>
+
+  getHook(hook: "onStepCompleted"): OnStepCompletedHook<State, Decorators>[]
 } & Decorators

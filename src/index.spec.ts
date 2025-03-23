@@ -403,7 +403,7 @@ test("return a error step result", async (t) => {
     t.assert.deepEqual(state, 4)
 })
 
-test("execute all the handler", { skip: true }, async (t: TestContext) => {
+test("execute all the handler", async (t: TestContext) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),

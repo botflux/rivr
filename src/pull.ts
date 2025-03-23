@@ -151,7 +151,7 @@ export class Poller implements Worker {
                                 }                                
                             }
 
-                            for (const handler of mWorkflow.onStepCompleted) {
+                            for (const handler of mWorkflow.getHook("onStepCompleted")) {
                                 handler.call(this, mWorkflow, mStep, newState)
                             }
 
