@@ -530,6 +530,35 @@ test("should be able to execute a hook in the correct context", async (t) => {
   t.assert.deepEqual(hookValue, 6)
 })
 
+test("should be able to execute async handler", async (t) => {
+  // Given
+  const engine = createEngine({
+    url: container.getConnectionString(),
+    dbName: randomUUID(),
+    signal: t.signal
+  })
+
+  let state: number | undefined
+
+  const workflow = rivr.workflow<number>("complex-calculation")
+    .step({
+      name: "add-1-async",
+      handler: async ({ state }) => state + 1
+    })
+    .addHook("onWorkflowCompleted", (w, s) => {
+      state = s
+    })
+
+  engine.createWorker().start([ workflow ])
+
+  // When
+  await engine.createTrigger().trigger(workflow, 1)
+
+  // Then
+  await waitForPredicate(() => state !== undefined)
+  t.assert.deepEqual(state, 2)
+})
+
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {
     let now = new Date().getTime()
     while (!fn() && new Date().getTime() - now < 5_000) {

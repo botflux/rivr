@@ -25,7 +25,7 @@ export type HandlerOpts<State, Decorators> = {
   skip: () => Skipped
   stop: () => Stopped
 }
-export type Handler<State, Decorators> = (opts: HandlerOpts<State, Decorators>) => State | StepResult<State>
+export type Handler<State, Decorators> = (opts: HandlerOpts<State, Decorators>) => State | StepResult<State> | Promise<State> | Promise<StepResult<State>>
 export type StepOpts<State, Decorators> = {
   name: string
   handler: Handler<State, Decorators>

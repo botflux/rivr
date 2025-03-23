@@ -101,7 +101,7 @@ export class Poller implements Worker {
                     if (!mStep)
                         continue
 
-                    const result = this.#handleStep(mStep, task.state, mWorkflow)
+                    const result = await this.#handleStep(mStep, task.state, mWorkflow)
 
                     switch(result.type) {
                         case "stopped": {
@@ -194,13 +194,13 @@ export class Poller implements Worker {
         await this.#storage.disconnect()
     }
 
-    #handleStep<State, Decorators>(
+    async #handleStep<State, Decorators>(
         step: StepOpts<State, Decorators>, 
         state: State, 
         workflow: Workflow<State, Decorators>
-    ): StepResult<State> {
+    ): Promise<StepResult<State>> {
         try {
-            const nextStateOrResult = step.handler({
+            const nextStateOrResult = await step.handler({
                 state,
                 workflow,
                 ok: state => ({
