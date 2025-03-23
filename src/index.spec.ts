@@ -449,3 +449,58 @@ test("execute all the handler", async (t: TestContext) => {
 
     t.assert.deepStrictEqual(stepCompletedStates, [ 6, 6, 10, 10 ])
 })
+
+test("execute onWorkflowCompleted hooks in order", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        signal: t.signal
+    })
+
+    let elements: number[] = []
+    let finished = false
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .addHook("onWorkflowCompleted", (w, s) => {
+          elements.push(1)
+      })
+      .step({
+          name: "add-1",
+          handler: ({ state }) => state + 1
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+          elements.push(2)
+      })
+      .register(w => {
+          return w
+            .addHook("onWorkflowCompleted", (w, s) => {
+                elements.push(3)
+            })
+            .step({
+                name: "add-4",
+                handler: ({ state }) => state + 4
+            })
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+          elements.push(4)
+          finished = true
+      })
+
+    engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 3)
+
+    // Then
+    await waitForPredicate(() => finished)
+    t.assert.deepEqual(finished, true)
+    t.assert.deepStrictEqual(elements, [ 1, 2, 3, 4 ])
+})
+
+async function waitForPredicate(fn: () => boolean, ms = 5_000) {
+    let now = new Date().getTime()
+    while (!fn() && new Date().getTime() - now < 5_000) {
+        await setTimeout(20)
+    }
+}

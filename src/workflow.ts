@@ -5,7 +5,7 @@ import {
     OnStepSkippedHook,
     OnWorkflowCompletedHook, StepCompletedElement, StepElement,
     StepOpts,
-    Workflow
+    Workflow, WorkflowCompletedElement
 } from "./types.ts";
 
 function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorators>, name: string) {
@@ -24,7 +24,7 @@ WorkflowConstructor.prototype.step = function step(this: Workflow<unknown, unkno
     return this
 }
 
-function* iterateDepthFirst(w: Workflow<unknown, unknown>): Iterable<StepElement<unknown, unknown> | StepCompletedElement<unknown, unknown>> {
+function* iterateDepthFirst(w: Workflow<unknown, unknown>): Iterable<StepElement<unknown, unknown> | WorkflowCompletedElement<unknown, unknown> | StepCompletedElement<unknown, unknown>> {
     for (const element of w.graph) {
         if (element.type === "context") {
             for (const nested of iterateDepthFirst(element.context)) {
@@ -49,6 +49,7 @@ WorkflowConstructor.prototype.getHook = function* getHook(this: Workflow<unknown
 WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown, unknown>, hook: string, handler: Function) {
     switch(hook) {
         case "onWorkflowCompleted":
+            this.graph.push({ type: "onWorkflowCompleted", hook: handler as OnWorkflowCompletedHook<unknown, unknown> })
             this.onWorkflowCompleted.push(handler as OnWorkflowCompletedHook<unknown, unknown>)
             break
         case "onStepError":

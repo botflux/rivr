@@ -41,11 +41,13 @@ export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State
 export type StepElement<State, Decorators> = { type: "step", step: StepOpts<State, Decorators> }
 export type ContextElement<State, Decorators> = { type: "context", context: Workflow<State, Decorators> }
 export type StepCompletedElement<State, Decorators> = { type: "onStepCompleted", hook: OnStepCompletedHook<State, Decorators> }
+export type WorkflowCompletedElement<State, Decorators> = { type: "onWorkflowCompleted", hook: OnWorkflowCompletedHook<State, Decorators> }
 
 export type ExecutionGraph<State, Decorators> =
   | StepElement<State, Decorators>
   | ContextElement<State, Decorators>
   | StepCompletedElement<State, Decorators>
+  | WorkflowCompletedElement<State, Decorators>
 
 export const kWorkflow = Symbol("kWorkflow")
 export type Workflow<State, Decorators> = {
@@ -182,4 +184,5 @@ export type Workflow<State, Decorators> = {
   addHook(hook: "onStepCompleted", handler: OnStepCompletedHook<State, Decorators>): Workflow<State, Decorators>
 
   getHook(hook: "onStepCompleted"): OnStepCompletedHook<State, Decorators>[]
+  getHook(hook: "onWorkflowCompleted"): OnWorkflowCompletedHook<State, Decorators>[]
 } & Decorators
