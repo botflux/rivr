@@ -41,13 +41,19 @@ export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State
 export type StepElement<State, Decorators> = { type: "step", step: StepOpts<State, Decorators> }
 export type ContextElement<State, Decorators> = { type: "context", context: Workflow<State, Decorators> }
 export type StepCompletedElement<State, Decorators> = { type: "onStepCompleted", hook: OnStepCompletedHook<State, Decorators> }
+export type StepErrorElement<State, Decorators> = { type: "onStepError", hook: OnStepErrorHook<State, Decorators> }
+export type StepSkippedElement<State, Decorators> = { type: "onStepSkipped", hook: OnStepSkippedHook<State, Decorators> }
 export type WorkflowCompletedElement<State, Decorators> = { type: "onWorkflowCompleted", hook: OnWorkflowCompletedHook<State, Decorators> }
+export type WorkflowStoppedElement<State, Decorators> = { type: "onWorkflowStopped", hook: OnWorkflowStoppedHook<State, Decorators> }
 
 export type ExecutionGraph<State, Decorators> =
   | StepElement<State, Decorators>
   | ContextElement<State, Decorators>
   | StepCompletedElement<State, Decorators>
   | WorkflowCompletedElement<State, Decorators>
+  | StepErrorElement<State, Decorators>
+  | StepSkippedElement<State, Decorators>
+  | WorkflowStoppedElement<State, Decorators>
 
 export const kWorkflow = Symbol("kWorkflow")
 export type Workflow<State, Decorators> = {
@@ -66,31 +72,6 @@ export type Workflow<State, Decorators> = {
    * Iterating through this tree depth-first would yield the steps in order.
    */
   graph: ExecutionGraph<State, Decorators>[]
-
-  /**
-   * Hooks to execute once a workflow is completed.
-   */
-  onWorkflowCompleted: OnWorkflowCompletedHook<State, Decorators>[]
-
-  /**
-   * Hooks to execute for each step error.
-   */
-  onStepError: OnStepErrorHook<State, Decorators>[]
-
-  /**
-   * Hooks to execute for each skipped step.
-   */
-  onStepSkipped: OnStepSkippedHook<State, Decorators>[]
-
-  /**
-   * Hooks to execute for each stopped workflow.
-   */
-  onWorkflowStopped: OnWorkflowStoppedHook<State, Decorators>[]
-
-  /**
-   * Hooks to execute each time a step is completed.
-   */
-  onStepCompleted: OnStepCompletedHook<State, Decorators>[]
 
   /**
    * Get this workflow's first step.
@@ -185,4 +166,7 @@ export type Workflow<State, Decorators> = {
 
   getHook(hook: "onStepCompleted"): OnStepCompletedHook<State, Decorators>[]
   getHook(hook: "onWorkflowCompleted"): OnWorkflowCompletedHook<State, Decorators>[]
+  getHook(hook: "onStepError"): OnStepErrorHook<State, Decorators>[]
+  getHook(hook: "onStepSkipped"): OnStepSkippedHook<State, Decorators>[]
+  getHook(hook: "onWorkflowStopped"): OnWorkflowStoppedHook<State, Decorators>[]
 } & Decorators

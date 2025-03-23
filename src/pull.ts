@@ -112,7 +112,7 @@ export class Poller implements Worker {
                                 }
                             ])
 
-                            for (const handler of mWorkflow.onWorkflowStopped) {
+                            for (const handler of mWorkflow.getHook("onWorkflowStopped")) {
                                 handler(mWorkflow, mStep, task.state)
                             }
 
@@ -146,7 +146,7 @@ export class Poller implements Worker {
                             ])
 
                             if (result.type === "skipped") {
-                                for (const handler of mWorkflow.onStepSkipped) {
+                                for (const handler of mWorkflow.getHook("onStepSkipped")) {
                                     handler(mWorkflow, mStep, task.state)
                                 }                                
                             }
@@ -172,7 +172,7 @@ export class Poller implements Worker {
                                 }
                             ])
 
-                            for (const hook of mWorkflow.onStepError) {
+                            for (const hook of mWorkflow.getHook("onStepError")) {
                                 hook(result.error, mWorkflow, task.state)
                             }
                         }
