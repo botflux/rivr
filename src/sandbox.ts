@@ -8,7 +8,10 @@ const workflow = rivr.workflow<number>("complex-calculation")
     })
     .register(w => {
         return w
-            .addHook("onStepCompleted", () => {})
+            .decorate("foo", 4)
+            .addHook("onStepCompleted", (workflow, state) => {
+
+            })
             .step({
                 name: "add-4",
                 handler: ({ state }) => state + 4
