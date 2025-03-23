@@ -1,7 +1,7 @@
 import { type Engine, type Trigger, type Worker } from "./core.ts";
 import { Poller, PullTrigger, type Storage, type Task, type Write } from "./pull.ts";
-import { type Workflow } from "./workflow.ts";
 import { type AnyBulkWriteOperation, type Collection, MongoClient, ObjectId } from "mongodb"
+import {Workflow} from "./types.ts";
 
 type MongoTask<State> = Omit<Task<State>, "id"> & {
     ack: boolean

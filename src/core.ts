@@ -1,4 +1,4 @@
-import { type Workflow } from "./workflow.ts"
+import {Workflow} from "./types.ts";
 
 export interface Worker {
     start<State, Decorators>(workflows: Workflow<State, Decorators>[]): void

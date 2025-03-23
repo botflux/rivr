@@ -1,6 +1,7 @@
 import { setTimeout } from "node:timers/promises"
 import { type Trigger, type Worker } from "./core.ts"
-import { StepOpts, StepResult, type Workflow } from "./workflow.ts"
+
+import {StepOpts, StepResult, Workflow} from "./types.ts";
 
 export type Task<State> = {
     id: string
