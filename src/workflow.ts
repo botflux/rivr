@@ -252,7 +252,7 @@ function* listStepDepthFirst(w: Workflow<unknown, unknown>): Iterable<[ step: St
     }
 }
 
-WorkflowConstructor.prototype.steps = function *steps (this: Workflow<unknown, unknown>) {
+WorkflowConstructor.prototype.steps = function *steps (this: Workflow<unknown, unknown>): Iterable<[ StepOpts<unknown, unknown>, Workflow<unknown, unknown> ]> {
     const root = getRootWorkflow(this)
 
     for (const step of listStepDepthFirst(root)) {

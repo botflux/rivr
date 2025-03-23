@@ -180,7 +180,7 @@ export class Poller implements Worker {
             }
 
             this.#hasFinished = true
-        })()
+        })().catch(console.error)
     }
 
     async stop(): Promise<void> {
