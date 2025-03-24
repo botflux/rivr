@@ -116,7 +116,11 @@ export class Poller implements Worker {
                             ])
 
                             for (const handler of mWorkflow.getHook("onWorkflowStopped")) {
-                                handler(mWorkflow, mStep, task.state)
+                                const [, error] = tryCatchSync(() => handler(mWorkflow, mStep, task.state))
+
+                                if (error !== undefined) {
+                                    this.#executeErrorHooks(error)
+                                }
                             }
 
                             break
@@ -150,12 +154,20 @@ export class Poller implements Worker {
 
                             if (result.type === "skipped") {
                                 for (const handler of mWorkflow.getHook("onStepSkipped")) {
-                                    handler(mWorkflow, mStep, task.state)
+                                    const [, error] = tryCatchSync(() => handler(mWorkflow, mStep, task.state))
+
+                                    if (error !== undefined) {
+                                        this.#executeErrorHooks(error)
+                                    }
                                 }                                
                             }
 
                             for (const handler of mWorkflow.getHook("onStepCompleted")) {
-                                handler.call(this, mWorkflow, mStep, newState)
+                                const [, error] = tryCatchSync(() => handler(mWorkflow, mStep, newState))
+
+                                if (error !== undefined) {
+                                    this.#executeErrorHooks(error)
+                                }
                             }
 
                             if (mNextStep === undefined) {
@@ -180,7 +192,11 @@ export class Poller implements Worker {
                             ])
 
                             for (const hook of mWorkflow.getHook("onStepError")) {
-                                hook(result.error, mWorkflow, task.state)
+                                const [, error] = tryCatchSync(() => hook(result.error, mWorkflow, task.state))
+
+                                if (error !== undefined) {
+                                    this.#executeErrorHooks(error)
+                                }
                             }
                         }
                     }
