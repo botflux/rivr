@@ -1,7 +1,7 @@
 import { type Engine, type Trigger, type Worker } from "./core.ts";
 import { Poller, PullTrigger, type Storage, type Task, type Write } from "./pull.ts";
 import {
-    type AnyBulkWriteOperation,
+    type AnyBulkWriteOperation, ClientSession,
     type Collection,
     MongoClient,
     MongoClientOptions,
@@ -13,7 +13,11 @@ type MongoTask<State> = Omit<Task<State>, "id"> & {
     ack: boolean
 }
 
-class MongoStorage implements Storage {
+export type WriteOpts = {
+    session?: ClientSession
+}
+
+class MongoStorage implements Storage<WriteOpts> {
     #client: MongoClient
     #collection: Collection<MongoTask<unknown>>
 
@@ -38,7 +42,9 @@ class MongoStorage implements Storage {
         })) as Task<State>[]
     }
 
-    async write<State>(writes: Write<State>[]): Promise<void> {
+    async write<State>(writes: Write<State>[], opts: WriteOpts = {}): Promise<void> {
+        const { session } = opts
+
         const mongoWrites = writes.map(write => {
             switch(write.type) {
                 case "ack": 
@@ -68,7 +74,9 @@ class MongoStorage implements Storage {
             }
         })
 
-        await this.#collection.bulkWrite(mongoWrites)
+        await this.#collection.bulkWrite(mongoWrites, {
+            session,
+        })
     }
 
     async disconnect(): Promise<void> {
@@ -76,10 +84,11 @@ class MongoStorage implements Storage {
     }
 }
 
-export class MongoEngine implements Engine {
+export class MongoEngine implements Engine<WriteOpts> {
+    #client: MongoClient | undefined
     #opts: CreateEngineOpts
     #workers: Worker[] = []
-    #triggerStorage: Storage[] = []
+    #triggerStorage: Storage<WriteOpts>[] = []
 
     constructor(opts: CreateEngineOpts) {
         this.#opts = opts
@@ -96,9 +105,7 @@ export class MongoEngine implements Engine {
 
     createWorker(): Worker {
         const storage = new MongoStorage(
-            new MongoClient(this.#opts.url, {
-                directConnection: true
-            }),
+            this.client,
             this.#opts.dbName,
             "tasks"
         )
@@ -109,9 +116,9 @@ export class MongoEngine implements Engine {
         return poller
     }
 
-    createTrigger(): Trigger {
+    createTrigger(): Trigger<WriteOpts> {
         const storage = new MongoStorage(
-            new MongoClient(this.#opts.url, this.#opts.clientOpts),
+            this.client,
             this.#opts.dbName,
             "tasks"
         )
@@ -119,6 +126,14 @@ export class MongoEngine implements Engine {
         this.#triggerStorage.push(storage)
 
         return new PullTrigger(storage)
+    }
+
+    get client(): MongoClient {
+        if (this.#client === undefined) {
+            this.#client = new MongoClient(this.#opts.url, this.#opts.clientOpts)
+        }
+
+        return this.#client
     }
 }
 

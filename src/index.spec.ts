@@ -640,6 +640,48 @@ test("should be able to handle hook failure", async (t) => {
   t.assert.deepEqual(error, "oops")
 })
 
+test("should be able to execute the write in a transaction", async (t) => {
+  // Given
+  const engine = createEngine({
+    url: container.getConnectionString(),
+    clientOpts: {
+      directConnection: true
+    },
+    dbName: randomUUID(),
+    signal: t.signal
+  })
+
+  const db = randomUUID()
+
+  let state: number | undefined
+
+  const workflow = rivr.workflow<number>("complex-calculation")
+    .step({
+      name: "add-1",
+      handler: ({ state }) => state + 1
+    })
+    .addHook("onWorkflowCompleted", (w, s) => {
+      state = s
+    })
+
+  engine.createWorker().start([ workflow ])
+
+  // When
+  await engine.client.withSession(async session => {
+    await engine.client.db(db).collection("another-collection").insertOne({
+      n: 1
+    })
+    await engine.createTrigger().trigger(workflow, 1, {
+      session
+    })
+  })
+
+  // Then
+  await waitForPredicate(() => state !== undefined)
+  t.assert.deepEqual(state, 2)
+  t.assert.deepEqual((await engine.client.db(db).collection("another-collection").findOne())?.n, 1)
+})
+
 describe("resilience", () => {
   let network: StartedNetwork
   let mongodb: StartedMongoDBContainer

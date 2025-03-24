@@ -8,11 +8,11 @@ export interface Worker {
     stop(): Promise<void>
 }
 
-export interface Trigger {
-    trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State): Promise<void>
+export interface Trigger<TriggerOpts> {
+    trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State, opts?: TriggerOpts): Promise<void>
 }
 
-export interface Engine {
+export interface Engine<TriggerOpts> {
     createWorker(): Worker
-    createTrigger(): Trigger
+    createTrigger(): Trigger<TriggerOpts>
 }

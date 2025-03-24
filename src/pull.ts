@@ -29,9 +29,9 @@ export type Nack<State> = {
 
 export type Write<State> = Ack<State> | Insert<State> | Nack<State>
 
-export interface Storage {
+export interface Storage<WriteOpts> {
     pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<Task<State>[]>
-    write<State>(writes: Write<State>[]): Promise<void>
+    write<State>(writes: Write<State>[], opts?: WriteOpts): Promise<void>
     disconnect(): Promise<void>
 }
 
@@ -49,14 +49,14 @@ class InfiniteLoop {
     }
 }
 
-export class PullTrigger implements Trigger {
-    #storage: Storage
+export class PullTrigger<TriggerOpts> implements Trigger<TriggerOpts> {
+    #storage: Storage<TriggerOpts>
 
-    constructor(storage: Storage) {
+    constructor(storage: Storage<TriggerOpts>) {
         this.#storage = storage
     }
 
-    async trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State): Promise<void> {
+    async trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State, opts?: TriggerOpts): Promise<void> {
         const mFirstStep = workflow.getFirstStep()
 
         if (!mFirstStep) {
@@ -72,20 +72,20 @@ export class PullTrigger implements Trigger {
                     workflow: workflow.name
                 }
             }
-        ])
+        ], opts)
     }
 
 }
 
-export class Poller implements Worker {
+export class Poller<TriggerOpts> implements Worker {
     #loop = new InfiniteLoop()
-    #storage: Storage
+    #storage: Storage<TriggerOpts>
 
     #hasFinished = false
 
     #onError: OnErrorHook[] = []
 
-    constructor(storage: Storage) {
+    constructor(storage: Storage<TriggerOpts>) {
         this.#storage = storage
     }
 
