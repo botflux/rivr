@@ -22,6 +22,9 @@ test("execute a workflow step", async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
+      clientOpts: {
+          directConnection: true
+      },
         dbName: randomUUID(),
         signal: t.signal
     })
@@ -57,6 +60,9 @@ test("skip a step", async (t) => {
     const engine = createEngine({
         url: container.getConnectionString(),
         dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true
+      },
         signal: t.signal
     })
 
@@ -106,6 +112,9 @@ test("stop a workflow", async (t) => {
     const engine = createEngine({
         url: container.getConnectionString(),
         dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true
+      },
         signal: t.signal
     })
 
@@ -148,6 +157,9 @@ test("execute a workflow made of multiple steps", async (t) => {
     const engine = createEngine({
         url: container.getConnectionString(),
         dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true
+      },
         signal: t.signal
     })
 
@@ -185,6 +197,9 @@ test("decorate workflow", async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
+      clientOpts: {
+        directConnection: true
+      },
         dbName: randomUUID(),
         signal: t.signal
     })
@@ -220,6 +235,9 @@ test("register plugin", async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
+      clientOpts: {
+        directConnection: true
+      },
         dbName: randomUUID(),
         signal: t.signal
     })
@@ -255,6 +273,9 @@ test("register step in a plugin", async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
+      clientOpts: {
+        directConnection: true
+      },
         dbName: randomUUID(),
         signal: t.signal
     })
@@ -300,6 +321,9 @@ test("handle step errors", async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
+      clientOpts: {
+        directConnection: true
+      },
         dbName: randomUUID(),
         signal: t.signal
     })
@@ -339,6 +363,9 @@ test("return a ok step result", async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
+      clientOpts: {
+        directConnection: true
+      },
         dbName: randomUUID(),
         signal: t.signal
     })
@@ -373,6 +400,9 @@ test("return a error step result", async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
+      clientOpts: {
+        directConnection: true
+      },
         dbName: randomUUID(),
         signal: t.signal
     })
@@ -411,6 +441,9 @@ test("execute all the handler", async (t: TestContext) => {
     const engine = createEngine({
         url: container.getConnectionString(),
         dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true
+      },
         signal: t.signal
     })
 
@@ -457,6 +490,9 @@ test("execute onWorkflowCompleted hooks in order", async (t: TestContext) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
+      clientOpts: {
+        directConnection: true
+      },
         dbName: randomUUID(),
         signal: t.signal
     })
@@ -505,6 +541,9 @@ test("should be able to execute a hook in the correct context", async (t) => {
   // Given
   const engine = createEngine({
     url: container.getConnectionString(),
+    clientOpts: {
+      directConnection: true
+    },
     dbName: randomUUID(),
     signal: t.signal
   })
@@ -538,6 +577,9 @@ test("should be able to execute async handler", async (t) => {
   const engine = createEngine({
     url: container.getConnectionString(),
     dbName: randomUUID(),
+    clientOpts: {
+      directConnection: true
+    },
     signal: t.signal
   })
 
@@ -566,6 +608,9 @@ test("should be able to handle hook failure", async (t) => {
   // Given
   const engine = createEngine({
     url: container.getConnectionString(),
+    clientOpts: {
+      directConnection: true
+    },
     dbName: randomUUID(),
     signal: t.signal
   })
@@ -642,6 +687,7 @@ describe("resilience", () => {
         socketTimeoutMS: 1_000,
         waitQueueTimeoutMS: 1_000,
         connectTimeoutMS: 1_000,
+        directConnection: true
       },
       dbName: randomUUID(),
       signal: t.signal
@@ -686,6 +732,7 @@ describe("resilience", () => {
         socketTimeoutMS: 1_000,
         waitQueueTimeoutMS: 1_000,
         connectTimeoutMS: 1_000,
+        directConnection: true
       },
       dbName: randomUUID(),
       signal: t.signal

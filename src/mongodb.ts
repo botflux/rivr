@@ -111,9 +111,7 @@ export class MongoEngine implements Engine {
 
     createTrigger(): Trigger {
         const storage = new MongoStorage(
-            new MongoClient(this.#opts.url, {
-                directConnection: true,
-            }),
+            new MongoClient(this.#opts.url, this.#opts.clientOpts),
             this.#opts.dbName,
             "tasks"
         )
