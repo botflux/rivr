@@ -1,7 +1,8 @@
 import { setTimeout } from "node:timers/promises"
-import { type Trigger, type Worker } from "./core.ts"
+import {OnErrorHook, type Trigger, type Worker} from "./core.ts"
 
 import {StepOpts, StepResult, Workflow} from "./types.ts";
+import {tryCatchSync} from "./inline-catch.ts";
 
 export type Task<State> = {
     id: string
@@ -81,6 +82,8 @@ export class Poller implements Worker {
 
     #hasFinished = false
 
+    #onError: OnErrorHook[] = []
+
     constructor(storage: Storage) {
         this.#storage = storage
     }
@@ -157,7 +160,11 @@ export class Poller implements Worker {
 
                             if (mNextStep === undefined) {
                                 for (const handler of mWorkflow.getHook("onWorkflowCompleted")) {
-                                    handler.call(mWorkflow, mWorkflow, newState)
+                                    const [ , err ] = tryCatchSync(() => handler.call(mWorkflow, mWorkflow, newState))
+
+                                    if (err !== undefined) {
+                                        this.#executeErrorHooks(err)
+                                    }
                                 }
                             }
 
@@ -182,6 +189,11 @@ export class Poller implements Worker {
 
             this.#hasFinished = true
         })().catch(console.error)
+    }
+
+    addHook(hook: "onError", handler: OnErrorHook): this {
+        this.#onError.push(handler)
+        return this
     }
 
     async stop(): Promise<void> {
@@ -235,5 +247,11 @@ export class Poller implements Worker {
     #isStepResult (value: unknown): value is StepResult<unknown> {
         return typeof value === "object" && value !== null &&
             "type" in value && typeof value["type"] === "string"
+    }
+
+    #executeErrorHooks(err: unknown): void {
+        for (const hook of this.#onError) {
+            hook(err)
+        }
     }
 }

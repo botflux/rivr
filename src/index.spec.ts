@@ -559,9 +559,42 @@ test("should be able to execute async handler", async (t) => {
   t.assert.deepEqual(state, 2)
 })
 
+test("should be able to handle hook failure", async (t) => {
+  // Given
+  const engine = createEngine({
+    url: container.getConnectionString(),
+    dbName: randomUUID(),
+    signal: t.signal
+  })
+
+  const workflow = rivr.workflow<number>("complex-calculation")
+    .addHook("onWorkflowCompleted", (w, s) => {
+      throw "oops"
+    })
+    .step({
+      name: "add-1",
+      handler: ({ state }) => state + 1
+    })
+
+  let error: unknown
+
+  const worker = engine.createWorker()
+  worker.addHook("onError", err => {
+    error = err
+  })
+  worker.start([ workflow ])
+
+  // When
+  await engine.createTrigger().trigger(workflow, 1)
+
+  // Then
+  await waitForPredicate(() => error !== undefined)
+  t.assert.deepEqual(error, "oops")
+})
+
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {
     let now = new Date().getTime()
-    while (!fn() && new Date().getTime() - now < 5_000) {
+    while (!fn() && new Date().getTime() - now < ms) {
         await setTimeout(20)
     }
 }
