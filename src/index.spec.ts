@@ -6,6 +6,7 @@ import { createEngine } from "./mongodb.ts"
 import { rivr } from "./workflow.ts"
 import {Network, StartedNetwork} from "testcontainers";
 import {CreatedProxy, StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
+import {MongoBulkWriteError} from "mongodb";
 
 let container!: StartedMongoDBContainer
 
@@ -674,6 +675,50 @@ describe("resilience", () => {
     // Then
     await waitForPredicate(() => state !== undefined)
     t.assert.deepEqual(state, 4)
+  })
+
+  test("should be able to survive a write error", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+      url: `mongodb://${proxy.host}:${proxy.port}`,
+      clientOpts: {
+        serverSelectionTimeoutMS: 3_000,
+        socketTimeoutMS: 1_000,
+        waitQueueTimeoutMS: 1_000,
+        connectTimeoutMS: 1_000,
+      },
+      dbName: randomUUID(),
+      signal: t.signal
+    })
+
+    let error: unknown
+
+    const worker = engine.createWorker()
+      .addHook("onError", err => {
+        error = err
+      })
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .step({
+        name: "add-3",
+        handler: ({ state }) => state + 3
+      })
+      .step({
+        name: "disable-proxy",
+        handler: async ({ state }) => {
+          await proxy.setEnabled(false)
+          return state
+        }
+      })
+
+    worker.start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 1)
+
+    // Then
+    await waitForPredicate(() => error !== undefined)
+    t.assert.deepStrictEqual(error instanceof MongoBulkWriteError, true)
   })
 })
 

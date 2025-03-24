@@ -3,6 +3,7 @@ import {OnErrorHook, type Trigger, type Worker} from "./core.ts"
 
 import {StepOpts, StepResult, Workflow} from "./types.ts";
 import {tryCatch, tryCatchSync} from "./inline-catch.ts";
+import {write} from "node:fs";
 
 export type Task<State> = {
     id: string
@@ -113,7 +114,7 @@ export class Poller implements Worker {
 
                     switch(result.type) {
                         case "stopped": {
-                            await this.#storage.write([
+                            await this.#write([
                                 {
                                     type: "ack",
                                     task
@@ -138,7 +139,7 @@ export class Poller implements Worker {
                                 : result.state
                             const mNextStep = mWorkflow.getNextStep(task.step)
 
-                            await this.#storage.write([
+                            await this.#write([
                                 {
                                     type: "ack",
                                     task
@@ -189,7 +190,7 @@ export class Poller implements Worker {
                         }
 
                         case "failure": {
-                            await this.#storage.write([
+                            await this.#write([
                                 {
                                     type: "nack",
                                     task
@@ -273,6 +274,14 @@ export class Poller implements Worker {
     #executeErrorHooks(err: unknown): void {
         for (const hook of this.#onError) {
             hook(err)
+        }
+    }
+
+    async #write<State>(writes: Write<State>[]) {
+        const [, err ] = await tryCatch(this.#storage.write(writes))
+
+        if (err !== undefined) {
+            this.#executeErrorHooks(err)
         }
     }
 }
