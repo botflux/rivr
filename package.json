@@ -27,6 +27,7 @@
     "@fastify/mongodb": "^9.0.2",
     "@testcontainers/mongodb": "^10.13.1",
     "@testcontainers/postgresql": "^10.13.2",
+    "@testcontainers/toxiproxy": "^10.22.0",
     "@types/node": "^22.7.4",
     "@types/pg": "^8.11.10",
     "close-with-grace": "^2.1.0",

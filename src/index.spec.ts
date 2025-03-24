@@ -1,9 +1,11 @@
-import { test, before, after, type TestContext } from "node:test"
+import {test, before, after, type TestContext, describe, beforeEach, afterEach} from "node:test"
 import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongodb"
 import { randomUUID } from "crypto"
 import { setTimeout } from "timers/promises"
 import { createEngine } from "./mongodb.ts"
 import { rivr } from "./workflow.ts"
+import {Network, StartedNetwork} from "testcontainers";
+import {CreatedProxy, StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
 
 let container!: StartedMongoDBContainer
 
@@ -590,6 +592,89 @@ test("should be able to handle hook failure", async (t) => {
   // Then
   await waitForPredicate(() => error !== undefined)
   t.assert.deepEqual(error, "oops")
+})
+
+describe("resilience", () => {
+  let network: StartedNetwork
+  let mongodb: StartedMongoDBContainer
+  let toxiproxy: StartedToxiProxyContainer
+
+  before(async () => {
+    network = await new Network().start()
+
+    mongodb = await new MongoDBContainer("mongo:8")
+      .withNetwork(network)
+      .withNetworkAliases("mongodb")
+      .start()
+
+    toxiproxy = await new ToxiProxyContainer("ghcr.io/shopify/toxiproxy:2.12.0")
+      .withNetwork(network)
+      .start()
+  })
+
+  let proxy!: CreatedProxy
+
+  beforeEach(async () => {
+    proxy = await toxiproxy.createProxy({
+      name: "mongodb",
+      upstream: "mongodb:27017",
+      enabled: true
+    })
+  })
+
+  afterEach(async () => {
+    await proxy.instance.remove()
+  })
+
+  after(async () => {
+    await toxiproxy.stop()
+    await mongodb.stop()
+    await network.stop()
+  })
+
+  test("should be able to survive a mongodb crash", async (t) => {
+    // Given
+    const engine = createEngine({
+      url: `mongodb://${proxy.host}:${proxy.port}`,
+      clientOpts: {
+        serverSelectionTimeoutMS: 3_000,
+        socketTimeoutMS: 1_000,
+        waitQueueTimeoutMS: 1_000,
+        connectTimeoutMS: 1_000,
+      },
+      dbName: randomUUID(),
+      signal: t.signal
+    })
+
+    let state: number | undefined
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .step({
+        name: "add-2",
+        handler: ({ state }) => state + 2
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+        state = s
+      })
+
+    let error: unknown
+
+    const worker = engine.createWorker()
+      .addHook("onError", err => {
+        error = err
+      })
+
+    // When
+    await engine.createTrigger().trigger(workflow, 2)
+    await proxy.setEnabled(false)
+    worker.start([ workflow ])
+    await waitForPredicate(() => error !== undefined)
+    await proxy.setEnabled(true)
+
+    // Then
+    await waitForPredicate(() => state !== undefined)
+    t.assert.deepEqual(state, 4)
+  })
 })
 
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {

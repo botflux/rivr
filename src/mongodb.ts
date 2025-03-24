@@ -1,6 +1,12 @@
 import { type Engine, type Trigger, type Worker } from "./core.ts";
 import { Poller, PullTrigger, type Storage, type Task, type Write } from "./pull.ts";
-import { type AnyBulkWriteOperation, type Collection, MongoClient, ObjectId } from "mongodb"
+import {
+    type AnyBulkWriteOperation,
+    type Collection,
+    MongoClient,
+    MongoClientOptions,
+    ObjectId
+} from "mongodb"
 import {Workflow} from "./types.ts";
 
 type MongoTask<State> = Omit<Task<State>, "id"> & {
@@ -120,6 +126,7 @@ export class MongoEngine implements Engine {
 
 export type CreateEngineOpts = {
     url: string
+    clientOpts?: MongoClientOptions
     dbName: string
     signal?: AbortSignal
 }

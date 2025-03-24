@@ -2,7 +2,7 @@ import { setTimeout } from "node:timers/promises"
 import {OnErrorHook, type Trigger, type Worker} from "./core.ts"
 
 import {StepOpts, StepResult, Workflow} from "./types.ts";
-import {tryCatchSync} from "./inline-catch.ts";
+import {tryCatch, tryCatchSync} from "./inline-catch.ts";
 
 export type Task<State> = {
     id: string
@@ -91,7 +91,12 @@ export class Poller implements Worker {
     start<State, Decorators>(workflows: Workflow<State, Decorators>[]): void {
         (async () => {
             for (const _ of this.#loop) {
-                const tasks = await this.#storage.pull(workflows)
+                const [tasks, tasksErr] = await tryCatch(this.#storage.pull(workflows))
+
+                if (tasksErr !== undefined) {
+                    this.#executeErrorHooks(tasksErr)
+                    continue
+                }
 
                 for (const task of tasks) {
                     const mWorkflow = workflows.find(w => w.name === task.workflow)
