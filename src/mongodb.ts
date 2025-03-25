@@ -9,9 +9,7 @@ import {
 } from "mongodb"
 import {Workflow} from "./types.ts";
 
-type MongoTask<State> = Omit<Task<State>, "id"> & {
-    ack: boolean
-}
+type MongoTask<State> = Omit<Task<State>, "id">
 
 export type WriteOpts = {
     session?: ClientSession
@@ -33,10 +31,22 @@ class MongoStorage implements Storage<WriteOpts> {
     async pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<Task<State>[]> {
         const names = workflows.map(w => w.name)
 
-        const tasks = await this.#collection.find({ workflow: { $in: names }, ack: false })
+        const tasks = await this.#collection.find({
+            $and: [
+                {
+                    workflow: { $in: names },
+                },
+                {
+                    $or: [
+                        { type: "waiting" },
+                        { type: "failed", canBeRetried: true }
+                    ]
+                }
+            ]
+        })
             .toArray()
 
-        return tasks.map(({ _id, ack, ...rest }) => ({
+        return tasks.map(({ _id, ...rest }) => ({
             ...rest,
             id: _id.toHexString()
         })) as Task<State>[]
@@ -47,7 +57,19 @@ class MongoStorage implements Storage<WriteOpts> {
 
         const mongoWrites = writes.map(write => {
             switch(write.type) {
-                case "ack": 
+                case "ack": return {
+                    updateOne: {
+                        filter: {
+                            _id: ObjectId.createFromHexString(write.task.id)
+                        },
+                        update: {
+                            $set: {
+                                type: "success"
+                            }
+                        }
+                    }
+                } satisfies AnyBulkWriteOperation<MongoTask<State>>
+
                 case "nack": return {
                     updateOne: {
                         filter: {
@@ -55,7 +77,11 @@ class MongoStorage implements Storage<WriteOpts> {
                         },
                         update: {
                             $set: {
-                                ack: true
+                                type: "failed",
+                                canBeRetried: write.retry,
+                            },
+                            $inc: {
+                                attempt: 1
                             }
                         }
                     }
@@ -65,7 +91,7 @@ class MongoStorage implements Storage<WriteOpts> {
                     insertOne: {
                         document: {
                             ...write.task,
-                            ack: false   
+                            type: "waiting"
                         }
                     }
                 } satisfies AnyBulkWriteOperation<MongoTask<State>>

@@ -5,11 +5,30 @@ import {StepOpts, StepResult, Workflow} from "./types.ts";
 import {tryCatch, tryCatchSync} from "./inline-catch.ts";
 import {write} from "node:fs";
 
-export type Task<State> = {
+export type Task<State> =
+    | WaitingTask<State>
+    | FailedTask<State>
+    | SuccessfulTask<State>
+
+export type CommonTask<State> = {
     id: string
     workflow: string
     step: string
     state: State
+    attempt: number
+}
+
+export type SuccessfulTask<State> = CommonTask<State> & {
+    type: "success"
+}
+
+export type FailedTask<State> = CommonTask<State> & {
+    type: "failed"
+    canBeRetried: boolean
+}
+
+export type WaitingTask<State> = CommonTask<State> & {
+    type: "waiting"
 }
 
 export type Ack<State> = {
@@ -19,12 +38,13 @@ export type Ack<State> = {
 
 export type Insert<State> = {
     type: "insert"
-    task: Omit<Task<State>, "id">
+    task: Omit<CommonTask<State>, "id">
 }
 
 export type Nack<State> = {
     type: "nack"
     task: Task<State>
+    retry: boolean
 }
 
 export type Write<State> = Ack<State> | Insert<State> | Nack<State>
@@ -69,7 +89,8 @@ export class PullTrigger<TriggerOpts> implements Trigger<TriggerOpts> {
                 task: {
                     state,
                     step: mFirstStep.name,
-                    workflow: workflow.name
+                    workflow: workflow.name,
+                    attempt: 1
                 }
             }
         ], opts)
@@ -110,7 +131,7 @@ export class Poller<TriggerOpts> implements Worker {
                     if (!mStep)
                         continue
 
-                    const result = await this.#handleStep(mStep, task.state, mWorkflow)
+                    const result = await this.#handleStep(mStep, task, mWorkflow)
 
                     switch(result.type) {
                         case "stopped": {
@@ -151,7 +172,8 @@ export class Poller<TriggerOpts> implements Worker {
                                             task: {
                                                 state: newState,
                                                 step: mNextStep.name,
-                                                workflow: mWorkflow.name
+                                                workflow: mWorkflow.name,
+                                                attempt: 1
                                             }
                                         } satisfies Insert<State>
                                     ]
@@ -193,7 +215,8 @@ export class Poller<TriggerOpts> implements Worker {
                             await this.#write([
                                 {
                                     type: "nack",
-                                    task
+                                    task,
+                                    retry: result.forceRetry === "retry"
                                 }
                             ])
 
@@ -230,27 +253,33 @@ export class Poller<TriggerOpts> implements Worker {
 
     async #handleStep<State, Decorators>(
         step: StepOpts<State, Decorators>, 
-        state: State, 
+        task: Task<State>,
         workflow: Workflow<State, Decorators>
     ): Promise<StepResult<State>> {
         try {
             const nextStateOrResult = await step.handler({
-                state,
+                state: task.state,
                 workflow,
                 ok: state => ({
                     type: "success",
                     state
                 }),
-                err: error => ({
+                err: (error, opts) => ({
                     type: "failure",
-                    error
+                    error,
+                    forceRetry: opts?.retry === undefined
+                        ? "unset"
+                        : opts.retry
+                            ? "retry"
+                            : "no-retry"
                 }),
                 skip: () => ({
                     type: "skipped"
                 }),
                 stop: () => ({
                     type: "stopped"
-                })
+                }),
+                attempt: task.attempt
             })
 
             if (this.#isStepResult(nextStateOrResult)) {
@@ -262,7 +291,7 @@ export class Poller<TriggerOpts> implements Worker {
                 state: nextStateOrResult
             })
         } catch(error: unknown) {
-            return ({ type: "failure", error })
+            return ({ type: "failure", error, forceRetry: "unset" })
         }
     }
 
