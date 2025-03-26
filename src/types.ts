@@ -5,17 +5,12 @@ export type Success<State> = {
 export type Failure = {
   type: "failure"
   error: unknown
-  forceRetry: "unset" | "no-retry" | "retry"
 }
 export type Skipped = {
   type: "skipped"
 }
 export type Stopped = {
   type: "stopped"
-}
-
-export type FailureOpts = {
-  retry?: boolean
 }
 
 export type StepResult<State> =
@@ -27,7 +22,7 @@ export type HandlerOpts<State, Decorators> = {
   state: State
   workflow: Workflow<State, Decorators>
   ok: (state: State) => Success<State>
-  err: (error: unknown, opts?: FailureOpts) => Failure
+  err: (error: unknown) => Failure
   skip: () => Skipped
   stop: () => Stopped
   attempt: number

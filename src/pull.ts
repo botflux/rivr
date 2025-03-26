@@ -44,7 +44,6 @@ export type Insert<State> = {
 export type Nack<State> = {
     type: "nack"
     task: Task<State>
-    retry: boolean
 }
 
 export type Write<State> = Ack<State> | Insert<State> | Nack<State>
@@ -216,7 +215,6 @@ export class Poller<TriggerOpts> implements Worker {
                                 {
                                     type: "nack",
                                     task,
-                                    retry: result.forceRetry === "retry"
                                 }
                             ])
 
@@ -274,14 +272,9 @@ export class Poller<TriggerOpts> implements Worker {
                     type: "success",
                     state
                 }),
-                err: (error, opts) => ({
+                err: error => ({
                     type: "failure",
                     error,
-                    forceRetry: opts?.retry === undefined
-                        ? "unset"
-                        : opts.retry
-                            ? "retry"
-                            : "no-retry"
                 }),
                 skip: () => ({
                     type: "skipped"
@@ -301,7 +294,7 @@ export class Poller<TriggerOpts> implements Worker {
                 state: nextStateOrResult
             })
         } catch(error: unknown) {
-            return ({ type: "failure", error, forceRetry: "unset" })
+            return ({ type: "failure", error })
         }
     }
 

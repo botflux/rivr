@@ -682,52 +682,6 @@ test("should be able to execute the write in a transaction", async (t) => {
   t.assert.deepEqual((await engine.client.db(db).collection("another-collection").findOne())?.n, 1)
 })
 
-test("should be able to retry a failed step", {skip: true},async (t) => {
-  // Given
-  const engine = createEngine({
-    url: container.getConnectionString(),
-    clientOpts: {
-      directConnection: true
-    },
-    dbName: randomUUID(),
-    signal: t.signal
-  })
-
-  let state: number | undefined
-  let errorCount = 0
-  let stepExecutedCount = 0
-
-  const workflow = rivr.workflow<number>("complex-calculation")
-    .step({
-      name: "fails-first-try",
-      handler: ({ state, attempt, err }) => {
-        stepExecutedCount ++
-        if (attempt === 1) {
-          return err(new Error("oops"), {
-            retry: true
-          })
-        } else {
-          return state + 1
-        }
-      }
-    })
-    .addHook("onStepError", err => errorCount ++)
-    .addHook("onWorkflowCompleted", (w, s) => {
-      state = s
-    })
-
-  engine.createWorker().start([ workflow ])
-
-  // When
-  await engine.createTrigger().trigger(workflow, 1)
-
-  // Then
-  await waitForPredicate(() => state !== undefined)
-  t.assert.deepEqual(state, 2)
-  t.assert.deepEqual(stepExecutedCount, 2)
-  t.assert.deepEqual(errorCount, 1)
-})
-
 test("should be able to retry a failed step", async (t) => {
   // Given
   const engine = createEngine({
