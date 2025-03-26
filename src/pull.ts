@@ -1,7 +1,7 @@
 import { setTimeout } from "node:timers/promises"
 import {OnErrorHook, type Trigger, type Worker} from "./core.ts"
 
-import {StepOpts, StepResult, Workflow} from "./types.ts";
+import {Step, StepResult, Workflow} from "./types.ts";
 import {tryCatch, tryCatchSync} from "./inline-catch.ts";
 import {write} from "node:fs";
 
@@ -227,6 +227,16 @@ export class Poller<TriggerOpts> implements Worker {
                                     this.#executeErrorHooks(error)
                                 }
                             }
+
+                            if (task.attempt + 1 > mStep.maxAttempts) {
+                                for (const hook of mWorkflow.getHook("onWorkflowFailed")) {
+                                    const [, error] = tryCatchSync(() => hook(result.error, mWorkflow, mStep, task.state))
+
+                                    if (error !== undefined) {
+                                        this.#executeErrorHooks(error)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -252,7 +262,7 @@ export class Poller<TriggerOpts> implements Worker {
     }
 
     async #handleStep<State, Decorators>(
-        step: StepOpts<State, Decorators>, 
+        step: Step<State, Decorators>,
         task: Task<State>,
         workflow: Workflow<State, Decorators>
     ): Promise<StepResult<State>> {

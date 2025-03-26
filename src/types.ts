@@ -33,26 +33,35 @@ export type HandlerOpts<State, Decorators> = {
   attempt: number
 }
 export type Handler<State, Decorators> = (opts: HandlerOpts<State, Decorators>) => State | StepResult<State> | Promise<State> | Promise<StepResult<State>>
-export type StepOpts<State, Decorators> = {
+export type Step<State, Decorators> = {
   name: string
   handler: Handler<State, Decorators>
   maxAttempts: number
 }
+
+export type StepOpts<State, Decorators> = {
+  name: string
+  handler: Handler<State, Decorators>
+  maxAttempts?: number
+}
+
 export type OnWorkflowCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, state: State) => void
 export type OnStepErrorHook<State, Decorators> = (error: unknown, workflow: Workflow<State, Decorators>, state: State) => void
-export type OnStepSkippedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: StepOpts<State, Decorators>, state: State) => void
-export type OnWorkflowStoppedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: StepOpts<State, Decorators>, state: State) => void
-export type OnStepCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: StepOpts<State, Decorators>, state: State) => void
+export type OnStepSkippedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
+export type OnWorkflowStoppedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
+export type OnWorkflowFailedHook<State, Decorators> = (error: unknown, workflow: Workflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
+export type OnStepCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
 
 export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State, Decorators>) => Workflow<State, NewDecorators>
 
-export type StepElement<State, Decorators> = { type: "step", step: StepOpts<State, Decorators> }
+export type StepElement<State, Decorators> = { type: "step", step: Step<State, Decorators> }
 export type ContextElement<State, Decorators> = { type: "context", context: Workflow<State, Decorators> }
 export type StepCompletedElement<State, Decorators> = { type: "onStepCompleted", hook: OnStepCompletedHook<State, Decorators> }
 export type StepErrorElement<State, Decorators> = { type: "onStepError", hook: OnStepErrorHook<State, Decorators> }
 export type StepSkippedElement<State, Decorators> = { type: "onStepSkipped", hook: OnStepSkippedHook<State, Decorators> }
 export type WorkflowCompletedElement<State, Decorators> = { type: "onWorkflowCompleted", hook: OnWorkflowCompletedHook<State, Decorators> }
 export type WorkflowStoppedElement<State, Decorators> = { type: "onWorkflowStopped", hook: OnWorkflowStoppedHook<State, Decorators> }
+export type WorkflowFailedElement<State, Decorators> = { type: "onWorkflowFailed", hook: OnWorkflowFailedHook<State, Decorators> }
 
 export type ExecutionGraph<State, Decorators> =
   | StepElement<State, Decorators>
@@ -62,6 +71,7 @@ export type ExecutionGraph<State, Decorators> =
   | StepErrorElement<State, Decorators>
   | StepSkippedElement<State, Decorators>
   | WorkflowStoppedElement<State, Decorators>
+  | WorkflowFailedElement<State, Decorators>
 
 export const kWorkflow = Symbol("kWorkflow")
 export type Workflow<State, Decorators> = {
@@ -85,7 +95,7 @@ export type Workflow<State, Decorators> = {
    * Get this workflow's first step.
    * Returns `undefined` if the workflow is empty.
    */
-  getFirstStep(): StepOpts<State, Decorators> | undefined
+  getFirstStep(): Step<State, Decorators> | undefined
 
   /**
    * Search a step by its name.
@@ -93,7 +103,7 @@ export type Workflow<State, Decorators> = {
    *
    * @param name
    */
-  getStep(name: string): StepOpts<State, Decorators> | undefined
+  getStep(name: string): Step<State, Decorators> | undefined
 
   /**
    * Search the step succeding the step matching the given name.
@@ -102,7 +112,7 @@ export type Workflow<State, Decorators> = {
    *
    * @param name
    */
-  getNextStep(name: string): StepOpts<State, Decorators> | undefined
+  getNextStep(name: string): Step<State, Decorators> | undefined
 
   /**
    * Add a property to the current workflow.
@@ -123,14 +133,14 @@ export type Workflow<State, Decorators> = {
    * Iterate over each step.
    * The iterator yields a tuple containing the step, and the context within which the step must be executed.
    */
-  steps(): Iterable<[step: StepOpts<State, Decorators>, context: Workflow<State, Decorators>]>
+  steps(): Iterable<[step: Step<State, Decorators>, context: Workflow<State, Decorators>]>
 
   /**
    * Add a step
    *
    * @param opts
    */
-  step(opts: Omit<StepOpts<State, Decorators>, "maxAttempts">): Workflow<State, Decorators>
+  step(opts: StepOpts<State, Decorators>): Workflow<State, Decorators>
 
   /**
    * Hook on workflow completed.
@@ -172,9 +182,12 @@ export type Workflow<State, Decorators> = {
    */
   addHook(hook: "onStepCompleted", handler: OnStepCompletedHook<State, Decorators>): Workflow<State, Decorators>
 
+  addHook(hook: "onWorkflowFailed", handler: OnWorkflowFailedHook<State, Decorators>): Workflow<State, Decorators>
+
   getHook(hook: "onStepCompleted"): OnStepCompletedHook<State, Decorators>[]
   getHook(hook: "onWorkflowCompleted"): OnWorkflowCompletedHook<State, Decorators>[]
   getHook(hook: "onStepError"): OnStepErrorHook<State, Decorators>[]
   getHook(hook: "onStepSkipped"): OnStepSkippedHook<State, Decorators>[]
   getHook(hook: "onWorkflowStopped"): OnWorkflowStoppedHook<State, Decorators>[]
+  getHook(hook: "onWorkflowFailed"): OnWorkflowFailedHook<State, Decorators>[]
 } & Decorators

@@ -4,8 +4,8 @@ import {
     OnStepErrorHook,
     OnStepSkippedHook,
     OnWorkflowCompletedHook, OnWorkflowStoppedHook, StepCompletedElement, StepElement, StepErrorElement,
-    StepOpts, StepSkippedElement,
-    Workflow, WorkflowCompletedElement, WorkflowStoppedElement
+    Step, StepSkippedElement,
+    Workflow, WorkflowCompletedElement, WorkflowStoppedElement, StepOpts, OnWorkflowFailedHook, WorkflowFailedElement
 } from "./types.ts";
 
 function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorators>, name: string) {
@@ -15,11 +15,16 @@ function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorator
 }
 
 WorkflowConstructor.prototype.step = function step(this: Workflow<unknown, unknown>, opts: StepOpts<unknown, unknown>) {
-    this.graph.push({ type: "step", step: { ...opts, maxAttempts: 1 } })
+    const {
+        maxAttempts = 1,
+        ...requiredFields
+    } = opts
+
+    this.graph.push({ type: "step", step: { ...requiredFields, maxAttempts } })
     return this
 }
 
-function* iterateDepthFirst(w: Workflow<unknown, unknown>): Iterable<StepElement<unknown, unknown> | WorkflowStoppedElement<unknown, unknown> | StepSkippedElement<unknown, unknown> | StepErrorElement<unknown, unknown> | WorkflowCompletedElement<unknown, unknown> | StepCompletedElement<unknown, unknown>> {
+function* iterateDepthFirst(w: Workflow<unknown, unknown>): Iterable<StepElement<unknown, unknown> | WorkflowFailedElement<unknown, unknown> | WorkflowStoppedElement<unknown, unknown> | StepSkippedElement<unknown, unknown> | StepErrorElement<unknown, unknown> | WorkflowCompletedElement<unknown, unknown> | StepCompletedElement<unknown, unknown>> {
     for (const element of w.graph) {
         if (element.type === "context") {
             for (const nested of iterateDepthFirst(element.context)) {
@@ -62,6 +67,10 @@ WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown,
             this.graph.push({ type: "onStepCompleted", hook: handler as OnStepCompletedHook<unknown, unknown> })
             break
 
+        case "onWorkflowFailed":
+            this.graph.push({ type: "onWorkflowFailed", hook: handler as OnWorkflowFailedHook<unknown, unknown> })
+            break
+
         default:
             throw new Error(`Hook type '${hook}' is not supported`)
     }
@@ -79,7 +88,7 @@ function getRootWorkflow (w: Workflow<unknown, unknown>): Workflow<unknown, unkn
     return getRootWorkflow(proto)
 }
 
-function* listStepDepthFirst(w: Workflow<unknown, unknown>): Iterable<[ step: StepOpts<unknown, unknown>, context: Workflow<unknown, unknown> ]> {
+function* listStepDepthFirst(w: Workflow<unknown, unknown>): Iterable<[ step: Step<unknown, unknown>, context: Workflow<unknown, unknown> ]> {
     for (const element of w.graph) {
         if (element.type === "step") {
             yield [element.step, w]
@@ -91,7 +100,7 @@ function* listStepDepthFirst(w: Workflow<unknown, unknown>): Iterable<[ step: St
     }
 }
 
-WorkflowConstructor.prototype.steps = function *steps (this: Workflow<unknown, unknown>): Iterable<[ StepOpts<unknown, unknown>, Workflow<unknown, unknown> ]> {
+WorkflowConstructor.prototype.steps = function *steps (this: Workflow<unknown, unknown>): Iterable<[ Step<unknown, unknown>, Workflow<unknown, unknown> ]> {
     const root = getRootWorkflow(this)
 
     for (const step of listStepDepthFirst(root)) {

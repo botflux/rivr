@@ -7,7 +7,7 @@ import {
     MongoClientOptions,
     ObjectId
 } from "mongodb"
-import {Workflow} from "./types.ts";
+import {Step, Workflow} from "./types.ts";
 
 type MongoTask<State> = Omit<Task<State>, "id">
 
@@ -29,28 +29,73 @@ class MongoStorage implements Storage<WriteOpts> {
     }
 
     #getPullFilter<State, Decorators>(workflows: Workflow<State, Decorators>[]): Filter<MongoTask<unknown>> {
-        const workflowAndSteps = workflows.map(workflow => ({
-            $and: [
-                {
-                    workflow: workflow.name,
-                    step: { $in: Array.from(workflow.steps()).map(([ step ]) => step.name) },
-                },
-                {
-                    $or: [
+        const steps = workflows
+          .map(workflow => Array.from(workflow.steps()))
+          .flat()
+          .map(([ step, workflow ]) => [
+            `${workflow.name}-${step.maxAttempts}`,
+              {
+                  step,
+                  workflow
+              }
+          ] as const)
+          .reduce(
+            (acc, [ id, { step, workflow } ]) => {
+                const existing = acc.get(id)
 
-                        { type: "waiting" },
-                        {
-                            type: "failed",
-                            canBeRetried: true,
-                        }
-
-                    ]
+                if (!existing) {
+                    acc.set(id, { steps: [ step ], workflow: workflow.name, maxAttempts: step.maxAttempts })
+                    return acc
                 }
-            ]
-        })) satisfies Filter<MongoTask<State>>[]
+
+                return acc.set(id, { ...existing, steps: [ ...existing.steps, step ] })
+            },
+            new Map<string, { workflow: string, maxAttempts: number, steps: Step<State, Decorators>[] }>()
+          )
+
+        const filter = Array.from(steps.entries())
+          .map(([ , { maxAttempts, workflow, steps }]) => ({
+              $and: [
+                  {
+                      workflow,
+                      step: { $in: steps.map(step => step.name) },
+                  },
+                  {
+                      $or: [
+                          {
+                              type: "waiting"
+                          },
+                          {
+                              type: "failed",
+                              attempt: { $lte: maxAttempts }
+                          }
+                      ]
+                  }
+              ]
+          })) satisfies Filter<MongoTask<State>>[]
+
+        // const workflowAndSteps = workflows.map(workflow => ({
+        //     $and: [
+        //         {
+        //             workflow: workflow.name,
+        //             step: { $in: Array.from(workflow.steps()).map(([ step ]) => step.name) },
+        //         },
+        //         {
+        //             $or: [
+        //
+        //                 { type: "waiting" },
+        //                 {
+        //                     type: "failed",
+        //                     canBeRetried: true,
+        //                 }
+        //
+        //             ]
+        //         }
+        //     ]
+        // })) satisfies Filter<MongoTask<State>>[]
 
         return {
-            $or: workflowAndSteps
+            $or: filter
         }
     }
 

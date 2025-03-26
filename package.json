@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "test": "node --test -r ts-node/register $(find . -name \"*.spec.ts\")",
-    "test:only": "node --experimental-transform-types --test-only $(find . -name \"*.spec.ts\")",
+    "test:only": "node --test -r ts-node/register --test-only $(find . -name \"*.spec.ts\")",
     "typecheck": "tsc --noEmit",
     "sandbox": "ts-node tests/sandbox.ts",
     "test:mongodb": "node -r ts-node/register --test --test-timeout 80000000 \"./src/mongodb/engine.test.ts\""
