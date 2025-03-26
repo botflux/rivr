@@ -36,6 +36,7 @@ export type Handler<State, Decorators> = (opts: HandlerOpts<State, Decorators>) 
 export type StepOpts<State, Decorators> = {
   name: string
   handler: Handler<State, Decorators>
+  maxAttempts: number
 }
 export type OnWorkflowCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, state: State) => void
 export type OnStepErrorHook<State, Decorators> = (error: unknown, workflow: Workflow<State, Decorators>, state: State) => void
@@ -129,7 +130,7 @@ export type Workflow<State, Decorators> = {
    *
    * @param opts
    */
-  step(opts: StepOpts<State, Decorators>): Workflow<State, Decorators>
+  step(opts: Omit<StepOpts<State, Decorators>, "maxAttempts">): Workflow<State, Decorators>
 
   /**
    * Hook on workflow completed.

@@ -15,7 +15,7 @@ function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorator
 }
 
 WorkflowConstructor.prototype.step = function step(this: Workflow<unknown, unknown>, opts: StepOpts<unknown, unknown>) {
-    this.graph.push({ type: "step", step: opts })
+    this.graph.push({ type: "step", step: { ...opts, maxAttempts: 1 } })
     return this
 }
 

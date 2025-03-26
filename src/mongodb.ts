@@ -2,7 +2,7 @@ import { type Engine, type Trigger, type Worker } from "./core.ts";
 import { Poller, PullTrigger, type Storage, type Task, type Write } from "./pull.ts";
 import {
     type AnyBulkWriteOperation, ClientSession,
-    type Collection,
+    type Collection, Filter,
     MongoClient,
     MongoClientOptions,
     ObjectId
@@ -28,22 +28,36 @@ class MongoStorage implements Storage<WriteOpts> {
         this.#collection = this.#client.db(dbName).collection(collectionName)
     }
 
-    async pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<Task<State>[]> {
-        const names = workflows.map(w => w.name)
-
-        const tasks = await this.#collection.find({
+    #getPullFilter<State, Decorators>(workflows: Workflow<State, Decorators>[]): Filter<MongoTask<unknown>> {
+        const workflowAndSteps = workflows.map(workflow => ({
             $and: [
                 {
-                    workflow: { $in: names },
+                    workflow: workflow.name,
+                    step: { $in: Array.from(workflow.steps()).map(([ step ]) => step.name) },
                 },
                 {
                     $or: [
+
                         { type: "waiting" },
-                        { type: "failed", canBeRetried: true }
+                        {
+                            type: "failed",
+                            canBeRetried: true,
+                        }
+
                     ]
                 }
             ]
-        })
+        })) satisfies Filter<MongoTask<State>>[]
+
+        return {
+            $or: workflowAndSteps
+        }
+    }
+
+    async pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<Task<State>[]> {
+        const filter = this.#getPullFilter(workflows)
+
+        const tasks = await this.#collection.find(filter)
             .toArray()
 
         return tasks.map(({ _id, ...rest }) => ({
