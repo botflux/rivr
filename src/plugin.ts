@@ -13,13 +13,18 @@ export type MergeUnionTypes<T> = (T extends any ? (x: T) => any : never) extends
 
 export type RivrPlugin<Out> = {
   (w: Workflow<any, any>): Workflow<any, Out>
+  deps: RivrPlugin<unknown>[]
 }
 
 function rivrPlugin<Out, Deps extends RivrPlugin<any>[]> (
   plugin: (w: Workflow<any, MergeUnionTypes<GetDecorator<UnwrapItem<Deps>>>>) => Workflow<any, Out>,
   deps: Deps
 ): RivrPlugin<Out> {
-  throw new Error("Not implemented at line 19 in plugin.ts")
+  Object.assign(plugin, {
+    deps
+  })
+
+  return plugin as RivrPlugin<Out>
 }
 
 const plugin1 = rivrPlugin(w => w.decorate("foo", "foo"), [])
