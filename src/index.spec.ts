@@ -7,6 +7,7 @@ import { rivr } from "./workflow.ts"
 import {Network, StartedNetwork} from "testcontainers";
 import {CreatedProxy, StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
 import {MongoBulkWriteError} from "mongodb";
+import {rivrPlugin} from "./types.ts";
 
 let container!: StartedMongoDBContainer
 
@@ -315,6 +316,43 @@ test("register step in a plugin", async (t) => {
         await setTimeout(20)
     }
     t.assert.deepEqual(state, 10)
+})
+
+test("register a plugin with dependencies", async (t) => {
+  // Given
+  const engine = createEngine({
+    url: container.getConnectionString(),
+    signal: t.signal,
+    dbName: randomUUID(),
+    clientOpts: {
+      directConnection: true
+    }
+  })
+
+  const pluginA = rivrPlugin((w) => w.decorate("foo", 1), [])
+  const pluginB = rivrPlugin(w => w, [ pluginA ])
+
+  let state: number | undefined
+
+  const workflow = rivr.workflow<number>("complex-calculation")
+    .register(pluginA)
+    .register(pluginB)
+    .step({
+      name: "add-bar",
+      handler: ({ state, workflow }) => state + workflow.bar
+    })
+    .addHook("onWorkflowCompleted", (w, s) => {
+      state = s
+    })
+
+  engine.createWorker().start([ workflow ])
+
+  // When
+  await engine.createTrigger().trigger(workflow, 1)
+
+  // Then
+  await waitForPredicate(() => state !== undefined)
+  t.assert.deepEqual(state, 3)
 })
 
 test("handle step errors", async (t) => {

@@ -1,3 +1,5 @@
+import {rivr} from "./workflow.ts";
+
 export type Success<State> = {
   type: "success"
   state: State
@@ -79,12 +81,6 @@ export type Workflow<State, Decorators> = {
    * The name of the workflow.
    */
   name: string
-
-  /**
-   * A tree containing the steps and sub-workflow in order.
-   * Iterating through this tree depth-first would yield the steps in order.
-   */
-  graph: ExecutionGraph<State, Decorators>[]
 
   /**
    * Get this workflow's first step.

@@ -3,18 +3,37 @@ import {
     OnStepCompletedHook,
     OnStepErrorHook,
     OnStepSkippedHook,
-    OnWorkflowCompletedHook, OnWorkflowStoppedHook, StepCompletedElement, StepElement, StepErrorElement,
-    Step, StepSkippedElement,
-    Workflow, WorkflowCompletedElement, WorkflowStoppedElement, StepOpts, OnWorkflowFailedHook, WorkflowFailedElement
+    OnWorkflowCompletedHook,
+    OnWorkflowStoppedHook,
+    StepCompletedElement,
+    StepElement,
+    StepErrorElement,
+    Step,
+    StepSkippedElement,
+    Workflow,
+    WorkflowCompletedElement,
+    WorkflowStoppedElement,
+    StepOpts,
+    OnWorkflowFailedHook,
+    WorkflowFailedElement,
+    ExecutionGraph
 } from "./types.ts";
 
-function WorkflowConstructor<State, Decorators> (this: Workflow<State, Decorators>, name: string) {
+interface WorkflowImplementation extends Workflow<unknown, unknown> {
+    /**
+     * A tree containing the steps and sub-workflow in order.
+     * Iterating through this tree depth-first would yield the steps in order.
+     */
+    graph: ExecutionGraph<unknown, unknown>[]
+}
+
+function WorkflowConstructor (this: WorkflowImplementation, name: string) {
     this[kWorkflow] = true
     this.name = name
     this.graph = []
 }
 
-WorkflowConstructor.prototype.step = function step(this: Workflow<unknown, unknown>, opts: StepOpts<unknown, unknown>) {
+WorkflowConstructor.prototype.step = function step(this: WorkflowImplementation, opts: StepOpts<unknown, unknown>) {
     const {
         maxAttempts = 1,
         ...requiredFields
@@ -24,10 +43,10 @@ WorkflowConstructor.prototype.step = function step(this: Workflow<unknown, unkno
     return this
 }
 
-function* iterateDepthFirst(w: Workflow<unknown, unknown>): Iterable<StepElement<unknown, unknown> | WorkflowFailedElement<unknown, unknown> | WorkflowStoppedElement<unknown, unknown> | StepSkippedElement<unknown, unknown> | StepErrorElement<unknown, unknown> | WorkflowCompletedElement<unknown, unknown> | StepCompletedElement<unknown, unknown>> {
+function* iterateDepthFirst(w: WorkflowImplementation): Iterable<StepElement<unknown, unknown> | WorkflowFailedElement<unknown, unknown> | WorkflowStoppedElement<unknown, unknown> | StepSkippedElement<unknown, unknown> | StepErrorElement<unknown, unknown> | WorkflowCompletedElement<unknown, unknown> | StepCompletedElement<unknown, unknown>> {
     for (const element of w.graph) {
         if (element.type === "context") {
-            for (const nested of iterateDepthFirst(element.context)) {
+            for (const nested of iterateDepthFirst(element.context as WorkflowImplementation)) {
                 yield nested
             }
         } else {
@@ -36,7 +55,7 @@ function* iterateDepthFirst(w: Workflow<unknown, unknown>): Iterable<StepElement
     }
 }
 
-WorkflowConstructor.prototype.getHook = function* getHook(this: Workflow<unknown, unknown>, hook: "onStepCompleted") {
+WorkflowConstructor.prototype.getHook = function* getHook(this: WorkflowImplementation, hook: "onStepCompleted") {
     const root = getRootWorkflow(this)
 
     for (const element of iterateDepthFirst(root)) {
@@ -46,7 +65,7 @@ WorkflowConstructor.prototype.getHook = function* getHook(this: Workflow<unknown
     }
 }
 
-WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown, unknown>, hook: string, handler: Function) {
+WorkflowConstructor.prototype.addHook = function addHook(this: WorkflowImplementation, hook: string, handler: Function) {
     switch(hook) {
         case "onWorkflowCompleted":
             this.graph.push({ type: "onWorkflowCompleted", hook: handler as OnWorkflowCompletedHook<unknown, unknown> })
@@ -77,7 +96,7 @@ WorkflowConstructor.prototype.addHook = function addHook(this: Workflow<unknown,
     return this
 }
 
-function getRootWorkflow (w: Workflow<unknown, unknown>): Workflow<unknown, unknown> {
+function getRootWorkflow (w: WorkflowImplementation): WorkflowImplementation {
     const proto = Object.getPrototypeOf(w)
     const isRoot = !(kWorkflow in proto)
 
@@ -88,19 +107,19 @@ function getRootWorkflow (w: Workflow<unknown, unknown>): Workflow<unknown, unkn
     return getRootWorkflow(proto)
 }
 
-function* listStepDepthFirst(w: Workflow<unknown, unknown>): Iterable<[ step: Step<unknown, unknown>, context: Workflow<unknown, unknown> ]> {
+function* listStepDepthFirst(w: WorkflowImplementation): Iterable<[ step: Step<unknown, unknown>, context: WorkflowImplementation ]> {
     for (const element of w.graph) {
         if (element.type === "step") {
             yield [element.step, w]
         } else if (element.type === "context") {
-            for (const elem of listStepDepthFirst(element.context)) {
+            for (const elem of listStepDepthFirst(element.context as WorkflowImplementation)) {
                 yield elem
             }
         }
     }
 }
 
-WorkflowConstructor.prototype.steps = function *steps (this: Workflow<unknown, unknown>): Iterable<[ Step<unknown, unknown>, Workflow<unknown, unknown> ]> {
+WorkflowConstructor.prototype.steps = function *steps (this: WorkflowImplementation): Iterable<[ Step<unknown, unknown>, WorkflowImplementation ]> {
     const root = getRootWorkflow(this)
 
     for (const step of listStepDepthFirst(root)) {
@@ -108,7 +127,7 @@ WorkflowConstructor.prototype.steps = function *steps (this: Workflow<unknown, u
     }
 }
 
-WorkflowConstructor.prototype.register = function register(this: Workflow<unknown, unknown>, plugin: (workflow: Workflow<unknown, unknown>) => Workflow<unknown, unknown>) {
+WorkflowConstructor.prototype.register = function register(this: WorkflowImplementation, plugin: (workflow: WorkflowImplementation) => WorkflowImplementation) {
     const newContext = new (WorkflowConstructor as any)(this.name)
     Object.setPrototypeOf(newContext, this)
     plugin(newContext)
@@ -116,26 +135,26 @@ WorkflowConstructor.prototype.register = function register(this: Workflow<unknow
     return newContext
 }
 
-WorkflowConstructor.prototype.decorate = function decorate(this: Workflow<unknown, unknown>, key: string, value: unknown) {
+WorkflowConstructor.prototype.decorate = function decorate(this: WorkflowImplementation, key: string, value: unknown) {
     // @ts-expect-error
     this[key] = value
     return this
 }
 
-WorkflowConstructor.prototype.getFirstStep = function getFirstStep(this: Workflow<unknown, unknown>) {
+WorkflowConstructor.prototype.getFirstStep = function getFirstStep(this: WorkflowImplementation) {
     for (const [ step ] of this.steps()) {
         return step
     }
 }
 
-WorkflowConstructor.prototype.getStep = function getStep(this: Workflow<unknown, unknown>, name: string) {
+WorkflowConstructor.prototype.getStep = function getStep(this: WorkflowImplementation, name: string) {
     for (const [ step ] of this.steps()) {
         if (name === step.name)
             return step
     }
 }
 
-WorkflowConstructor.prototype.getNextStep = function getNextStep(this: Workflow<unknown, unknown>, name: string) {
+WorkflowConstructor.prototype.getNextStep = function getNextStep(this: WorkflowImplementation, name: string) {
     let found = false
 
     for (const [ step ] of this.steps()) {
