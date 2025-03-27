@@ -137,7 +137,6 @@ class MongoStorage implements Storage<WriteOpts> {
                         update: {
                             $set: {
                                 type: "failed",
-                                canBeRetried: write.retry,
                             },
                             $inc: {
                                 attempt: 1

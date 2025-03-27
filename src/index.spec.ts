@@ -335,8 +335,8 @@ test("register a plugin with dependencies", async (t) => {
   let state: number | undefined
 
   const workflow = rivr.workflow<number>("complex-calculation")
-    .registerPlugin(pluginA)
-    .registerPlugin(pluginB)
+    .register(pluginA)
+    .register(pluginB)
     .step({
       name: "add-bar",
       handler: ({ state, workflow }) => state + workflow.bar
