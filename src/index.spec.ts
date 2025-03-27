@@ -7,7 +7,7 @@ import { rivr } from "./workflow.ts"
 import {Network, StartedNetwork} from "testcontainers";
 import {CreatedProxy, StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
 import {MongoBulkWriteError} from "mongodb";
-import {rivrPlugin} from "./types.ts";
+import {rivrPlugin} from "./plugin.ts";
 
 let container!: StartedMongoDBContainer
 
@@ -330,13 +330,13 @@ test("register a plugin with dependencies", async (t) => {
   })
 
   const pluginA = rivrPlugin((w) => w.decorate("foo", 1), [])
-  const pluginB = rivrPlugin(w => w, [ pluginA ])
+  const pluginB = rivrPlugin(w => w.decorate("bar", w.foo + 1), [ pluginA ])
 
   let state: number | undefined
 
   const workflow = rivr.workflow<number>("complex-calculation")
-    .register(pluginA)
-    .register(pluginB)
+    .registerPlugin(pluginA)
+    .registerPlugin(pluginB)
     .step({
       name: "add-bar",
       handler: ({ state, workflow }) => state + workflow.bar

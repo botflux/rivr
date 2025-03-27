@@ -16,7 +16,7 @@ export type RivrPlugin<Out, State> = {
   deps: RivrPlugin<State, unknown>[]
 }
 
-function rivrPlugin<Out, State, Deps extends RivrPlugin<any, State>[]> (
+export function rivrPlugin<Out, State = any, Deps extends RivrPlugin<any, State>[] = []> (
   plugin: (w: Workflow<State, MergeUnionTypes<GetDecorator<UnwrapItem<Deps>, State>>>) => Workflow<State, Out>,
   deps: Deps
 ): RivrPlugin<Out, State> {
