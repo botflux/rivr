@@ -18,6 +18,7 @@ import {
     WorkflowFailedElement,
     ExecutionGraph
 } from "./types.ts";
+import {RivrPlugin} from "./plugin.ts";
 
 interface WorkflowImplementation extends Workflow<unknown, unknown> {
     /**
@@ -25,12 +26,15 @@ interface WorkflowImplementation extends Workflow<unknown, unknown> {
      * Iterating through this tree depth-first would yield the steps in order.
      */
     graph: ExecutionGraph<unknown, unknown>[]
+
+    plugins: RivrPlugin<unknown, unknown>[]
 }
 
 function WorkflowConstructor (this: WorkflowImplementation, name: string) {
     this[kWorkflow] = true
     this.name = name
     this.graph = []
+    this.plugins = []
 }
 
 WorkflowConstructor.prototype.step = function step(this: WorkflowImplementation, opts: StepOpts<unknown, unknown>) {
@@ -128,11 +132,52 @@ WorkflowConstructor.prototype.steps = function *steps (this: WorkflowImplementat
 }
 
 WorkflowConstructor.prototype.register = function register(this: WorkflowImplementation, plugin: (workflow: WorkflowImplementation) => WorkflowImplementation) {
+    const deps = "deps" in plugin
+        ? plugin.deps as RivrPlugin<unknown, unknown>[]
+        : []
+
+    if (deps.length > 0) {
+        const fulfilled: RivrPlugin<unknown, unknown>[] = []
+
+        for (const context of iterateFromChild(this)) {
+            for (const plugin of context.plugins) {
+                if (deps.includes(plugin)) {
+                    fulfilled.push(plugin)
+                }
+            }
+        }
+        
+        if (deps.length !== fulfilled.length) {
+            throw new Error("A plugin is missing its dependency")
+        }
+
+
+        // iterate over this instance's deps
+        // if not all deps fulfilled, then move to the parent
+        // if root reached and deps not fulfilled, then throw
+    }
+
     const newContext = new (WorkflowConstructor as any)(this.name)
     Object.setPrototypeOf(newContext, this)
     plugin(newContext)
     this.graph.push({ type: "context", context: newContext })
+    this.plugins.push(plugin)
     return newContext
+}
+
+function* iterateFromChild (child: WorkflowImplementation): Iterable<WorkflowImplementation> {
+    yield child
+
+    const proto = Object.getPrototypeOf(child)
+    const isRoot = !(kWorkflow in proto)
+
+    if (isRoot) {
+        return
+    }
+
+    for (const parent of iterateFromChild(proto)) {
+        yield parent
+    }
 }
 
 WorkflowConstructor.prototype.decorate = function decorate(this: WorkflowImplementation, key: string, value: unknown) {
