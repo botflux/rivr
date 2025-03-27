@@ -11,20 +11,20 @@ import {Workflow} from "./types.ts";
 export type MergeUnionTypes<T> = (T extends any ? (x: T) => any : never) extends
   (x: infer R) => any ? R : never;
 
-export type RivrPlugin<Out> = {
-  (w: Workflow<any, any>): Workflow<any, Out>
-  deps: RivrPlugin<unknown>[]
+export type RivrPlugin<Out, State> = {
+  (w: Workflow<State, any>): Workflow<State, Out>
+  deps: RivrPlugin<State, unknown>[]
 }
 
-function rivrPlugin<Out, Deps extends RivrPlugin<any>[]> (
-  plugin: (w: Workflow<any, MergeUnionTypes<GetDecorator<UnwrapItem<Deps>>>>) => Workflow<any, Out>,
+function rivrPlugin<Out, State, Deps extends RivrPlugin<any, State>[]> (
+  plugin: (w: Workflow<State, MergeUnionTypes<GetDecorator<UnwrapItem<Deps>, State>>>) => Workflow<State, Out>,
   deps: Deps
-): RivrPlugin<Out> {
+): RivrPlugin<Out, State> {
   Object.assign(plugin, {
     deps
   })
 
-  return plugin as RivrPlugin<Out>
+  return plugin as RivrPlugin<Out, State>
 }
 
 const plugin1 = rivrPlugin(w => w.decorate("foo", "foo"), [])
@@ -35,5 +35,5 @@ const deps = [ plugin1, plugin2 ]
 const plugin3 = rivrPlugin(w => w.decorate("baz", w.bar + w.foo), deps)
 
 type UnwrapItem<T> = T extends (infer U)[] ? U : never
-type GetDecorator<T> = T extends RivrPlugin<infer U> ? U : never
+type GetDecorator<T, State> = T extends RivrPlugin<infer U, State> ? U : never
 
