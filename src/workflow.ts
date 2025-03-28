@@ -72,6 +72,7 @@ export type ReadyExecutionGraph<State, Decorators> =
 
 interface WorkflowImplementation extends Workflow<unknown, unknown> {
     [kReady]: boolean
+    [kReadyGraph]: ReadyExecutionGraph<unknown, unknown>[]
 
     /**
      * A tree containing the steps and sub-workflow in order.
@@ -87,6 +88,7 @@ interface WorkflowImplementation extends Workflow<unknown, unknown> {
 function WorkflowConstructor (this: WorkflowImplementation, name: string) {
     this[kWorkflow] = true
     this[kReady] = false
+    this[kReadyGraph] = []
     this.name = name
     this.graph = []
     this.plugins = []
@@ -309,15 +311,15 @@ WorkflowConstructor.prototype.ready = async function ready(this: WorkflowImpleme
 
 async function prepareGraph (root: WorkflowImplementation) {
     for (const element of root.graph) {
-        if (element.type === "plugin") {
-            if (element.context[kReady]) {
-                continue
-            }
 
-            const ctx = element.context
-            element.plugin(ctx)
-            ctx[kReady] = true
-            await prepareGraph(element.context)
+        if (element.type === "plugin") {
+            const currentPluginElements = [...element.context.graph]
+            element.context.graph = []
+            element.plugin(element.context)
+            element.context.graph.push(...currentPluginElements)
+            element.context[kReady] = true
+        } else {
+            root[kReadyGraph].push(element)
         }
     }
 }
