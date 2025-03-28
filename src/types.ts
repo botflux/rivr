@@ -72,6 +72,7 @@ export type ExecutionGraph<State, Decorators> =
   | WorkflowFailedElement<State, Decorators>
 
 export const kWorkflow = Symbol("kWorkflow")
+
 export type Workflow<State, Decorators> = {
   /**
    * A flag to discriminates if an object is a workflow.
@@ -183,4 +184,10 @@ export type Workflow<State, Decorators> = {
   getHook(hook: "onStepSkipped"): OnStepSkippedHook<State, Decorators>[]
   getHook(hook: "onWorkflowStopped"): OnWorkflowStoppedHook<State, Decorators>[]
   getHook(hook: "onWorkflowFailed"): OnWorkflowFailedHook<State, Decorators>[]
+
+  /**
+   * Execute the dependency graph.
+   * This function does nothing if the dependency graph was already executed.
+   */
+  ready(): Promise<Workflow<State, Decorators>>
 } & Decorators

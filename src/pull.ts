@@ -109,8 +109,12 @@ export class Poller<TriggerOpts> implements Worker {
         this.#storage = storage
     }
 
-    start<State, Decorators>(workflows: Workflow<State, Decorators>[]): void {
-        (async () => {
+    async start<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<void> {
+        for (const w of workflows) {
+            await w.ready()
+        }
+
+        ;(async () => {
             for (const _ of this.#loop) {
                 const [tasks, tasksErr] = await tryCatch(this.#storage.pull(workflows))
 

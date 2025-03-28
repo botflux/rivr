@@ -20,7 +20,17 @@ import {
 } from "./types.ts";
 import {RivrPlugin} from "./plugin.ts";
 
+class WorkflowNotReadyError extends Error {
+    constructor(name: string) {
+        super(`The workflow ${name} is not ready, please call '.ready()'`);
+    }
+}
+
+const kReady = Symbol("kReady");
+
 interface WorkflowImplementation extends Workflow<unknown, unknown> {
+    [kReady]: boolean
+
     /**
      * A tree containing the steps and sub-workflow in order.
      * Iterating through this tree depth-first would yield the steps in order.
@@ -32,6 +42,7 @@ interface WorkflowImplementation extends Workflow<unknown, unknown> {
 
 function WorkflowConstructor (this: WorkflowImplementation, name: string) {
     this[kWorkflow] = true
+    this[kReady] = false
     this.name = name
     this.graph = []
     this.plugins = []
@@ -60,6 +71,10 @@ function* iterateDepthFirst(w: WorkflowImplementation): Iterable<StepElement<unk
 }
 
 WorkflowConstructor.prototype.getHook = function* getHook(this: WorkflowImplementation, hook: "onStepCompleted") {
+    if (!this[kReady]) {
+        throw new WorkflowNotReadyError(this.name)
+    }
+
     const root = getRootWorkflow(this)
 
     for (const element of iterateDepthFirst(root)) {
@@ -124,6 +139,10 @@ function* listStepDepthFirst(w: WorkflowImplementation): Iterable<[ step: Step<u
 }
 
 WorkflowConstructor.prototype.steps = function *steps (this: WorkflowImplementation): Iterable<[ Step<unknown, unknown>, WorkflowImplementation ]> {
+    if (!this[kReady]) {
+        throw new WorkflowNotReadyError(this.name)
+    }
+
     const root = getRootWorkflow(this)
 
     for (const step of listStepDepthFirst(root)) {
@@ -187,12 +206,20 @@ WorkflowConstructor.prototype.decorate = function decorate(this: WorkflowImpleme
 }
 
 WorkflowConstructor.prototype.getFirstStep = function getFirstStep(this: WorkflowImplementation) {
+    if (!this[kReady]) {
+        throw new WorkflowNotReadyError(this.name)
+    }
+
     for (const [ step ] of this.steps()) {
         return step
     }
 }
 
 WorkflowConstructor.prototype.getStep = function getStep(this: WorkflowImplementation, name: string) {
+    if (!this[kReady]) {
+        throw new WorkflowNotReadyError(this.name)
+    }
+
     for (const [ step ] of this.steps()) {
         if (name === step.name)
             return step
@@ -200,6 +227,10 @@ WorkflowConstructor.prototype.getStep = function getStep(this: WorkflowImplement
 }
 
 WorkflowConstructor.prototype.getNextStep = function getNextStep(this: WorkflowImplementation, name: string) {
+    if (!this[kReady]) {
+        throw new WorkflowNotReadyError(this.name)
+    }
+
     let found = false
 
     for (const [ step ] of this.steps()) {
@@ -216,6 +247,15 @@ WorkflowConstructor.prototype.getNextStep = function getNextStep(this: WorkflowI
     if (!found) {
         throw new Error(`Cannot find the next step of '${name}' because there is no step named '${name}'`)
     }
+}
+
+WorkflowConstructor.prototype.ready = async function ready(this: WorkflowImplementation) {
+    if (this[kReady]) {
+        return this
+    }
+
+    this[kReady] = true
+    return this
 }
 
 export const rivr = {
