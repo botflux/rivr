@@ -837,15 +837,15 @@ describe("resilience", {skip: false}, () => {
     await network.stop()
   })
 
-  test("should be able to survive a mongodb crash", {skip: true}, async (t) => {
+  test("should be able to survive a mongodb crash", async (t) => {
     // Given
     const engine = createEngine({
       url: `mongodb://${proxy.host}:${proxy.port}`,
       clientOpts: {
         serverSelectionTimeoutMS: 3_000,
-        socketTimeoutMS: 1_000,
-        waitQueueTimeoutMS: 1_000,
-        connectTimeoutMS: 1_000,
+        socketTimeoutMS: 3_000,
+        waitQueueTimeoutMS: 3_000,
+        connectTimeoutMS: 3_000,
         directConnection: true
       },
       dbName: randomUUID(),
@@ -869,6 +869,8 @@ describe("resilience", {skip: false}, () => {
       .addHook("onError", err => {
         error = err
       })
+
+    await workflow.ready()
 
     // When
     await engine.createTrigger().trigger(workflow, 2)

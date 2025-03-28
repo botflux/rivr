@@ -342,7 +342,6 @@ function areDepsSatisfied (root: WorkflowImplementation, deps: RivrPlugin<unknow
     do {
         for (const element of current.graph) {
             if (element.type === "plugin") {
-                console.log(deps, element.plugin)
                 if (deps.includes(element.plugin)) {
                     foundDeps.push(element)
                 }
