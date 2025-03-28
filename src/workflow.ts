@@ -335,9 +335,38 @@ function* listStepDepthFirst(w: WorkflowImplementation): Iterable<[ step: Step<u
     }
 }
 
+function areDepsSatisfied (root: WorkflowImplementation, deps: RivrPlugin<unknown, unknown>[]): boolean {
+    const foundDeps = []
+    let current = root
+
+    do {
+        for (const element of current.graph) {
+            if (element.type === "plugin") {
+                console.log(deps, element.plugin)
+                if (deps.includes(element.plugin)) {
+                    foundDeps.push(element)
+                }
+            }
+        }
+
+        current = Object.getPrototypeOf(current)
+
+    } while (foundDeps.length !== deps.length && kWorkflow in current)
+
+    return foundDeps.length === deps.length
+}
+
 async function prepareGraph (root: WorkflowImplementation) {
     for (const element of root.graph) {
         if (element.type === "plugin") {
+            if (
+              element.plugin.deps &&
+              element.plugin.deps.length > 0 &&
+              !areDepsSatisfied(root, element.plugin.deps)
+            ) {
+                throw new Error("A plugin is missing its dependencies")
+            }
+
             const currentPluginElements = [...element.context.graph]
             element.context.graph = []
             element.plugin(element.context)

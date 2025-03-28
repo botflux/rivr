@@ -318,7 +318,7 @@ test("register step in a plugin", {skip: false}, async (t) => {
     t.assert.deepEqual(state, 10)
 })
 
-test("register a plugin with dependencies", {skip: false, only: true}, async (t) => {
+test("register a plugin with dependencies", {skip: false}, async (t) => {
   // Given
   const engine = createEngine({
     url: container.getConnectionString(),
@@ -329,8 +329,12 @@ test("register a plugin with dependencies", {skip: false, only: true}, async (t)
     }
   })
 
-  const pluginA = rivrPlugin((w) => w.decorate("foo", 1), [])
-  const pluginB = rivrPlugin(w => w.decorate("bar", w.foo + 1), [ pluginA ])
+  const pluginA = rivrPlugin(function pluginA(w) {
+    return w.decorate("foo", 1)
+  }, [])
+  const pluginB = rivrPlugin(function pluginB(w) {
+    return w.decorate("bar", w.foo + 1)
+  }, [ pluginA ])
 
   let state: number | undefined
 
@@ -355,13 +359,14 @@ test("register a plugin with dependencies", {skip: false, only: true}, async (t)
   t.assert.deepEqual(state, 3)
 })
 
-test("register a plugin with a missing dependency throw an error", {skip: true}, (t) => {
+test("register a plugin with a missing dependency throw an error", {skip: false, only: false}, async (t) => {
   const plugin1 = rivrPlugin(w => w, [  ])
   const plugin2 = rivrPlugin(w => w, [ plugin1 ])
 
-  t.assert.throws(() => {
-    rivr.workflow("my-workflow").register(plugin2)
-  }, new Error("A plugin is missing its dependency"))
+  await t.assert.rejects(
+    rivr.workflow("my-workflow").register(plugin2).ready(),
+    new Error("A plugin is missing its dependencies")
+  )
 })
 
 test("handle step errors", {skip: false}, async (t) => {
