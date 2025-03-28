@@ -83,8 +83,6 @@ interface WorkflowImplementation extends Workflow<unknown, unknown> {
     plugins: RivrPlugin<unknown, unknown>[]
 }
 
-
-
 function WorkflowConstructor (this: WorkflowImplementation, name: string) {
     this[kWorkflow] = true
     this[kReady] = false
@@ -104,18 +102,6 @@ WorkflowConstructor.prototype.step = function step(this: WorkflowImplementation,
     this.graph.push({ type: "step", step: { ...requiredFields, maxAttempts } })
     console.log("after", this.graph)
     return this
-}
-
-function* iterateDepthFirst(w: WorkflowImplementation): Iterable<StepElement<unknown, unknown> | WorkflowFailedElement<unknown, unknown> | WorkflowStoppedElement<unknown, unknown> | StepSkippedElement<unknown, unknown> | StepErrorElement<unknown, unknown> | WorkflowCompletedElement<unknown, unknown> | StepCompletedElement<unknown, unknown>> {
-    for (const element of w.graph) {
-        if (element.type === "plugin") {
-            for (const nested of iterateDepthFirst(element.context as WorkflowImplementation)) {
-                yield nested
-            }
-        } else {
-            yield element
-        }
-    }
 }
 
 WorkflowConstructor.prototype.getHook = function* getHook(this: WorkflowImplementation, hook: "onStepCompleted") {
@@ -161,29 +147,6 @@ WorkflowConstructor.prototype.addHook = function addHook(this: WorkflowImplement
             throw new Error(`Hook type '${hook}' is not supported`)
     }
     return this
-}
-
-function getRootWorkflow (w: WorkflowImplementation): WorkflowImplementation {
-    const proto = Object.getPrototypeOf(w)
-    const isRoot = !(kWorkflow in proto)
-
-    if (isRoot) {
-        return w
-    }
-
-    return getRootWorkflow(proto)
-}
-
-function* listStepDepthFirst(w: WorkflowImplementation): Iterable<[ step: Step<unknown, unknown>, context: WorkflowImplementation ]> {
-    for (const element of w.graph) {
-        if (element.type === "step") {
-            yield [element.step, w]
-        } else if (element.type === "plugin") {
-            for (const elem of listStepDepthFirst(element.context as WorkflowImplementation)) {
-                yield elem
-            }
-        }
-    }
 }
 
 WorkflowConstructor.prototype.steps = function *steps (this: WorkflowImplementation): Iterable<[ Step<unknown, unknown>, WorkflowImplementation ]> {
@@ -307,6 +270,41 @@ WorkflowConstructor.prototype.ready = async function ready(this: WorkflowImpleme
 
     root[kReady] = true
     return this
+}
+
+function* iterateDepthFirst(w: WorkflowImplementation): Iterable<StepElement<unknown, unknown> | WorkflowFailedElement<unknown, unknown> | WorkflowStoppedElement<unknown, unknown> | StepSkippedElement<unknown, unknown> | StepErrorElement<unknown, unknown> | WorkflowCompletedElement<unknown, unknown> | StepCompletedElement<unknown, unknown>> {
+    for (const element of w.graph) {
+        if (element.type === "plugin") {
+            for (const nested of iterateDepthFirst(element.context as WorkflowImplementation)) {
+                yield nested
+            }
+        } else {
+            yield element
+        }
+    }
+}
+
+function getRootWorkflow (w: WorkflowImplementation): WorkflowImplementation {
+    const proto = Object.getPrototypeOf(w)
+    const isRoot = !(kWorkflow in proto)
+
+    if (isRoot) {
+        return w
+    }
+
+    return getRootWorkflow(proto)
+}
+
+function* listStepDepthFirst(w: WorkflowImplementation): Iterable<[ step: Step<unknown, unknown>, context: WorkflowImplementation ]> {
+    for (const element of w.graph) {
+        if (element.type === "step") {
+            yield [element.step, w]
+        } else if (element.type === "plugin") {
+            for (const elem of listStepDepthFirst(element.context as WorkflowImplementation)) {
+                yield elem
+            }
+        }
+    }
 }
 
 async function prepareGraph (root: WorkflowImplementation) {
