@@ -318,7 +318,7 @@ test("register step in a plugin", {skip: false}, async (t) => {
     t.assert.deepEqual(state, 10)
 })
 
-test("register a plugin with dependencies", {skip: true}, async (t) => {
+test("register a plugin with dependencies", {skip: false, only: true}, async (t) => {
   // Given
   const engine = createEngine({
     url: container.getConnectionString(),

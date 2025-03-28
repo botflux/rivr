@@ -18,7 +18,7 @@ class WorkflowNotReadyError extends Error {
     }
 }
 
-const kReady = Symbol("kReady");
+export const kReady = Symbol("kReady");
 
 export type StepElement<State, Decorators> = {
     type: "step",
@@ -289,15 +289,14 @@ WorkflowConstructor.prototype.getNextStep = function getNextStep(this: WorkflowI
 }
 
 WorkflowConstructor.prototype.ready = async function ready(this: WorkflowImplementation) {
-    if (this[kReady]) {
+    const root = getRootWorkflow(this)
+
+    if (root[kReady]) {
         return this
     }
 
-    const root = getRootWorkflow(this)
-
     await prepareGraph(root)
 
-    root[kReady] = true
     return this
 }
 
@@ -313,7 +312,7 @@ function* iterateDepthFirst(w: WorkflowImplementation): Iterable<StepElement<unk
     }
 }
 
-function getRootWorkflow (w: WorkflowImplementation): WorkflowImplementation {
+export function getRootWorkflow (w: WorkflowImplementation): WorkflowImplementation {
     const proto = Object.getPrototypeOf(w)
     const isRoot = !(kWorkflow in proto)
 
@@ -338,15 +337,16 @@ function* listStepDepthFirst(w: WorkflowImplementation): Iterable<[ step: Step<u
 
 async function prepareGraph (root: WorkflowImplementation) {
     for (const element of root.graph) {
-
         if (element.type === "plugin") {
             const currentPluginElements = [...element.context.graph]
             element.context.graph = []
             element.plugin(element.context)
             element.context.graph.push(...currentPluginElements)
             element.context[kReady] = true
+            await prepareGraph(element.context)
         }
     }
+    root[kReady] = true
 }
 export const rivr = {
     workflow<State>(name: string): Workflow<State, Record<string, unknown>> {
