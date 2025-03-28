@@ -21,7 +21,6 @@ class WorkflowNotReadyError extends Error {
 const kReady = Symbol("kReady");
 
 export type StepElement<State, Decorators> = { type: "step", step: Step<State, Decorators> }
-export type ContextElement<State, Decorators> = { type: "context", context: Workflow<State, Decorators> }
 export type StepCompletedElement<State, Decorators> = {
     type: "onStepCompleted",
     hook: OnStepCompletedHook<State, Decorators>
