@@ -23,9 +23,9 @@ test("execute a workflow step", async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
-      clientOpts: {
-          directConnection: true
-      },
+        clientOpts: {
+            directConnection: true
+        },
         dbName: randomUUID(),
         signal: t.signal
     })

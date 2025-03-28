@@ -27,13 +27,6 @@ export function rivrPlugin<Out, State = any, Deps extends RivrPlugin<any, State>
   return plugin as RivrPlugin<Out, State>
 }
 
-const plugin1 = rivrPlugin(w => w.decorate("foo", "foo"), [])
-const plugin2 = rivrPlugin(w => w.decorate("bar", "bar"), [])
-
-const deps = [ plugin1, plugin2 ]
-
-const plugin3 = rivrPlugin(w => w.decorate("baz", w.bar + w.foo), deps)
-
 type UnwrapItem<T> = T extends (infer U)[] ? U : never
 type GetDecorator<T, State> = T extends RivrPlugin<infer U, State> ? U : never
 
