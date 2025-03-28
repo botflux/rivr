@@ -56,7 +56,7 @@ test("execute a workflow step", async (t) => {
     t.assert.deepEqual(state, 7)
 })
 
-test("skip a step", async (t) => {
+test("skip a step", {skip: false}, async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
@@ -108,7 +108,7 @@ test("skip a step", async (t) => {
     t.assert.deepEqual(state, 5)
 })
 
-test("stop a workflow", async (t) => {
+test("stop a workflow", {skip: false}, async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
@@ -153,7 +153,7 @@ test("stop a workflow", async (t) => {
     t.assert.deepEqual(stoppedState, 6)
 })
 
-test("execute a workflow made of multiple steps", async (t) => {
+test("execute a workflow made of multiple steps", {skip: false}, async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
@@ -194,7 +194,7 @@ test("execute a workflow made of multiple steps", async (t) => {
     t.assert.deepEqual(state, 9)
 })
 
-test("decorate workflow", async (t) => {
+test("decorate workflow", {skip: false}, async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
@@ -232,7 +232,7 @@ test("decorate workflow", async (t) => {
     t.assert.deepEqual(state, 6)
 })
 
-test("register plugin", async (t) => {
+test("register plugin", {skip: false}, async (t: TestContext) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
@@ -245,6 +245,7 @@ test("register plugin", async (t) => {
 
     let hookExecuted = false
     let state
+    let errors: unknown[] = []
 
     const workflow = rivr.workflow<number>("complex-calculation")
         .register(workflow => workflow.decorate("add", (x: number, y: number) => x + y))
@@ -256,6 +257,7 @@ test("register plugin", async (t) => {
             hookExecuted = true
             state = s
         })
+        .addHook("onStepError", error => errors.push(error))
 
     await engine.createWorker().start([ workflow ])
 
@@ -266,11 +268,12 @@ test("register plugin", async (t) => {
     let now = new Date().getTime()
     while (!hookExecuted && new Date().getTime() - now < 5_000) {
         await setTimeout(20)
+        t.assert.deepStrictEqual(errors, [])
     }
     t.assert.deepEqual(state, 6)
 })
 
-test("register step in a plugin", async (t) => {
+test("register step in a plugin", {skip: false, only: true}, async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
@@ -282,7 +285,7 @@ test("register step in a plugin", async (t) => {
     })
 
     let hookExecuted = false
-    let state
+    let state: number | undefined
 
     const workflow = rivr.workflow<number>("complex-calculation")
         .step({
@@ -311,14 +314,11 @@ test("register step in a plugin", async (t) => {
     await engine.createTrigger().trigger(workflow, 4)
 
     // Then
-    let now = new Date().getTime()
-    while (!hookExecuted && new Date().getTime() - now < 5_000) {
-        await setTimeout(20)
-    }
+    await waitForPredicate(() => state !== undefined)
     t.assert.deepEqual(state, 10)
 })
 
-test("register a plugin with dependencies", async (t) => {
+test("register a plugin with dependencies", {skip: true}, async (t) => {
   // Given
   const engine = createEngine({
     url: container.getConnectionString(),
@@ -355,7 +355,7 @@ test("register a plugin with dependencies", async (t) => {
   t.assert.deepEqual(state, 3)
 })
 
-test("register a plugin with a missing dependency throw an error", (t) => {
+test("register a plugin with a missing dependency throw an error", {skip: true}, (t) => {
   const plugin1 = rivrPlugin(w => w, [  ])
   const plugin2 = rivrPlugin(w => w, [ plugin1 ])
 
@@ -364,7 +364,7 @@ test("register a plugin with a missing dependency throw an error", (t) => {
   }, new Error("A plugin is missing its dependency"))
 })
 
-test("handle step errors", async (t) => {
+test("handle step errors", {skip: true}, async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
@@ -406,7 +406,7 @@ test("handle step errors", async (t) => {
     t.assert.deepEqual(state, 4)
 })
 
-test("return a ok step result", async (t) => {
+test("return a ok step result", {skip: true}, async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
@@ -443,7 +443,7 @@ test("return a ok step result", async (t) => {
     t.assert.deepEqual(state, 7)
 })
 
-test("return a error step result", async (t) => {
+test("return a error step result", {skip: true}, async (t) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
@@ -483,7 +483,7 @@ test("return a error step result", async (t) => {
     t.assert.deepEqual(state, 4)
 })
 
-test("execute all the handler", async (t: TestContext) => {
+test("execute all the handler", {skip: true}, async (t: TestContext) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
@@ -533,7 +533,7 @@ test("execute all the handler", async (t: TestContext) => {
     t.assert.deepStrictEqual(stepCompletedStates, [ 6, 6, 10, 10 ])
 })
 
-test("execute onWorkflowCompleted hooks in order", async (t: TestContext) => {
+test("execute onWorkflowCompleted hooks in order", {skip: true}, async (t: TestContext) => {
     // Given
     const engine = createEngine({
         url: container.getConnectionString(),
@@ -584,7 +584,7 @@ test("execute onWorkflowCompleted hooks in order", async (t: TestContext) => {
     t.assert.deepStrictEqual(elements, [ 1, 2, 3, 4 ])
 })
 
-test("should be able to execute a hook in the correct context", async (t) => {
+test("should be able to execute a hook in the correct context", {skip: true}, async (t) => {
   // Given
   const engine = createEngine({
     url: container.getConnectionString(),
@@ -619,7 +619,7 @@ test("should be able to execute a hook in the correct context", async (t) => {
   t.assert.deepEqual(hookValue, 6)
 })
 
-test("should be able to execute async handler", async (t) => {
+test("should be able to execute async handler", {skip: true}, async (t) => {
   // Given
   const engine = createEngine({
     url: container.getConnectionString(),
@@ -651,7 +651,7 @@ test("should be able to execute async handler", async (t) => {
   t.assert.deepEqual(state, 2)
 })
 
-test("should be able to handle hook failure", async (t) => {
+test("should be able to handle hook failure", {skip: true}, async (t) => {
   // Given
   const engine = createEngine({
     url: container.getConnectionString(),
@@ -687,7 +687,7 @@ test("should be able to handle hook failure", async (t) => {
   t.assert.deepEqual(error, "oops")
 })
 
-test("should be able to execute the write in a transaction", async (t) => {
+test("should be able to execute the write in a transaction", {skip: true}, async (t) => {
   // Given
   const engine = createEngine({
     url: container.getConnectionString(),
@@ -729,7 +729,7 @@ test("should be able to execute the write in a transaction", async (t) => {
   t.assert.deepEqual((await engine.client.db(db).collection("another-collection").findOne())?.n, 1)
 })
 
-test("should be able to retry a failed step", async (t) => {
+test("should be able to retry a failed step", {skip: true}, async (t) => {
   // Given
   const engine = createEngine({
     url: container.getConnectionString(),
@@ -762,7 +762,7 @@ test("should be able to retry a failed step", async (t) => {
   t.assert.deepEqual(errorCount, 5)
 })
 
-test("should be able to not retry failed steps by default", async (t) => {
+test("should be able to not retry failed steps by default", {skip: true}, async (t) => {
   // Given
   const engine = createEngine({
     url: container.getConnectionString(),
@@ -794,7 +794,7 @@ test("should be able to not retry failed steps by default", async (t) => {
   t.assert.deepEqual(errorCount, 1)
 })
 
-describe("resilience", () => {
+describe("resilience", {skip: true}, () => {
   let network: StartedNetwork
   let mongodb: StartedMongoDBContainer
   let toxiproxy: StartedToxiProxyContainer

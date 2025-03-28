@@ -1,4 +1,3 @@
-import {rivr} from "./workflow.ts";
 import {RivrPlugin} from "./plugin.ts";
 
 export type Success<State> = {
@@ -52,25 +51,6 @@ export type OnStepCompletedHook<State, Decorators> = (workflow: Workflow<State, 
 
 export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State, Decorators>) => Workflow<State, NewDecorators>
 
-export type StepElement<State, Decorators> = { type: "step", step: Step<State, Decorators> }
-export type ContextElement<State, Decorators> = { type: "context", context: Workflow<State, Decorators> }
-export type StepCompletedElement<State, Decorators> = { type: "onStepCompleted", hook: OnStepCompletedHook<State, Decorators> }
-export type StepErrorElement<State, Decorators> = { type: "onStepError", hook: OnStepErrorHook<State, Decorators> }
-export type StepSkippedElement<State, Decorators> = { type: "onStepSkipped", hook: OnStepSkippedHook<State, Decorators> }
-export type WorkflowCompletedElement<State, Decorators> = { type: "onWorkflowCompleted", hook: OnWorkflowCompletedHook<State, Decorators> }
-export type WorkflowStoppedElement<State, Decorators> = { type: "onWorkflowStopped", hook: OnWorkflowStoppedHook<State, Decorators> }
-export type WorkflowFailedElement<State, Decorators> = { type: "onWorkflowFailed", hook: OnWorkflowFailedHook<State, Decorators> }
-
-export type ExecutionGraph<State, Decorators> =
-  | StepElement<State, Decorators>
-  | ContextElement<State, Decorators>
-  | StepCompletedElement<State, Decorators>
-  | WorkflowCompletedElement<State, Decorators>
-  | StepErrorElement<State, Decorators>
-  | StepSkippedElement<State, Decorators>
-  | WorkflowStoppedElement<State, Decorators>
-  | WorkflowFailedElement<State, Decorators>
-
 export const kWorkflow = Symbol("kWorkflow")
 
 export type Workflow<State, Decorators> = {
@@ -97,6 +77,8 @@ export type Workflow<State, Decorators> = {
    * @param name
    */
   getStep(name: string): Step<State, Decorators> | undefined
+
+  getStepAndExecutionContext(name: string): [ Step<State, Decorators>, Workflow<State, Decorators> ] | undefined
 
   /**
    * Search the step succeding the step matching the given name.

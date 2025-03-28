@@ -4,19 +4,11 @@ import {
     OnStepErrorHook,
     OnStepSkippedHook,
     OnWorkflowCompletedHook,
-    OnWorkflowStoppedHook,
-    StepCompletedElement,
-    StepElement,
-    StepErrorElement,
-    Step,
-    StepSkippedElement,
-    Workflow,
-    WorkflowCompletedElement,
-    WorkflowStoppedElement,
-    StepOpts,
     OnWorkflowFailedHook,
-    WorkflowFailedElement,
-    ExecutionGraph
+    OnWorkflowStoppedHook,
+    Step,
+    StepOpts,
+    Workflow
 } from "./types.ts";
 import {RivrPlugin} from "./plugin.ts";
 
@@ -27,22 +19,76 @@ class WorkflowNotReadyError extends Error {
 }
 
 const kReady = Symbol("kReady");
+const kReadyGraph = Symbol("kReadyGraph");
+
+export type StepElement<State, Decorators> = { type: "step", step: Step<State, Decorators> }
+export type ContextElement<State, Decorators> = { type: "context", context: Workflow<State, Decorators> }
+export type StepCompletedElement<State, Decorators> = {
+    type: "onStepCompleted",
+    hook: OnStepCompletedHook<State, Decorators>
+}
+export type StepErrorElement<State, Decorators> = { type: "onStepError", hook: OnStepErrorHook<State, Decorators> }
+export type StepSkippedElement<State, Decorators> = {
+    type: "onStepSkipped",
+    hook: OnStepSkippedHook<State, Decorators>
+}
+export type WorkflowCompletedElement<State, Decorators> = {
+    type: "onWorkflowCompleted",
+    hook: OnWorkflowCompletedHook<State, Decorators>
+}
+export type WorkflowStoppedElement<State, Decorators> = {
+    type: "onWorkflowStopped",
+    hook: OnWorkflowStoppedHook<State, Decorators>
+}
+export type WorkflowFailedElement<State, Decorators> = {
+    type: "onWorkflowFailed",
+    hook: OnWorkflowFailedHook<State, Decorators>
+}
+export type WorkflowPluginElement<State, Decorators> = {
+    type: "plugin",
+    plugin: RivrPlugin<Decorators, State>
+    context: WorkflowImplementation
+}
+
+export type UnreadyExecutionGraph<State, Decorators> =
+  | StepElement<State, Decorators>
+  | StepCompletedElement<State, Decorators>
+  | WorkflowCompletedElement<State, Decorators>
+  | StepErrorElement<State, Decorators>
+  | StepSkippedElement<State, Decorators>
+  | WorkflowStoppedElement<State, Decorators>
+  | WorkflowFailedElement<State, Decorators>
+  | WorkflowPluginElement<State, Decorators>
+
+export type ReadyExecutionGraph<State, Decorators> =
+  | StepElement<State, Decorators>
+  | ContextElement<State, Decorators>
+  | StepCompletedElement<State, Decorators>
+  | WorkflowCompletedElement<State, Decorators>
+  | StepErrorElement<State, Decorators>
+  | StepSkippedElement<State, Decorators>
+  | WorkflowStoppedElement<State, Decorators>
+  | WorkflowFailedElement<State, Decorators>
 
 interface WorkflowImplementation extends Workflow<unknown, unknown> {
     [kReady]: boolean
+    [kReadyGraph]: ReadyExecutionGraph<unknown, unknown>[]
 
     /**
      * A tree containing the steps and sub-workflow in order.
      * Iterating through this tree depth-first would yield the steps in order.
      */
-    graph: ExecutionGraph<unknown, unknown>[]
+    graph: UnreadyExecutionGraph<unknown, unknown>[]
 
     plugins: RivrPlugin<unknown, unknown>[]
 }
 
+
+
 function WorkflowConstructor (this: WorkflowImplementation, name: string) {
     this[kWorkflow] = true
     this[kReady] = false
+    this[kReadyGraph] = []
     this.name = name
     this.graph = []
     this.plugins = []
@@ -54,13 +100,15 @@ WorkflowConstructor.prototype.step = function step(this: WorkflowImplementation,
         ...requiredFields
     } = opts
 
+    console.log("before", this.graph)
     this.graph.push({ type: "step", step: { ...requiredFields, maxAttempts } })
+    console.log("after", this.graph)
     return this
 }
 
 function* iterateDepthFirst(w: WorkflowImplementation): Iterable<StepElement<unknown, unknown> | WorkflowFailedElement<unknown, unknown> | WorkflowStoppedElement<unknown, unknown> | StepSkippedElement<unknown, unknown> | StepErrorElement<unknown, unknown> | WorkflowCompletedElement<unknown, unknown> | StepCompletedElement<unknown, unknown>> {
     for (const element of w.graph) {
-        if (element.type === "context") {
+        if (element.type === "plugin") {
             for (const nested of iterateDepthFirst(element.context as WorkflowImplementation)) {
                 yield nested
             }
@@ -130,7 +178,7 @@ function* listStepDepthFirst(w: WorkflowImplementation): Iterable<[ step: Step<u
     for (const element of w.graph) {
         if (element.type === "step") {
             yield [element.step, w]
-        } else if (element.type === "context") {
+        } else if (element.type === "plugin") {
             for (const elem of listStepDepthFirst(element.context as WorkflowImplementation)) {
                 yield elem
             }
@@ -151,52 +199,40 @@ WorkflowConstructor.prototype.steps = function *steps (this: WorkflowImplementat
 }
 
 WorkflowConstructor.prototype.register = function register(this: WorkflowImplementation, plugin: (workflow: WorkflowImplementation) => WorkflowImplementation) {
-    const deps = "deps" in plugin
-        ? plugin.deps as RivrPlugin<unknown, unknown>[]
-        : []
+    // const deps = "deps" in plugin
+    //     ? plugin.deps as RivrPlugin<unknown, unknown>[]
+    //     : []
+    //
+    // if (deps.length > 0) {
+    //     const fulfilled: RivrPlugin<unknown, unknown>[] = []
+    //
+    //     for (const context of iterateFromChild(this)) {
+    //         for (const plugin of context.plugins) {
+    //             if (deps.includes(plugin)) {
+    //                 fulfilled.push(plugin)
+    //             }
+    //         }
+    //     }
+    //
+    //     if (deps.length !== fulfilled.length) {
+    //         throw new Error("A plugin is missing its dependency")
+    //     }
+    //
+    //
+    //     // iterate over this instance's deps
+    //     // if not all deps fulfilled, then move to the parent
+    //     // if root reached and deps not fulfilled, then throw
+    // }
+    //
+    // const newContext = new (WorkflowConstructor as any)(this.name)
+    // Object.setPrototypeOf(newContext, this)
+    // plugin(newContext)
+    const nested = new (WorkflowConstructor as any)(this.name)
+    Object.setPrototypeOf(nested, this)
 
-    if (deps.length > 0) {
-        const fulfilled: RivrPlugin<unknown, unknown>[] = []
-
-        for (const context of iterateFromChild(this)) {
-            for (const plugin of context.plugins) {
-                if (deps.includes(plugin)) {
-                    fulfilled.push(plugin)
-                }
-            }
-        }
-        
-        if (deps.length !== fulfilled.length) {
-            throw new Error("A plugin is missing its dependency")
-        }
-
-
-        // iterate over this instance's deps
-        // if not all deps fulfilled, then move to the parent
-        // if root reached and deps not fulfilled, then throw
-    }
-
-    const newContext = new (WorkflowConstructor as any)(this.name)
-    Object.setPrototypeOf(newContext, this)
-    plugin(newContext)
-    this.graph.push({ type: "context", context: newContext })
-    this.plugins.push(plugin)
-    return newContext
-}
-
-function* iterateFromChild (child: WorkflowImplementation): Iterable<WorkflowImplementation> {
-    yield child
-
-    const proto = Object.getPrototypeOf(child)
-    const isRoot = !(kWorkflow in proto)
-
-    if (isRoot) {
-        return
-    }
-
-    for (const parent of iterateFromChild(proto)) {
-        yield parent
-    }
+    this.graph.push({ type: "plugin", plugin, context: nested })
+    // this.plugins.push(plugin)
+    return nested
 }
 
 WorkflowConstructor.prototype.decorate = function decorate(this: WorkflowImplementation, key: string, value: unknown) {
@@ -223,6 +259,17 @@ WorkflowConstructor.prototype.getStep = function getStep(this: WorkflowImplement
     for (const [ step ] of this.steps()) {
         if (name === step.name)
             return step
+    }
+}
+
+WorkflowConstructor.prototype.getStepAndExecutionContext = function getStepAndExecutionContext(this: WorkflowImplementation, name: string) {
+    if (!this[kReady]) {
+        throw new WorkflowNotReadyError(this.name)
+    }
+
+    for (const [ step, context ] of this.steps()) {
+        if (name === step.name)
+            return [step, context] as const
     }
 }
 
@@ -254,10 +301,28 @@ WorkflowConstructor.prototype.ready = async function ready(this: WorkflowImpleme
         return this
     }
 
-    this[kReady] = true
+    const root = getRootWorkflow(this)
+
+    await prepareGraph(root)
+
+    root[kReady] = true
     return this
 }
 
+async function prepareGraph (root: WorkflowImplementation) {
+    for (const element of root.graph) {
+        if (element.type === "plugin") {
+            if (element.context[kReady]) {
+                continue
+            }
+
+            const ctx = element.context
+            element.plugin(ctx)
+            ctx[kReady] = true
+            await prepareGraph(element.context)
+        }
+    }
+}
 export const rivr = {
     workflow<State>(name: string): Workflow<State, Record<string, unknown>> {
         return new (WorkflowConstructor as any)(name)
