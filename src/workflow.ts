@@ -19,7 +19,6 @@ class WorkflowNotReadyError extends Error {
 }
 
 const kReady = Symbol("kReady");
-const kReadyGraph = Symbol("kReadyGraph");
 
 export type StepElement<State, Decorators> = { type: "step", step: Step<State, Decorators> }
 export type ContextElement<State, Decorators> = { type: "context", context: Workflow<State, Decorators> }
@@ -60,19 +59,8 @@ export type UnreadyExecutionGraph<State, Decorators> =
   | WorkflowFailedElement<State, Decorators>
   | WorkflowPluginElement<State, Decorators>
 
-export type ReadyExecutionGraph<State, Decorators> =
-  | StepElement<State, Decorators>
-  | ContextElement<State, Decorators>
-  | StepCompletedElement<State, Decorators>
-  | WorkflowCompletedElement<State, Decorators>
-  | StepErrorElement<State, Decorators>
-  | StepSkippedElement<State, Decorators>
-  | WorkflowStoppedElement<State, Decorators>
-  | WorkflowFailedElement<State, Decorators>
-
 interface WorkflowImplementation extends Workflow<unknown, unknown> {
     [kReady]: boolean
-    [kReadyGraph]: ReadyExecutionGraph<unknown, unknown>[]
 
     /**
      * A tree containing the steps and sub-workflow in order.
@@ -86,7 +74,6 @@ interface WorkflowImplementation extends Workflow<unknown, unknown> {
 function WorkflowConstructor (this: WorkflowImplementation, name: string) {
     this[kWorkflow] = true
     this[kReady] = false
-    this[kReadyGraph] = []
     this.name = name
     this.graph = []
     this.plugins = []
@@ -316,8 +303,6 @@ async function prepareGraph (root: WorkflowImplementation) {
             element.plugin(element.context)
             element.context.graph.push(...currentPluginElements)
             element.context[kReady] = true
-        } else {
-            root[kReadyGraph].push(element)
         }
     }
 }
