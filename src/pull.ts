@@ -138,7 +138,6 @@ export class Poller<TriggerOpts> implements Worker {
 
                     const result = await this.#handleStep(step, task, executionContext)
 
-                    console.log("step: ", step.name, task.state, result)
                     switch(result.type) {
                         case "stopped": {
                             await this.#write([
@@ -148,8 +147,8 @@ export class Poller<TriggerOpts> implements Worker {
                                 }
                             ])
 
-                            for (const handler of mWorkflow.getHook("onWorkflowStopped")) {
-                                const [, error] = tryCatchSync(() => handler(executionContext, step, task.state))
+                            for (const [handler, context] of mWorkflow.getHook("onWorkflowStopped")) {
+                                const [, error] = tryCatchSync(() => handler(context, step, task.state))
 
                                 if (error !== undefined) {
                                     this.#executeErrorHooks(error)
@@ -187,8 +186,8 @@ export class Poller<TriggerOpts> implements Worker {
                             ])
 
                             if (result.type === "skipped") {
-                                for (const handler of mWorkflow.getHook("onStepSkipped")) {
-                                    const [, error] = tryCatchSync(() => handler(executionContext, step, task.state))
+                                for (const [handler, context] of mWorkflow.getHook("onStepSkipped")) {
+                                    const [, error] = tryCatchSync(() => handler(context, step, task.state))
 
                                     if (error !== undefined) {
                                         this.#executeErrorHooks(error)
@@ -196,8 +195,8 @@ export class Poller<TriggerOpts> implements Worker {
                                 }                                
                             }
 
-                            for (const handler of mWorkflow.getHook("onStepCompleted")) {
-                                const [, error] = tryCatchSync(() => handler(executionContext, step, newState))
+                            for (const [handler, context] of mWorkflow.getHook("onStepCompleted")) {
+                                const [, error] = tryCatchSync(() => handler(context, step, newState))
 
                                 if (error !== undefined) {
                                     this.#executeErrorHooks(error)
@@ -205,8 +204,8 @@ export class Poller<TriggerOpts> implements Worker {
                             }
 
                             if (mNextStep === undefined) {
-                                for (const handler of mWorkflow.getHook("onWorkflowCompleted")) {
-                                    const [ , err ] = tryCatchSync(() => handler.call(mWorkflow, mWorkflow, newState))
+                                for (const [handler, context] of mWorkflow.getHook("onWorkflowCompleted")) {
+                                    const [ , err ] = tryCatchSync(() => handler.call(context, context, newState))
 
                                     if (err !== undefined) {
                                         this.#executeErrorHooks(err)
@@ -225,8 +224,8 @@ export class Poller<TriggerOpts> implements Worker {
                                 }
                             ])
 
-                            for (const hook of mWorkflow.getHook("onStepError")) {
-                                const [, error] = tryCatchSync(() => hook(result.error, executionContext, task.state))
+                            for (const [hook, context] of mWorkflow.getHook("onStepError")) {
+                                const [, error] = tryCatchSync(() => hook(result.error, context, task.state))
 
                                 if (error !== undefined) {
                                     this.#executeErrorHooks(error)
@@ -234,8 +233,8 @@ export class Poller<TriggerOpts> implements Worker {
                             }
 
                             if (task.attempt + 1 > step.maxAttempts) {
-                                for (const hook of mWorkflow.getHook("onWorkflowFailed")) {
-                                    const [, error] = tryCatchSync(() => hook(result.error, executionContext, step, task.state))
+                                for (const [hook, context] of mWorkflow.getHook("onWorkflowFailed")) {
+                                    const [, error] = tryCatchSync(() => hook(result.error, context, step, task.state))
 
                                     if (error !== undefined) {
                                         this.#executeErrorHooks(error)

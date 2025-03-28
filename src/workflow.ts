@@ -20,27 +20,40 @@ class WorkflowNotReadyError extends Error {
 
 const kReady = Symbol("kReady");
 
-export type StepElement<State, Decorators> = { type: "step", step: Step<State, Decorators> }
+export type StepElement<State, Decorators> = {
+    type: "step",
+    step: Step<State, Decorators>
+    context: WorkflowImplementation
+}
 export type StepCompletedElement<State, Decorators> = {
     type: "onStepCompleted",
     hook: OnStepCompletedHook<State, Decorators>
+    context: WorkflowImplementation
 }
-export type StepErrorElement<State, Decorators> = { type: "onStepError", hook: OnStepErrorHook<State, Decorators> }
+export type StepErrorElement<State, Decorators> = {
+    type: "onStepError",
+    hook: OnStepErrorHook<State, Decorators>
+    context: WorkflowImplementation
+}
 export type StepSkippedElement<State, Decorators> = {
     type: "onStepSkipped",
     hook: OnStepSkippedHook<State, Decorators>
+    context: WorkflowImplementation
 }
 export type WorkflowCompletedElement<State, Decorators> = {
     type: "onWorkflowCompleted",
     hook: OnWorkflowCompletedHook<State, Decorators>
+    context: WorkflowImplementation
 }
 export type WorkflowStoppedElement<State, Decorators> = {
     type: "onWorkflowStopped",
     hook: OnWorkflowStoppedHook<State, Decorators>
+    context: WorkflowImplementation
 }
 export type WorkflowFailedElement<State, Decorators> = {
     type: "onWorkflowFailed",
     hook: OnWorkflowFailedHook<State, Decorators>
+    context: WorkflowImplementation
 }
 export type WorkflowPluginElement<State, Decorators> = {
     type: "plugin",
@@ -84,9 +97,15 @@ WorkflowConstructor.prototype.step = function step(this: WorkflowImplementation,
         ...requiredFields
     } = opts
 
-    console.log("before", this.graph)
-    this.graph.push({ type: "step", step: { ...requiredFields, maxAttempts } })
-    console.log("after", this.graph)
+    this.graph.push({
+        type: "step",
+        step: {
+            ...requiredFields,
+            maxAttempts,
+        },
+        context: this
+    })
+
     return this
 }
 
@@ -99,7 +118,7 @@ WorkflowConstructor.prototype.getHook = function* getHook(this: WorkflowImplemen
 
     for (const element of iterateDepthFirst(root)) {
         if (element.type === hook) {
-            yield element.hook
+            yield [ element.hook, element.context ] as const
         }
     }
 }
@@ -107,26 +126,50 @@ WorkflowConstructor.prototype.getHook = function* getHook(this: WorkflowImplemen
 WorkflowConstructor.prototype.addHook = function addHook(this: WorkflowImplementation, hook: string, handler: Function) {
     switch(hook) {
         case "onWorkflowCompleted":
-            this.graph.push({ type: "onWorkflowCompleted", hook: handler as OnWorkflowCompletedHook<unknown, unknown> })
+            this.graph.push({
+                type: "onWorkflowCompleted",
+                hook: handler as OnWorkflowCompletedHook<unknown, unknown>,
+                context: this
+            })
             break
         case "onStepError":
-            this.graph.push({ type: "onStepError", hook: handler as OnStepErrorHook<unknown, unknown> })
+            this.graph.push({
+                type: "onStepError",
+                hook: handler as OnStepErrorHook<unknown, unknown>,
+                context: this
+            })
             break
 
         case "onStepSkipped":
-            this.graph.push({ type: "onStepSkipped", hook: handler as OnStepSkippedHook<unknown, unknown> })
+            this.graph.push({
+                type: "onStepSkipped",
+                hook: handler as OnStepSkippedHook<unknown, unknown>,
+                context: this
+            })
             break
 
         case "onWorkflowStopped":
-            this.graph.push({ type: "onWorkflowStopped", hook: handler as OnWorkflowStoppedHook<unknown, unknown> })
+            this.graph.push({
+                type: "onWorkflowStopped",
+                hook: handler as OnWorkflowStoppedHook<unknown, unknown>,
+                context: this
+            })
             break
 
         case "onStepCompleted":
-            this.graph.push({ type: "onStepCompleted", hook: handler as OnStepCompletedHook<unknown, unknown> })
+            this.graph.push({
+                type: "onStepCompleted",
+                hook: handler as OnStepCompletedHook<unknown, unknown>,
+                context: this
+            })
             break
 
         case "onWorkflowFailed":
-            this.graph.push({ type: "onWorkflowFailed", hook: handler as OnWorkflowFailedHook<unknown, unknown> })
+            this.graph.push({
+                type: "onWorkflowFailed",
+                hook: handler as OnWorkflowFailedHook<unknown, unknown>,
+                context: this
+            })
             break
 
         default:
