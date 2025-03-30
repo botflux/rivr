@@ -74,26 +74,6 @@ class MongoStorage implements Storage<WriteOpts> {
               ]
           })) satisfies Filter<MongoTask<State>>[]
 
-        // const workflowAndSteps = workflows.map(workflow => ({
-        //     $and: [
-        //         {
-        //             workflow: workflow.name,
-        //             step: { $in: Array.from(workflow.steps()).map(([ step ]) => step.name) },
-        //         },
-        //         {
-        //             $or: [
-        //
-        //                 { type: "waiting" },
-        //                 {
-        //                     type: "failed",
-        //                     canBeRetried: true,
-        //                 }
-        //
-        //             ]
-        //         }
-        //     ]
-        // })) satisfies Filter<MongoTask<State>>[]
-
         return {
             $or: filter
         }
