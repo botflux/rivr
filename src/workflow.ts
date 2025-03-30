@@ -335,26 +335,6 @@ function* listStepDepthFirst(w: WorkflowImplementation): Iterable<[ step: Step<u
     }
 }
 
-function areDepsSatisfied (root: WorkflowImplementation, deps: RivrPlugin<unknown, unknown>[]): boolean {
-    const foundDeps = []
-    let current = root
-
-    do {
-        for (const element of current.graph) {
-            if (element.type === "plugin") {
-                if (deps.includes(element.plugin)) {
-                    foundDeps.push(element)
-                }
-            }
-        }
-
-        current = Object.getPrototypeOf(current)
-
-    } while (foundDeps.length !== deps.length && kWorkflow in current)
-
-    return foundDeps.length === deps.length
-}
-
 function getUnsatisfiedDeps (root: WorkflowImplementation, deps: RivrPlugin<unknown, unknown>[]): RivrPlugin<unknown, unknown>[] {
     const foundDeps = []
     let current = root
