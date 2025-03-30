@@ -295,7 +295,7 @@ WorkflowConstructor.prototype.ready = async function ready(this: WorkflowImpleme
         return this
     }
 
-    await prepareGraph(root)
+    await executePlugins(root)
 
     return this
 }
@@ -355,7 +355,7 @@ function areDepsSatisfied (root: WorkflowImplementation, deps: RivrPlugin<unknow
     return foundDeps.length === deps.length
 }
 
-async function prepareGraph (root: WorkflowImplementation) {
+async function executePlugins (root: WorkflowImplementation) {
     for (const element of root.graph) {
         if (element.type === "plugin") {
             if (
@@ -371,11 +371,12 @@ async function prepareGraph (root: WorkflowImplementation) {
             element.plugin(element.context)
             element.context.graph.push(...currentPluginElements)
             element.context[kReady] = true
-            await prepareGraph(element.context)
+            await executePlugins(element.context)
         }
     }
     root[kReady] = true
 }
+
 export const rivr = {
     workflow<State>(name: string): Workflow<State, Record<string, unknown>> {
         return new (WorkflowConstructor as any)(name)
