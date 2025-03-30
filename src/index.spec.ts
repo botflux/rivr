@@ -331,10 +331,14 @@ test("register a plugin with dependencies", {skip: false}, async (t) => {
 
   const pluginA = rivrPlugin(function pluginA(w) {
     return w.decorate("foo", 1)
-  }, [])
+  }, {
+    deps: []
+  })
   const pluginB = rivrPlugin(function pluginB(w) {
     return w.decorate("bar", w.foo + 1)
-  }, [ pluginA ])
+  }, {
+    deps: [ pluginA ]
+  })
 
   let state: number | undefined
 
@@ -360,8 +364,12 @@ test("register a plugin with dependencies", {skip: false}, async (t) => {
 })
 
 test("register a plugin with a missing dependency throw an error", {skip: false, only: false}, async (t) => {
-  const plugin1 = rivrPlugin(w => w, [  ])
-  const plugin2 = rivrPlugin(w => w, [ plugin1 ])
+  const plugin1 = rivrPlugin(w => w, {
+    deps: []
+  })
+  const plugin2 = rivrPlugin(w => w, {
+    deps: [ plugin1 ]
+  })
 
   await t.assert.rejects(
     rivr.workflow("my-workflow").register(plugin2).ready(),

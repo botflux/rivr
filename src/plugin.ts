@@ -13,15 +13,19 @@ export type MergeUnionTypes<T> = (T extends any ? (x: T) => any : never) extends
 
 export type RivrPlugin<Out, State> = {
   (w: Workflow<State, any>): Workflow<State, Out>
-  deps?: RivrPlugin<State, unknown>[]
+  opts?: RivrPluginOpts<State>
+}
+
+export type RivrPluginOpts<State, Deps extends RivrPlugin<any, State>[] = []> = {
+  deps: Deps
 }
 
 export function rivrPlugin<Out, State = any, Deps extends RivrPlugin<any, State>[] = []> (
   plugin: (w: Workflow<State, MergeUnionTypes<GetDecorator<UnwrapItem<Deps>, State>>>) => Workflow<State, Out>,
-  deps: Deps
+  opts: RivrPluginOpts<State, Deps>
 ): RivrPlugin<Out, State> {
   Object.assign(plugin, {
-    deps
+    opts
   })
 
   return plugin as RivrPlugin<Out, State>

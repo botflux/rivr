@@ -358,10 +358,14 @@ function areDepsSatisfied (root: WorkflowImplementation, deps: RivrPlugin<unknow
 async function executePlugins (root: WorkflowImplementation) {
     for (const element of root.graph) {
         if (element.type === "plugin") {
+            const {
+                opts
+            } = element.plugin
+
             if (
-              element.plugin.deps &&
-              element.plugin.deps.length > 0 &&
-              !areDepsSatisfied(root, element.plugin.deps)
+              opts?.deps &&
+              opts.deps.length > 0 &&
+              !areDepsSatisfied(root, opts.deps)
             ) {
                 throw new Error("A plugin is missing its dependencies")
             }
