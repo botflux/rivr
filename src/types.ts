@@ -1,4 +1,4 @@
-import {RivrPlugin} from "./plugin.ts";
+import {RivrPlugin, RivrPluginOpts} from "./plugin.ts";
 
 export type Success<State> = {
   type: "success"

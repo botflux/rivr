@@ -81,6 +81,8 @@ interface WorkflowImplementation extends Workflow<unknown, unknown> {
     graph: UnreadyExecutionGraph<unknown, unknown>[]
 
     plugins: RivrPlugin<unknown, unknown>[]
+
+    autoPluginIndex: number
 }
 
 function WorkflowConstructor (this: WorkflowImplementation, name: string) {
@@ -89,6 +91,7 @@ function WorkflowConstructor (this: WorkflowImplementation, name: string) {
     this.name = name
     this.graph = []
     this.plugins = []
+    this.autoPluginIndex = 0
 }
 
 WorkflowConstructor.prototype.step = function step(this: WorkflowImplementation, opts: StepOpts<unknown, unknown>) {
@@ -190,9 +193,23 @@ WorkflowConstructor.prototype.steps = function *steps (this: WorkflowImplementat
     }
 }
 
-WorkflowConstructor.prototype.register = function register(this: WorkflowImplementation, plugin: (workflow: WorkflowImplementation) => WorkflowImplementation) {
+WorkflowConstructor.prototype.register = function register(this: WorkflowImplementation, plugin: RivrPlugin<unknown, unknown>) {
     const nested = new (WorkflowConstructor as any)(this.name)
     Object.setPrototypeOf(nested, this)
+
+    const {
+        opts: {
+            deps = [],
+            name = `plugin-auto-${getRootWorkflow(this).autoPluginIndex ++}`
+        } = {}
+    } = plugin
+
+    Object.defineProperty(plugin, "opts", {
+        value: {
+            deps,
+            name
+        }
+    })
 
     this.graph.push({ type: "plugin", plugin, context: nested })
     return nested
