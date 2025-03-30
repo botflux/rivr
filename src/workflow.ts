@@ -355,6 +355,42 @@ function areDepsSatisfied (root: WorkflowImplementation, deps: RivrPlugin<unknow
     return foundDeps.length === deps.length
 }
 
+function getUnsatisfiedDeps (root: WorkflowImplementation, deps: RivrPlugin<unknown, unknown>[]): RivrPlugin<unknown, unknown>[] {
+    const foundDeps = []
+    let current = root
+
+    do {
+        for (const element of current.graph) {
+            if (element.type === "plugin") {
+                if (deps.includes(element.plugin)) {
+                    foundDeps.push(element.plugin)
+                }
+            }
+        }
+
+        current = Object.getPrototypeOf(current)
+
+    } while (foundDeps.length !== deps.length && kWorkflow in current)
+
+    const diff = diffArrays(
+      foundDeps,
+      deps,
+      (a, b) => a.opts?.name === b.opts?.name
+    )
+
+    return diff
+}
+
+function diffArrays<T>(a: T[], b: T[], equals: (a: T, b: T) => boolean): T[] {
+    if (a.length === 0)
+        return b
+
+    if (b.length === 0)
+        return a
+
+    return a.filter(itemA => !b.some(itemB => equals(itemA, itemB)))
+}
+
 async function executePlugins (root: WorkflowImplementation) {
     for (const element of root.graph) {
         if (element.type === "plugin") {
@@ -362,12 +398,16 @@ async function executePlugins (root: WorkflowImplementation) {
                 opts
             } = element.plugin
 
+            const unsatisfiedDeps = opts?.deps && opts.deps.length > 0
+                ? getUnsatisfiedDeps(root, opts.deps)
+                : []
+
             if (
               opts?.deps &&
               opts.deps.length > 0 &&
-              !areDepsSatisfied(root, opts.deps)
+              unsatisfiedDeps.length > 0
             ) {
-                throw new Error("A plugin is missing its dependencies")
+                throw new Error(`Plugin "${opts.name}" needs "${unsatisfiedDeps[0]?.opts?.name}" to be registered`)
             }
 
             const currentPluginElements = [...element.context.graph]

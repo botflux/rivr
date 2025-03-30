@@ -18,6 +18,10 @@ export type RivrPlugin<Out, State> = {
 
 export type RivrPluginOpts<State, Deps extends RivrPlugin<any, State>[] = []> = {
   deps: Deps
+  /**
+   * The plugin's name
+   */
+  name: string
 }
 
 export function rivrPlugin<Out, State = any, Deps extends RivrPlugin<any, State>[] = []> (
@@ -25,7 +29,7 @@ export function rivrPlugin<Out, State = any, Deps extends RivrPlugin<any, State>
   opts: RivrPluginOpts<State, Deps>
 ): RivrPlugin<Out, State> {
   Object.assign(plugin, {
-    opts
+    opts,
   })
 
   return plugin as RivrPlugin<Out, State>

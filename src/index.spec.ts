@@ -332,12 +332,14 @@ test("register a plugin with dependencies", {skip: false}, async (t) => {
   const pluginA = rivrPlugin(function pluginA(w) {
     return w.decorate("foo", 1)
   }, {
-    deps: []
+    deps: [],
+    name: "plugin-a"
   })
   const pluginB = rivrPlugin(function pluginB(w) {
     return w.decorate("bar", w.foo + 1)
   }, {
-    deps: [ pluginA ]
+    deps: [ pluginA ],
+    name: "plugin-b"
   })
 
   let state: number | undefined
@@ -365,15 +367,17 @@ test("register a plugin with dependencies", {skip: false}, async (t) => {
 
 test("register a plugin with a missing dependency throw an error", {skip: false, only: false}, async (t) => {
   const plugin1 = rivrPlugin(w => w, {
-    deps: []
+    deps: [],
+    name: "plugin-1"
   })
   const plugin2 = rivrPlugin(w => w, {
-    deps: [ plugin1 ]
+    deps: [ plugin1 ],
+    name: "plugin-2"
   })
 
   await t.assert.rejects(
     rivr.workflow("my-workflow").register(plugin2).ready(),
-    new Error("A plugin is missing its dependencies")
+    new Error(`Plugin "plugin-2" needs "plugin-1" to be registered`)
   )
 })
 
@@ -936,6 +940,19 @@ describe("resilience", {skip: false}, () => {
     await waitForPredicate(() => error !== undefined)
     t.assert.deepStrictEqual(error instanceof MongoBulkWriteError, true)
   })
+})
+
+
+function diffArrays<T>(a: T[], b: T[], equals: (a: T, b: T) => boolean): T[] {
+  return a.filter(itemA => !b.some(itemB => equals(itemA, itemB)))
+}
+
+
+test("should be able to diff two arrays", (t: TestContext) => {
+  // Given
+  // When
+  // Then
+  t.assert.deepStrictEqual(diffArrays([ "a", "b"], [ "b" ], (a, b) => a === b), [ "a" ])
 })
 
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {
