@@ -191,39 +191,10 @@ WorkflowConstructor.prototype.steps = function *steps (this: WorkflowImplementat
 }
 
 WorkflowConstructor.prototype.register = function register(this: WorkflowImplementation, plugin: (workflow: WorkflowImplementation) => WorkflowImplementation) {
-    // const deps = "deps" in plugin
-    //     ? plugin.deps as RivrPlugin<unknown, unknown>[]
-    //     : []
-    //
-    // if (deps.length > 0) {
-    //     const fulfilled: RivrPlugin<unknown, unknown>[] = []
-    //
-    //     for (const context of iterateFromChild(this)) {
-    //         for (const plugin of context.plugins) {
-    //             if (deps.includes(plugin)) {
-    //                 fulfilled.push(plugin)
-    //             }
-    //         }
-    //     }
-    //
-    //     if (deps.length !== fulfilled.length) {
-    //         throw new Error("A plugin is missing its dependency")
-    //     }
-    //
-    //
-    //     // iterate over this instance's deps
-    //     // if not all deps fulfilled, then move to the parent
-    //     // if root reached and deps not fulfilled, then throw
-    // }
-    //
-    // const newContext = new (WorkflowConstructor as any)(this.name)
-    // Object.setPrototypeOf(newContext, this)
-    // plugin(newContext)
     const nested = new (WorkflowConstructor as any)(this.name)
     Object.setPrototypeOf(nested, this)
 
     this.graph.push({ type: "plugin", plugin, context: nested })
-    // this.plugins.push(plugin)
     return nested
 }
 
