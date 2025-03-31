@@ -404,6 +404,55 @@ test("register a plugin with dependencies", {skip: false}, async (t) => {
   t.assert.deepEqual(state, 3)
 })
 
+test("declare a plugin options as a function", async (t) => {
+  // Given
+  const engine = createEngine({
+    url: container.getConnectionString(),
+    signal: t.signal,
+    dbName: randomUUID(),
+    clientOpts: {
+      directConnection: true
+    }
+  })
+
+  const plugin0 = rivrPlugin(function plugin0(w) {
+    return w.decorate("fooFromPlugin0", 1)
+  }, {
+    name: "plugin-0"
+  })
+
+  const plugin1 = rivrPlugin((w, opts: { foo: number }) => {
+    return w.decorate("foo", opts.foo)
+  }, {
+    name: "plugin-1",
+    deps: [ plugin0]
+  })
+
+  let state: number | undefined
+
+  const workflow = rivr.workflow<number>("complex-calculation")
+    .register(plugin0)
+    .register(plugin1, w => ({
+      foo: w.fooFromPlugin0
+    }))
+    .step({
+      name: "my-step",
+      handler: ctx => ctx.workflow.foo + 1
+    })
+    .addHook("onWorkflowCompleted", (w, s) => {
+      state = s
+    })
+
+  await engine.createWorker().start([ workflow ])
+
+  // When
+  await engine.createTrigger().trigger(workflow, 1)
+
+  // Then
+  await waitForPredicate(() => state !== undefined)
+  t.assert.deepEqual(state, 2)
+})
+
 test("register a plugin with options", async (t: TestContext) => {
   // Given
   const engine = createEngine({

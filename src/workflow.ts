@@ -381,7 +381,12 @@ async function executePlugins (root: WorkflowImplementation) {
 
             const currentPluginElements = [...element.context.graph]
             element.context.graph = []
-            element.plugin(element.context, element.opts)
+
+            const pluginOpts = typeof element.opts === "function"
+                ? element.opts(element.context)
+                : element.opts
+
+            element.plugin(element.context, pluginOpts)
             element.context.graph.push(...currentPluginElements)
             element.context[kReady] = true
             await executePlugins(element.context)
