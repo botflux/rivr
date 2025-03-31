@@ -11,7 +11,7 @@ same transaction.
 ```typescript
 import { rivr } from "rivr"
 
-const workflow = rivr.workflow<number>()
+const workflow = rivr.workflow<number>("complex-calculation")
   .step({
     name: "add-3",
     handler: ({ state }) => state + 3
