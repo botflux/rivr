@@ -17,7 +17,7 @@ export type RivrPlugin<Out, Opts, State> = {
 }
 
 export type RivrPluginOpts<State, Deps extends RivrPlugin<any, any, State>[] = []> = {
-  deps: Deps
+  deps?: Deps
   /**
    * The plugin's name
    */

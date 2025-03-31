@@ -318,6 +318,45 @@ test("register step in a plugin", {skip: false}, async (t) => {
     t.assert.deepEqual(state, 10)
 })
 
+test("register a plugin without its dependency list", async (t) => {
+  // Given
+  const engine = createEngine({
+    url: container.getConnectionString(),
+    signal: t.signal,
+    dbName: randomUUID(),
+    clientOpts: {
+      directConnection: true
+    }
+  })
+
+  const pluginA = rivrPlugin(function pluginA(w) {
+    return w.decorate("foo", 1)
+  }, {
+    name: "plugin-a"
+  })
+
+  let state: number | undefined
+
+  const workflow = rivr.workflow<number>("complex-calculation")
+    .register(pluginA)
+    .step({
+      name: "add-bar",
+      handler: ({ state, workflow }) => state + workflow.foo
+    })
+    .addHook("onWorkflowCompleted", (w, s) => {
+      state = s
+    })
+
+  await engine.createWorker().start([ workflow ])
+
+  // When
+  await engine.createTrigger().trigger(workflow, 1)
+
+  // Then
+  await waitForPredicate(() => state !== undefined)
+  t.assert.deepEqual(state, 2)
+})
+
 test("register a plugin with dependencies", {skip: false}, async (t) => {
   // Given
   const engine = createEngine({
