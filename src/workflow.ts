@@ -57,8 +57,9 @@ export type WorkflowFailedElement<State, Decorators> = {
 }
 export type WorkflowPluginElement<State, Decorators> = {
     type: "plugin",
-    plugin: RivrPlugin<Decorators, State>
+    plugin: RivrPlugin<Decorators, unknown, State>
     context: WorkflowImplementation
+    opts: unknown
 }
 
 export type UnreadyExecutionGraph<State, Decorators> =
@@ -80,7 +81,7 @@ interface WorkflowImplementation extends Workflow<unknown, unknown> {
      */
     graph: UnreadyExecutionGraph<unknown, unknown>[]
 
-    plugins: RivrPlugin<unknown, unknown>[]
+    plugins: RivrPlugin<unknown, unknown, unknown>[]
 
     autoPluginIndex: number
 }
@@ -193,7 +194,7 @@ WorkflowConstructor.prototype.steps = function *steps (this: WorkflowImplementat
     }
 }
 
-WorkflowConstructor.prototype.register = function register(this: WorkflowImplementation, plugin: RivrPlugin<unknown, unknown>) {
+WorkflowConstructor.prototype.register = function register(this: WorkflowImplementation, plugin: RivrPlugin<unknown, unknown, unknown>, opts: unknown) {
     const nested = new (WorkflowConstructor as any)(this.name)
     Object.setPrototypeOf(nested, this)
 
@@ -211,7 +212,7 @@ WorkflowConstructor.prototype.register = function register(this: WorkflowImpleme
         }
     })
 
-    this.graph.push({ type: "plugin", plugin, context: nested })
+    this.graph.push({ type: "plugin", plugin, context: nested, opts })
     return nested
 }
 
@@ -323,7 +324,7 @@ function* listStepDepthFirst(w: WorkflowImplementation): Iterable<[ step: Step<u
     }
 }
 
-function getUnsatisfiedDeps (root: WorkflowImplementation, deps: RivrPlugin<unknown, unknown>[]): RivrPlugin<unknown, unknown>[] {
+function getUnsatisfiedDeps (root: WorkflowImplementation, deps: RivrPlugin<unknown, unknown, unknown>[]): RivrPlugin<unknown, unknown, unknown>[] {
     const foundDeps = []
     let current = root
 
@@ -380,7 +381,7 @@ async function executePlugins (root: WorkflowImplementation) {
 
             const currentPluginElements = [...element.context.graph]
             element.context.graph = []
-            element.plugin(element.context)
+            element.plugin(element.context, element.opts)
             element.context.graph.push(...currentPluginElements)
             element.context[kReady] = true
             await executePlugins(element.context)

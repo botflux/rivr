@@ -105,7 +105,8 @@ export type Workflow<State, Decorators> = {
    * @param plugin
    */
   register<NewDecorators>(plugin: Plugin<State, Decorators, NewDecorators>): Workflow<State, Decorators & NewDecorators>
-  register<NewDecorators>(plugin: RivrPlugin<NewDecorators, State>): Workflow<State, Decorators & NewDecorators>
+  register<NewDecorators>(plugin: RivrPlugin<NewDecorators, undefined, State>): Workflow<State, Decorators & NewDecorators>
+  register<NewDecorators, Opts>(plugin: RivrPlugin<NewDecorators, Opts, State>, opts: Opts): Workflow<State, Decorators & NewDecorators>
 
   /**
    * Iterate over each step.
