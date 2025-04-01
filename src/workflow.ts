@@ -283,6 +283,11 @@ WorkflowConstructor.prototype.ready = async function ready(this: WorkflowImpl) {
     return this
 }
 
+/**
+ * Iterate the workflow graph depth first.
+ *
+ * @param w
+ */
 function* iterateDepthFirst(w: WorkflowImpl): Iterable<GraphWithoutPlugin<unknown, unknown>> {
     for (const element of w[kGraph]) {
         if (element.type === "plugin") {
@@ -295,6 +300,11 @@ function* iterateDepthFirst(w: WorkflowImpl): Iterable<GraphWithoutPlugin<unknow
     }
 }
 
+/**
+ * Get the root workflow of the given workflow.
+ *
+ * @param w
+ */
 function getRootWorkflow (w: WorkflowImpl): WorkflowImpl {
     const proto = Object.getPrototypeOf(w)
     const isRoot = !(kWorkflow in proto)
@@ -306,6 +316,12 @@ function getRootWorkflow (w: WorkflowImpl): WorkflowImpl {
     return getRootWorkflow(proto)
 }
 
+/**
+ * List unsatisfied deps.
+ *
+ * @param root
+ * @param deps
+ */
 function getUnsatisfiedDeps (root: WorkflowImpl, deps: RivrPlugin<unknown, unknown, unknown>[]): RivrPlugin<unknown, unknown, unknown>[] {
     const foundDeps = []
     let current = root
