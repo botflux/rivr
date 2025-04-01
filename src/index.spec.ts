@@ -57,6 +57,47 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 7)
   })
 
+  test("execute a workflow made of multiple steps",  async (t) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true
+      },
+      signal: t.signal
+    })
+
+    let hookExecuted = false
+    let state
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .step({
+        name: "add-3",
+        handler: ({ state }) => state + 3
+      })
+      .step({
+        name: "multiply-by-3",
+        handler: ({ state }) => state * 3
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+        hookExecuted = true
+        state = s
+      })
+
+    await engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 0)
+
+    // Then
+    let now = new Date().getTime()
+    while (!hookExecuted && new Date().getTime() - now < 5_000) {
+      await setTimeout(20)
+    }
+    t.assert.deepEqual(state, 9)
+  })
+
   test("skip a step",  async (t) => {
     // Given
     const engine = createEngine({
@@ -152,47 +193,6 @@ describe('basic flow control', function () {
       await setTimeout(20)
     }
     t.assert.deepEqual(stoppedState, 6)
-  })
-
-  test("execute a workflow made of multiple steps",  async (t) => {
-    // Given
-    const engine = createEngine({
-      url: container.getConnectionString(),
-      dbName: randomUUID(),
-      clientOpts: {
-        directConnection: true
-      },
-      signal: t.signal
-    })
-
-    let hookExecuted = false
-    let state
-
-    const workflow = rivr.workflow<number>("complex-calculation")
-      .step({
-        name: "add-3",
-        handler: ({ state }) => state + 3
-      })
-      .step({
-        name: "multiply-by-3",
-        handler: ({ state }) => state * 3
-      })
-      .addHook("onWorkflowCompleted", (w, s) => {
-        hookExecuted = true
-        state = s
-      })
-
-    await engine.createWorker().start([ workflow ])
-
-    // When
-    await engine.createTrigger().trigger(workflow, 0)
-
-    // Then
-    let now = new Date().getTime()
-    while (!hookExecuted && new Date().getTime() - now < 5_000) {
-      await setTimeout(20)
-    }
-    t.assert.deepEqual(state, 9)
   })
 
   test("handle step errors",  async (t) => {
