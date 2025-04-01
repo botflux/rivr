@@ -62,7 +62,7 @@ export type WorkflowPluginElement<State, Decorators> = {
     opts: unknown
 }
 
-export type UnreadyExecutionGraph<State, Decorators> =
+export type ExecutionGraph<State, Decorators> =
   | StepElement<State, Decorators>
   | StepCompletedElement<State, Decorators>
   | WorkflowCompletedElement<State, Decorators>
@@ -79,7 +79,7 @@ interface WorkflowImplementation extends Workflow<unknown, unknown> {
      * A tree containing the steps and sub-workflow in order.
      * Iterating through this tree depth-first would yield the steps in order.
      */
-    graph: UnreadyExecutionGraph<unknown, unknown>[]
+    graph: ExecutionGraph<unknown, unknown>[]
 
     plugins: RivrPlugin<unknown, unknown, unknown>[]
 
