@@ -1187,19 +1187,6 @@ describe("resilience",  () => {
   })
 })
 
-
-function diffArrays<T>(a: T[], b: T[], equals: (a: T, b: T) => boolean): T[] {
-  return a.filter(itemA => !b.some(itemB => equals(itemA, itemB)))
-}
-
-
-test("should be able to diff two arrays", (t: TestContext) => {
-  // Given
-  // When
-  // Then
-  t.assert.deepStrictEqual(diffArrays([ "a", "b"], [ "b" ], (a, b) => a === b), [ "a" ])
-})
-
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {
     let now = new Date().getTime()
     while (!fn() && new Date().getTime() - now < ms) {
