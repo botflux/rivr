@@ -78,17 +78,15 @@ export type Workflow<State, Decorators> = {
   getFirstStep(): Step<State, Decorators> | undefined
 
   /**
-   * Search a step by its name.
-   * Returns `undefined` if there is no step matching the given name.
+   * Get a step, and its execution context, from its name.
+   * Returns `undefined` if no step is matching the given name.
    *
    * @param name
    */
-  getStep(name: string): Step<State, Decorators> | undefined
-
   getStepAndExecutionContext(name: string): WithContext<Step<State, Decorators>, State, Decorators> | undefined
 
   /**
-   * Search the step succeding the step matching the given name.
+   * Search the step succeeding the step matching the given name.
    * `undefined` is returned if there is no next step.
    * An error is thrown if there is no step matching the given name.
    *

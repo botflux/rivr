@@ -234,17 +234,6 @@ WorkflowConstructor.prototype.getFirstStep = function getFirstStep(this: Workflo
     }
 }
 
-WorkflowConstructor.prototype.getStep = function getStep(this: WorkflowImplementation, name: string) {
-    if (!this[kReady]) {
-        throw new WorkflowNotReadyError(this.name)
-    }
-
-    for (const [ step ] of this.steps()) {
-        if (name === step.name)
-            return step
-    }
-}
-
 WorkflowConstructor.prototype.getStepAndExecutionContext = function getStepAndExecutionContext(this: WorkflowImplementation, name: string) {
     if (!this[kReady]) {
         throw new WorkflowNotReadyError(this.name)
