@@ -1,9 +1,8 @@
-import { setTimeout } from "node:timers/promises"
+import {setTimeout} from "node:timers/promises"
 import {OnErrorHook, type Trigger, type Worker} from "./core.ts"
 
 import {Step, StepResult, Workflow} from "./types.ts";
 import {tryCatch, tryCatchSync} from "./inline-catch.ts";
-import {write} from "node:fs";
 
 export type Task<State> =
     | WaitingTask<State>
@@ -221,12 +220,16 @@ export class Poller<TriggerOpts> implements Worker {
                         case "failure": {
                             const hasExhaustedRetry = task.attempt + 1 > step.maxAttempts
                             const mNextStep = mWorkflow.getNextStep(task.step)
+                            const delayOrFunction = step.delayBetweenAttempts
+                            const delayFn = typeof delayOrFunction === "number"
+                              ? () => delayOrFunction
+                              : delayOrFunction
 
                             await this.#write([
                                 {
                                     type: "nack",
                                     task,
-                                    retryAfter: new Date(new Date().getTime() + step.delayBetweenAttempts)
+                                    retryAfter: new Date(new Date().getTime() + delayFn(task.attempt))
                                 },
                               ...hasExhaustedRetry && step.optional && mNextStep !== undefined
                                 ? [

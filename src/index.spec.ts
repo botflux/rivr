@@ -564,6 +564,50 @@ describe('advance flow control', function () {
     t.assert.strictEqual(end - start > 1_500, true)
     t.assert.strictEqual(state, 2)
   })
+
+  test("should be able to increase the delay between tries", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      signal: t.signal,
+      dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true,
+      }
+    })
+
+    let state: number | undefined
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .step({
+        name: "fails-once",
+        handler: ctx => {
+          if (ctx.attempt <= 2) {
+            return ctx.err("oops")
+          }
+
+          return ctx.state + 1
+        },
+        maxAttempts: 3,
+        delayBetweenAttempts: attempt => attempt * 500
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+        state = s
+      })
+
+    const start = new Date().getTime()
+
+    await engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 1)
+
+    // Then
+    await waitForPredicate(() => state !== undefined)
+    const end = new Date().getTime()
+    t.assert.strictEqual(end - start > 1_500, true)
+    t.assert.strictEqual(state, 2)
+  })
 })
 
 describe('extension', function () {
