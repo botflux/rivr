@@ -98,6 +98,7 @@ function WorkflowConstructor (this: WorkflowImplementation, name: string) {
 WorkflowConstructor.prototype.step = function step(this: WorkflowImplementation, opts: StepOpts<unknown, unknown>) {
     const {
         maxAttempts = 1,
+        optional = false,
         ...requiredFields
     } = opts
 
@@ -106,6 +107,7 @@ WorkflowConstructor.prototype.step = function step(this: WorkflowImplementation,
         step: {
             ...requiredFields,
             maxAttempts,
+            optional
         },
         context: this
     })

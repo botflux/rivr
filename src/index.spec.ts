@@ -318,6 +318,147 @@ test("register step in a plugin", {skip: false}, async (t) => {
     t.assert.deepEqual(state, 10)
 })
 
+test("register an optional step", async (t: TestContext) => {
+  // Given
+  const engine = createEngine({
+    url: container.getConnectionString(),
+    signal: t.signal,
+    dbName: randomUUID(),
+    clientOpts: {
+      directConnection: true
+    }
+  })
+
+  let state: number | undefined
+  let errors: unknown[] = []
+
+  const workflow = rivr.workflow<number>("complex-calculation")
+    .step({
+      name: "add-1",
+      handler: ({ state }) => state + 1
+    })
+    .step({
+      name: "always-fails",
+      handler: ({ state }) => {
+        throw "oops"
+      },
+      optional: true
+    })
+    .step({
+      name: "add-2",
+      handler: ({ state }) => state + 2
+    })
+    .addHook("onStepError", (e) => {
+      errors.push(e)
+    })
+    .addHook("onWorkflowCompleted", (w, s) => {
+      state = s
+    })
+
+  await engine.createWorker().start([ workflow ])
+
+  // When
+  await engine.createTrigger().trigger(workflow, 3)
+
+  // Then
+  await waitForPredicate(() => state !== undefined)
+  t.assert.deepEqual(state, 6)
+  t.assert.deepStrictEqual(errors, [ "oops" ])
+})
+
+test("emit a workflow completed if the last step is optional and is failing", async (t: TestContext) => {
+  // Given
+  const engine = createEngine({
+    url: container.getConnectionString(),
+    signal: t.signal,
+    dbName: randomUUID(),
+    clientOpts: {
+      directConnection: true
+    }
+  })
+
+  let state: number | undefined
+  let workflowFailedCalled = false
+
+  const workflow = rivr.workflow<number>("complex-calculation")
+    .step({
+      name: "add-1",
+      handler: ({ state }) => state + 1
+    })
+    .step({
+      name: "always-fails",
+      handler: () => {
+        throw "oops"
+      },
+      optional: true,
+    })
+    .addHook("onWorkflowCompleted", (w, s) => {
+      state = s
+    })
+    .addHook("onWorkflowFailed", (w, s) => {
+      workflowFailedCalled = true
+    })
+
+  await engine.createWorker().start([ workflow ])
+
+  // When
+  await engine.createTrigger().trigger(workflow, 3)
+
+  // Then
+  await waitForPredicate(() => state !== undefined)
+  t.assert.deepEqual(state, 4)
+  t.assert.deepEqual(workflowFailedCalled, false)
+})
+
+test("retry an optional step until it passes", async (t: TestContext) => {
+  // Given
+  const engine = createEngine({
+    url: container.getConnectionString(),
+    signal: t.signal,
+    dbName: randomUUID(),
+    clientOpts: {
+      directConnection: true
+    }
+  })
+
+  let state: number | undefined
+  let errors: unknown[] = []
+
+  const workflow = rivr.workflow<number>("complex-calculation")
+    .step({
+      name: "add-1",
+      handler: ({ state }) => state + 1
+    })
+    .step({
+      name: "always-fails",
+      handler: ({ state }) => {
+        throw "oops"
+      },
+      maxAttempts: 5,
+      optional: true
+    })
+    .step({
+      name: "add-2",
+      handler: ({ state }) => state + 2
+    })
+    .addHook("onStepError", (e) => {
+      errors.push(e)
+    })
+    .addHook("onWorkflowCompleted", (w, s) => {
+      state = s
+    })
+
+  await engine.createWorker().start([ workflow ])
+
+  // When
+  await engine.createTrigger().trigger(workflow, 3)
+
+  // Then
+  await waitForPredicate(() => state !== undefined)
+  t.assert.deepEqual(state, 6)
+  t.assert.deepStrictEqual(errors, [ "oops", "oops", "oops", "oops", "oops" ])
+})
+
 test("register a plugin without its dependency list", async (t) => {
   // Given
   const engine = createEngine({

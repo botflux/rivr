@@ -34,12 +34,17 @@ export type Step<State, Decorators> = {
   name: string
   handler: Handler<State, Decorators>
   maxAttempts: number
+  optional: boolean
 }
 
 export type StepOpts<State, Decorators> = {
   name: string
   handler: Handler<State, Decorators>
   maxAttempts?: number
+  /**
+   * True if this step can fail without blocking the workflow.
+   */
+  optional?: boolean
 }
 
 export type OnWorkflowCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, state: State) => void
