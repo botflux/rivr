@@ -67,7 +67,13 @@ class MongoStorage implements Storage<WriteOpts> {
                           },
                           {
                               type: "failed",
-                              attempt: { $lte: maxAttempts }
+                              attempt: { $lte: maxAttempts },
+                              retryAfter: { $exists: false }
+                          },
+                          {
+                              type: "failed",
+                              attempt: { $lte: maxAttempts },
+                              retryAfter: { $lte: new Date() }
                           }
                       ]
                   }
@@ -117,6 +123,7 @@ class MongoStorage implements Storage<WriteOpts> {
                         update: {
                             $set: {
                                 type: "failed",
+                                retryAfter: write.retryAfter
                             },
                             $inc: {
                                 attempt: 1

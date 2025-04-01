@@ -25,6 +25,7 @@ export type SuccessfulTask<State> = CommonTask<State> & {
 export type FailedTask<State> = CommonTask<State> & {
     type: "failed"
     canBeRetried: boolean
+    retryAfter: Date
 }
 
 export type WaitingTask<State> = CommonTask<State> & {
@@ -44,6 +45,7 @@ export type Insert<State> = {
 export type Nack<State> = {
     type: "nack"
     task: Task<State>
+    retryAfter: Date
 }
 
 export type Write<State> = Ack<State> | Insert<State> | Nack<State>
@@ -224,6 +226,7 @@ export class Poller<TriggerOpts> implements Worker {
                                 {
                                     type: "nack",
                                     task,
+                                    retryAfter: new Date(new Date().getTime() + step.delayBetweenAttempts)
                                 },
                               ...hasExhaustedRetry && step.optional && mNextStep !== undefined
                                 ? [

@@ -35,12 +35,15 @@ export type Step<State, Decorators> = {
   handler: Handler<State, Decorators>
   maxAttempts: number
   optional: boolean
+  delayBetweenAttempts: number
 }
 
 export type StepOpts<State, Decorators> = {
   name: string
   handler: Handler<State, Decorators>
   maxAttempts?: number
+  delayBetweenAttempts?: number
+
   /**
    * True if this step can fail without blocking the workflow.
    */
