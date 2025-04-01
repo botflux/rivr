@@ -225,7 +225,7 @@ export class Poller<TriggerOpts> implements Worker {
                                     type: "nack",
                                     task,
                                 },
-                              ...hasExhaustedRetry && step.optional && mNextStep
+                              ...hasExhaustedRetry && step.optional && mNextStep !== undefined
                                 ? [
                                     {
                                         type: "insert",
