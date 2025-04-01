@@ -64,7 +64,7 @@ type WorkflowPluginElement<State, Decorators> = {
     opts: unknown
 }
 
-type Graph<State, Decorators> =
+type GraphElement<State, Decorators> =
   | StepElement<State, Decorators>
   | StepCompletedElement<State, Decorators>
   | WorkflowCompletedElement<State, Decorators>
@@ -74,7 +74,7 @@ type Graph<State, Decorators> =
   | WorkflowFailedElement<State, Decorators>
   | WorkflowPluginElement<State, Decorators>
 
-type GraphWithoutPlugin<State, Decorators> = Exclude<Graph<State, Decorators>, WorkflowPluginElement<State, Decorators>>
+type GraphWithoutPlugin<State, Decorators> = Exclude<GraphElement<State, Decorators>, WorkflowPluginElement<State, Decorators>>
 
 interface WorkflowImpl extends Workflow<unknown, unknown> {
     [kReady]: boolean
@@ -83,7 +83,7 @@ interface WorkflowImpl extends Workflow<unknown, unknown> {
      * A tree containing the steps and sub-workflow in order.
      * Iterating through this tree depth-first would yield the steps in order.
      */
-    [kGraph]: Graph<unknown, unknown>[]
+    [kGraph]: GraphElement<unknown, unknown>[]
 
     [kPluginAutoId]: number
 }
@@ -301,6 +301,23 @@ function* iterateDepthFirst(w: WorkflowImpl): Iterable<GraphWithoutPlugin<unknow
 }
 
 /**
+ * Iterate the workflow prototype chain from the given workflow to the top.
+ *
+ * @param w
+ */
+function* iterateBottomToTop (w: WorkflowImpl): Iterable<GraphElement<unknown, unknown>> {
+    let current = w
+
+    do {
+        for (const element of current[kGraph]) {
+            yield element
+        }
+
+        current = Object.getPrototypeOf(current)
+    } while (kWorkflow in current)
+}
+
+/**
  * Get the root workflow of the given workflow.
  *
  * @param w
@@ -324,20 +341,12 @@ function getRootWorkflow (w: WorkflowImpl): WorkflowImpl {
  */
 function getUnsatisfiedDeps (root: WorkflowImpl, deps: RivrPlugin<unknown, unknown, unknown>[]): RivrPlugin<unknown, unknown, unknown>[] {
     const foundDeps = []
-    let current = root
 
-    do {
-        for (const element of current[kGraph]) {
-            if (element.type === "plugin") {
-                if (deps.includes(element.plugin)) {
-                    foundDeps.push(element.plugin)
-                }
-            }
+    for (const element of iterateBottomToTop(root)) {
+        if (element.type === "plugin" && deps.includes(element.plugin)) {
+            foundDeps.push(element.plugin)
         }
-
-        current = Object.getPrototypeOf(current)
-
-    } while (foundDeps.length !== deps.length && kWorkflow in current)
+    }
 
     return diffArrays(
       foundDeps,
