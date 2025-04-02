@@ -8,11 +8,18 @@ export interface Worker {
     stop(): Promise<void>
 }
 
-export interface Trigger<TriggerOpts> {
+export type DefaultTriggerOpts = {
+    /**
+     * The ID of the workflow
+     */
+    id?: string
+}
+
+export interface Trigger<TriggerOpts extends DefaultTriggerOpts> {
     trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State, opts?: TriggerOpts): Promise<void>
 }
 
-export interface Engine<TriggerOpts> {
+export interface Engine<TriggerOpts extends DefaultTriggerOpts> {
     createWorker(): Worker
     createTrigger(): Trigger<TriggerOpts>
 }

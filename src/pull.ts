@@ -1,5 +1,5 @@
 import {setTimeout} from "node:timers/promises"
-import {OnErrorHook, type Trigger, type Worker} from "./core.ts"
+import {DefaultTriggerOpts, OnErrorHook, type Trigger, type Worker} from "./core.ts"
 
 import {Step, StepResult, Workflow} from "./types.ts";
 import {tryCatch, tryCatchSync} from "./inline-catch.ts";
@@ -69,7 +69,7 @@ class InfiniteLoop {
     }
 }
 
-export class PullTrigger<TriggerOpts> implements Trigger<TriggerOpts> {
+export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trigger<TriggerOpts> {
     #storage: Storage<TriggerOpts>
 
     constructor(storage: Storage<TriggerOpts>) {
@@ -95,7 +95,6 @@ export class PullTrigger<TriggerOpts> implements Trigger<TriggerOpts> {
             }
         ], opts)
     }
-
 }
 
 export class Poller<TriggerOpts> implements Worker {

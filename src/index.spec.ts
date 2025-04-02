@@ -969,6 +969,53 @@ describe('transaction', function () {
     t.assert.deepEqual(state, 2)
     t.assert.deepEqual((await engine.client.db(db).collection("another-collection").findOne())?.n, 1)
   })
+
+  test("should be able to trigger a workflow once", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true
+      },
+      signal: t.signal
+    })
+
+    const states: number[] = []
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .step({
+        name: "add-1",
+        handler: ({ state }) => state + 1
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+        states.push(s)
+      })
+
+    await engine.createWorker().start([ workflow ])
+
+    const trigger = engine.createTrigger()
+
+    // When
+    await Promise.all([
+      trigger.trigger(workflow, 1, {
+        id: "0"
+      }),
+      trigger.trigger(workflow, 1, {
+        id: "0"
+      }),
+      trigger.trigger(workflow, 2, {
+        id: "1"
+      }),
+      trigger.trigger(workflow, 2, {
+        id: "1"
+      }),
+    ])
+
+    // Then
+    await waitForPredicate(() => states.length === 2)
+    t.assert.deepStrictEqual(states, [ 2, 3 ])
+  })
 })
 
 describe('hooks', function () {

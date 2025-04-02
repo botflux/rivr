@@ -1,4 +1,4 @@
-import { type Engine, type Trigger, type Worker } from "./core.ts";
+import {DefaultTriggerOpts, type Engine, type Trigger, type Worker} from "./core.ts";
 import { Poller, PullTrigger, type Storage, type Task, type Write } from "./pull.ts";
 import {
     type AnyBulkWriteOperation, ClientSession,
@@ -9,11 +9,11 @@ import {
 } from "mongodb"
 import {Step, Workflow} from "./types.ts";
 
-type MongoTask<State> = Omit<Task<State>, "id">
+type MongoTask<State> = Task<State>
 
 export type WriteOpts = {
     session?: ClientSession
-}
+} & DefaultTriggerOpts
 
 class MongoStorage implements Storage<WriteOpts> {
     #client: MongoClient
@@ -132,14 +132,35 @@ class MongoStorage implements Storage<WriteOpts> {
                     }
                 } satisfies AnyBulkWriteOperation<MongoTask<State>>
 
-                case "insert": return {
-                    insertOne: {
-                        document: {
-                            ...write.task,
-                            type: "waiting"
-                        }
+                case "insert": {
+                    if (opts.id === undefined) {
+                        return {
+                            insertOne: {
+                                document: {
+                                    ...write.task,
+                                    type: "waiting",
+                                    id: ObjectId.createFromTime(new Date().getTime()).toString()
+                                }
+                            }
+                        } satisfies AnyBulkWriteOperation<MongoTask<State>>
                     }
-                } satisfies AnyBulkWriteOperation<MongoTask<State>>
+
+                    return {
+                        updateOne: {
+                            update: {
+                                $setOnInsert: {
+                                    ...write.task,
+                                    type: "waiting",
+                                    id: opts.id
+                                }
+                            },
+                            filter: {
+                                id: opts.id
+                            },
+                            upsert: true,
+                        },
+                    } satisfies AnyBulkWriteOperation<MongoTask<State>>
+                }
 
                 default: throw new Error(`Write is not supported`)
             }
