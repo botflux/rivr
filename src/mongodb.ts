@@ -8,6 +8,7 @@ import {
     ObjectId
 } from "mongodb"
 import {Step, Workflow} from "./types.ts";
+import {randomUUID} from "crypto";
 
 type MongoTask<State> = Task<State>
 
@@ -93,7 +94,7 @@ class MongoStorage implements Storage<WriteOpts> {
 
         return tasks.map(({ _id, ...rest }) => ({
             ...rest,
-            id: _id.toHexString()
+            taskId: _id.toHexString()
         })) as Task<State>[]
     }
 
@@ -105,7 +106,7 @@ class MongoStorage implements Storage<WriteOpts> {
                 case "ack": return {
                     updateOne: {
                         filter: {
-                            _id: ObjectId.createFromHexString(write.task.id)
+                            _id: ObjectId.createFromHexString(write.task.taskId)
                         },
                         update: {
                             $set: {
@@ -118,7 +119,7 @@ class MongoStorage implements Storage<WriteOpts> {
                 case "nack": return {
                     updateOne: {
                         filter: {
-                            _id: ObjectId.createFromHexString(write.task.id)
+                            _id: ObjectId.createFromHexString(write.task.taskId)
                         },
                         update: {
                             $set: {
@@ -139,7 +140,8 @@ class MongoStorage implements Storage<WriteOpts> {
                                 document: {
                                     ...write.task,
                                     type: "waiting",
-                                    id: ObjectId.createFromTime(new Date().getTime()).toString()
+                                    taskId: randomUUID(),
+                                    workflowId: randomUUID()
                                 }
                             }
                         } satisfies AnyBulkWriteOperation<MongoTask<State>>
@@ -151,11 +153,12 @@ class MongoStorage implements Storage<WriteOpts> {
                                 $setOnInsert: {
                                     ...write.task,
                                     type: "waiting",
-                                    id: opts.id
+                                    taskId: randomUUID(),
+                                    workflowId: opts.id,
                                 }
                             },
                             filter: {
-                                id: opts.id
+                                workflowId: opts.id
                             },
                             upsert: true,
                         },

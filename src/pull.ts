@@ -10,7 +10,8 @@ export type Task<State> =
     | SuccessfulTask<State>
 
 export type CommonTask<State> = {
-    id: string
+    taskId: string
+    workflowId: string
     workflow: string
     step: string
     state: State
@@ -38,7 +39,7 @@ export type Ack<State> = {
 
 export type Insert<State> = {
     type: "insert"
-    task: Omit<CommonTask<State>, "id">
+    task: Omit<CommonTask<State>, "taskId" | "workflowId">
 }
 
 export type Nack<State> = {
@@ -90,7 +91,7 @@ export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trig
                     state,
                     step: mFirstStep.name,
                     workflow: workflow.name,
-                    attempt: 1
+                    attempt: 1,
                 }
             }
         ], opts)
