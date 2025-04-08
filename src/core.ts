@@ -15,11 +15,11 @@ export type DefaultTriggerOpts = {
     id?: string
 }
 
-export interface Trigger<TriggerOpts extends DefaultTriggerOpts> {
-    trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State, opts?: TriggerOpts): Promise<void>
+export interface Trigger<TriggerOpts extends Record<never, never>> {
+    trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State, opts?: TriggerOpts & DefaultTriggerOpts): Promise<void>
 }
 
-export interface Engine<TriggerOpts extends DefaultTriggerOpts> {
+export interface Engine<TriggerOpts extends Record<never, never>> {
     createWorker(): Worker
     createTrigger(): Trigger<TriggerOpts>
 }
