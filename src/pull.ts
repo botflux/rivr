@@ -1,57 +1,23 @@
 import {setTimeout} from "node:timers/promises"
 import {DefaultTriggerOpts, OnErrorHook, type Trigger, type Worker} from "./core.ts"
-
 import {Step, StepResult, Workflow} from "./types.ts";
 import {tryCatch, tryCatchSync} from "./inline-catch.ts";
-
-export type Task<State> =
-    | WaitingTask<State>
-    | FailedTask<State>
-    | SuccessfulTask<State>
-
-export type CommonTask<State> = {
-    taskId: string
-    workflowId: string
-    workflow: string
-    step: string
-    state: State
-    attempt: number
-}
-
-export type SuccessfulTask<State> = CommonTask<State> & {
-    type: "success"
-}
-
-export type FailedTask<State> = CommonTask<State> & {
-    type: "failed"
-    canBeRetried: boolean
-    retryAfter: Date
-}
-
-export type WaitingTask<State> = CommonTask<State> & {
-    type: "waiting"
-}
-
-export type Ack<State> = {
-    type: "ack"
-    task: Task<State>
-}
+import {createWorkflowState, updateWorkflowState, WorkflowState} from "./state.ts";
 
 export type Insert<State> = {
     type: "insert"
-    task: Omit<CommonTask<State>, "taskId" | "workflowId">
+    state: WorkflowState<State>
 }
 
-export type Nack<State> = {
-    type: "nack"
-    task: Task<State>
-    retryAfter: Date
+export type Update<State> = {
+    type: "update"
+    state: WorkflowState<State>
 }
 
-export type Write<State> = Ack<State> | Insert<State> | Nack<State>
+export type Write<State> = Update<State> | Insert<State>
 
 export interface Storage<WriteOpts> {
-    pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<Task<State>[]>
+    pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<WorkflowState<State>[]>
     write<State>(writes: Write<State>[], opts?: WriteOpts): Promise<void>
     disconnect(): Promise<void>
 }
@@ -84,15 +50,12 @@ export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trig
             throw new Error("Cannot trigger a workflow that has no step")
         }
 
+        const s = createWorkflowState(workflow as unknown as Workflow<State, Record<never, never>>, state, opts?.id)
+
         await this.#storage.write([
             {
                 type: "insert",
-                task: {
-                    state,
-                    step: mFirstStep.name,
-                    workflow: workflow.name,
-                    attempt: 1,
-                }
+                state: s
             }
         ], opts)
     }
@@ -125,12 +88,12 @@ export class Poller<TriggerOpts> implements Worker {
                 }
 
                 for (const task of tasks) {
-                    const mWorkflow = workflows.find(w => w.name === task.workflow)
+                    const mWorkflow = workflows.find(w => w.name === task.name)
 
                     if (!mWorkflow)
                         continue
 
-                    const mStepAndContext = mWorkflow.getStepAndExecutionContext(task.step)
+                    const mStepAndContext = mWorkflow.getStepAndExecutionContext(task.toExecute.step)
 
                     if (!mStepAndContext)
                         continue
@@ -138,18 +101,19 @@ export class Poller<TriggerOpts> implements Worker {
                     const [step, executionContext] = mStepAndContext
 
                     const result = await this.#handleStep(step, task, executionContext)
+                    const newState = updateWorkflowState(task, step, result)
+
+                    await this.#write([
+                        {
+                            type: "update",
+                            state: newState
+                        }
+                    ])
 
                     switch(result.type) {
                         case "stopped": {
-                            await this.#write([
-                                {
-                                    type: "ack",
-                                    task
-                                }
-                            ])
-
                             for (const [handler, context] of mWorkflow.getHook("onWorkflowStopped")) {
-                                const [, error] = tryCatchSync(() => handler(context, step, task.state))
+                                const [, error] = tryCatchSync(() => handler(context, step, task.toExecute.state))
 
                                 if (error !== undefined) {
                                     this.#executeErrorHooks(error)
@@ -162,33 +126,13 @@ export class Poller<TriggerOpts> implements Worker {
                         case "success": 
                         case "skipped": {
                             const newState = result.type === "skipped"
-                                ? task.state
+                                ? task.toExecute.state
                                 : result.state
-                            const mNextStep = mWorkflow.getNextStep(task.step)
-
-                            await this.#write([
-                                {
-                                    type: "ack",
-                                    task
-                                },
-                                ...mNextStep !== undefined
-                                    ? [
-                                        {
-                                            type: "insert",
-                                            task: {
-                                                state: newState,
-                                                step: mNextStep.name,
-                                                workflow: mWorkflow.name,
-                                                attempt: 1
-                                            }
-                                        } satisfies Insert<State>
-                                    ]
-                                    : []
-                            ])
+                            const mNextStep = mWorkflow.getNextStep(task.toExecute.step)
 
                             if (result.type === "skipped") {
                                 for (const [handler, context] of mWorkflow.getHook("onStepSkipped")) {
-                                    const [, error] = tryCatchSync(() => handler(context, step, task.state))
+                                    const [, error] = tryCatchSync(() => handler(context, step, task.toExecute.state))
 
                                     if (error !== undefined) {
                                         this.#executeErrorHooks(error)
@@ -218,36 +162,11 @@ export class Poller<TriggerOpts> implements Worker {
                         }
 
                         case "failure": {
-                            const hasExhaustedRetry = task.attempt + 1 > step.maxAttempts
-                            const mNextStep = mWorkflow.getNextStep(task.step)
-                            const delayOrFunction = step.delayBetweenAttempts
-                            const delayFn = typeof delayOrFunction === "number"
-                              ? () => delayOrFunction
-                              : delayOrFunction
-
-                            await this.#write([
-                                {
-                                    type: "nack",
-                                    task,
-                                    retryAfter: new Date(new Date().getTime() + delayFn(task.attempt))
-                                },
-                              ...hasExhaustedRetry && step.optional && mNextStep !== undefined
-                                ? [
-                                    {
-                                        type: "insert",
-                                        task: {
-                                            state: task.state,
-                                            attempt: 1,
-                                            workflow: mWorkflow.name,
-                                            step: mNextStep.name
-                                        }
-                                    } satisfies Insert<State>
-                                ]
-                                : []
-                            ])
+                            const hasExhaustedRetry = task.toExecute.attempt + 1 > step.maxAttempts
+                            const mNextStep = mWorkflow.getNextStep(task.toExecute.step)
 
                             for (const [hook, context] of mWorkflow.getHook("onStepError")) {
-                                const [, error] = tryCatchSync(() => hook(result.error, context, task.state))
+                                const [, error] = tryCatchSync(() => hook(result.error, context, task.toExecute.state))
 
                                 if (error !== undefined) {
                                     this.#executeErrorHooks(error)
@@ -256,7 +175,7 @@ export class Poller<TriggerOpts> implements Worker {
 
                             if (hasExhaustedRetry && !step.optional) {
                                 for (const [hook, context] of mWorkflow.getHook("onWorkflowFailed")) {
-                                    const [, error] = tryCatchSync(() => hook(result.error, context, step, task.state))
+                                    const [, error] = tryCatchSync(() => hook(result.error, context, step, task.toExecute.state))
 
                                     if (error !== undefined) {
                                         this.#executeErrorHooks(error)
@@ -266,7 +185,7 @@ export class Poller<TriggerOpts> implements Worker {
 
                             if (hasExhaustedRetry && step.optional && mNextStep === undefined) {
                                 for (const [hook, context] of mWorkflow.getHook("onWorkflowCompleted")) {
-                                    const [, error] = tryCatchSync(() => hook(context, task.state))
+                                    const [, error] = tryCatchSync(() => hook(context, task.toExecute.state))
 
                                     if (error !== undefined) {
                                         this.#executeErrorHooks(error)
@@ -299,12 +218,12 @@ export class Poller<TriggerOpts> implements Worker {
 
     async #handleStep<State, Decorators>(
         step: Step<State, Decorators>,
-        task: Task<State>,
+        state: WorkflowState<State>,
         workflow: Workflow<State, Decorators>
     ): Promise<StepResult<State>> {
         try {
             const nextStateOrResult = await step.handler({
-                state: task.state,
+                state: state.toExecute.state,
                 workflow,
                 ok: state => ({
                     type: "success",
@@ -320,7 +239,7 @@ export class Poller<TriggerOpts> implements Worker {
                 stop: () => ({
                     type: "stopped"
                 }),
-                attempt: task.attempt
+                attempt: state.toExecute.attempt
             })
 
             if (this.#isStepResult(nextStateOrResult)) {

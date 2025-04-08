@@ -32,7 +32,7 @@ export type WorkflowState<State> = {
   steps: StepState[]
 }
 
-export function createWorkflowState<State>(workflow: Workflow<State, Record<never, never>>, state: State, id = randomUUID()): WorkflowState<State> {
+export function createWorkflowState<State>(workflow: Workflow<State, Record<never, never>>, state: State, id: string = randomUUID()): WorkflowState<State> {
   const [ mFirst, ...rest ] = Array.from(workflow.steps()).map(([ step ]) => step)
 
   if (mFirst === undefined) {

@@ -1,16 +1,15 @@
 import {DefaultTriggerOpts, type Engine, type Trigger, type Worker} from "./core.ts";
-import { Poller, PullTrigger, type Storage, type Task, type Write } from "./pull.ts";
+import { Poller, PullTrigger, type Storage, type Write } from "./pull.ts";
 import {
     type AnyBulkWriteOperation, ClientSession,
     type Collection, Filter,
     MongoClient,
-    MongoClientOptions,
-    ObjectId
+    MongoClientOptions
 } from "mongodb"
 import {Step, Workflow} from "./types.ts";
-import {randomUUID} from "crypto";
+import {WorkflowState} from "./state.ts";
 
-type MongoTask<State> = Task<State>
+type MongoWorkflowState<State> = WorkflowState<State>
 
 export type WriteOpts = {
     session?: ClientSession
@@ -18,7 +17,7 @@ export type WriteOpts = {
 
 class MongoStorage implements Storage<WriteOpts> {
     #client: MongoClient
-    #collection: Collection<MongoTask<unknown>>
+    #collection: Collection<MongoWorkflowState<unknown>>
 
     constructor(
         client: MongoClient,
@@ -29,7 +28,7 @@ class MongoStorage implements Storage<WriteOpts> {
         this.#collection = this.#client.db(dbName).collection(collectionName)
     }
 
-    #getPullFilter<State, Decorators>(workflows: Workflow<State, Decorators>[]): Filter<MongoTask<unknown>> {
+    #getPullFilter<State, Decorators>(workflows: Workflow<State, Decorators>[]): Filter<MongoWorkflowState<unknown>> {
         const steps = workflows
           .map(workflow => Array.from(workflow.steps()))
           .flat()
@@ -58,35 +57,32 @@ class MongoStorage implements Storage<WriteOpts> {
           .map(([ , { maxAttempts, workflow, steps }]) => ({
               $and: [
                   {
-                      workflow,
-                      step: { $in: steps.map(step => step.name) },
+                      name: workflow,
+                      "toExecute.step": { $in: steps.map(step => step.name) },
                   },
                   {
                       $or: [
                           {
-                              type: "waiting"
+                              "toExecute.status": "todo",
+                              "toExecute.attempt": { $lte: maxAttempts },
+                              "toExecute.pickAfter": { $exists: false }
                           },
                           {
-                              type: "failed",
-                              attempt: { $lte: maxAttempts },
-                              retryAfter: { $exists: false }
-                          },
-                          {
-                              type: "failed",
-                              attempt: { $lte: maxAttempts },
-                              retryAfter: { $lte: new Date() }
+                              "toExecute.status": "todo",
+                              "toExecute.attempt": { $lte: maxAttempts },
+                              "toExecute.pickAfter": { $lte: new Date() }
                           }
                       ]
                   }
               ]
-          })) satisfies Filter<MongoTask<State>>[]
+          })) satisfies Filter<MongoWorkflowState<State>>[]
 
         return {
             $or: filter
         }
     }
 
-    async pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<Task<State>[]> {
+    async pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<WorkflowState<State>[]> {
         const filter = this.#getPullFilter(workflows)
 
         const tasks = await this.#collection.find(filter)
@@ -94,8 +90,7 @@ class MongoStorage implements Storage<WriteOpts> {
 
         return tasks.map(({ _id, ...rest }) => ({
             ...rest,
-            taskId: _id.toHexString()
-        })) as Task<State>[]
+        } as WorkflowState<State>))
     }
 
     async write<State>(writes: Write<State>[], opts: WriteOpts = {}): Promise<void> {
@@ -103,66 +98,29 @@ class MongoStorage implements Storage<WriteOpts> {
 
         const mongoWrites = writes.map(write => {
             switch(write.type) {
-                case "ack": return {
-                    updateOne: {
-                        filter: {
-                            _id: ObjectId.createFromHexString(write.task.taskId)
-                        },
-                        update: {
-                            $set: {
-                                type: "success"
-                            }
-                        }
-                    }
-                } satisfies AnyBulkWriteOperation<MongoTask<State>>
-
-                case "nack": return {
-                    updateOne: {
-                        filter: {
-                            _id: ObjectId.createFromHexString(write.task.taskId)
-                        },
-                        update: {
-                            $set: {
-                                type: "failed",
-                                retryAfter: write.retryAfter
-                            },
-                            $inc: {
-                                attempt: 1
-                            }
-                        }
-                    }
-                } satisfies AnyBulkWriteOperation<MongoTask<State>>
-
                 case "insert": {
-                    if (opts.id === undefined) {
-                        return {
-                            insertOne: {
-                                document: {
-                                    ...write.task,
-                                    type: "waiting",
-                                    taskId: randomUUID(),
-                                    workflowId: randomUUID()
-                                }
-                            }
-                        } satisfies AnyBulkWriteOperation<MongoTask<State>>
-                    }
-
                     return {
                         updateOne: {
                             update: {
-                                $setOnInsert: {
-                                    ...write.task,
-                                    type: "waiting",
-                                    taskId: randomUUID(),
-                                    workflowId: opts.id,
-                                }
+                                $setOnInsert: write.state
                             },
                             filter: {
-                                workflowId: opts.id
+                                id: write.state.id
                             },
                             upsert: true,
                         },
-                    } satisfies AnyBulkWriteOperation<MongoTask<State>>
+                    } satisfies AnyBulkWriteOperation<MongoWorkflowState<State>>
+                }
+
+                case "update": {
+                    return {
+                        replaceOne: {
+                            filter: {
+                                id: write.state.id
+                            },
+                            replacement: write.state
+                        }
+                    } satisfies AnyBulkWriteOperation<MongoWorkflowState<State>>
                 }
 
                 default: throw new Error(`Write is not supported`)

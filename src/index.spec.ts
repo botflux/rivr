@@ -57,7 +57,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 7)
   })
 
-  test("execute a workflow made of multiple steps",  async (t) => {
+  test("execute a workflow made of multiple steps", async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -98,7 +98,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 9)
   })
 
-  test("skip a step",  async (t) => {
+  test("skip a step", async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -150,7 +150,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 5)
   })
 
-  test("stop a workflow",  async (t) => {
+  test("stop a workflow", async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -195,7 +195,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(stoppedState, 6)
   })
 
-  test("handle step errors",  async (t) => {
+  test("handle step errors", async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -237,7 +237,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 4)
   })
 
-  test("return a ok step result",  async (t) => {
+  test("return a ok step result", async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -274,7 +274,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 7)
   })
 
-  test("return a error step result",  async (t) => {
+  test("return a error step result", async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -1192,7 +1192,7 @@ describe('hooks', function () {
   })
 })
 
-describe("resilience",  () => {
+describe("resilience", () => {
   let network: StartedNetwork
   let mongodb: StartedMongoDBContainer
   let toxiproxy: StartedToxiProxyContainer
