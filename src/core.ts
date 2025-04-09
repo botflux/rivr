@@ -22,4 +22,5 @@ export interface Trigger<TriggerOpts extends Record<never, never>> {
 export interface Engine<TriggerOpts extends Record<never, never>> {
     createWorker(): Worker
     createTrigger(): Trigger<TriggerOpts>
+    close(): Promise<void>
 }

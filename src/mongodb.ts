@@ -146,13 +146,7 @@ export class MongoEngine implements Engine<WriteOpts> {
     constructor(opts: CreateEngineOpts) {
         this.#opts = opts
         this.#opts.signal?.addEventListener("abort", () => {
-            for (const worker of this.#workers) {
-                worker.stop().catch(console.error)
-            }
-
-            for (const storage of this.#triggerStorage) {
-                storage.disconnect().catch(console.error)
-            }
+            this.close().catch(console.error)
         })
     }
 
@@ -179,6 +173,16 @@ export class MongoEngine implements Engine<WriteOpts> {
         this.#triggerStorage.push(storage)
 
         return new PullTrigger(storage)
+    }
+
+    async close(): Promise<void> {
+        for (const worker of this.#workers) {
+            await worker.stop()
+        }
+
+        for (const storage of this.#triggerStorage) {
+            await storage.disconnect()
+        }
     }
 
     get client(): MongoClient {
