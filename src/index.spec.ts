@@ -925,6 +925,16 @@ describe('extension', function () {
     await waitForPredicate(() => state !== undefined)
     t.assert.deepEqual(state, 2)
   })
+
+  test("should not be able to decorate using the property twice", (t) => {
+    // Given
+    const workflow = rivr.workflow<number>("complex-calculation")
+    workflow.decorate("foo", 1)
+
+    // When
+    // Then
+    t.assert.throws(() => workflow.decorate("foo", 2), new Error(`Cannot decorate the same property 'foo' twice`))
+  })
 })
 
 describe('transaction', function () {

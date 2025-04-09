@@ -21,6 +21,7 @@ class WorkflowNotReadyError extends Error {
 const kReady = Symbol("kReady");
 const kPluginAutoId = Symbol("kPluginAutoId");
 const kGraph = Symbol("kGraph");
+const kRegisteredDecorators = Symbol("kRegisteredDecorators")
 
 type StepElement<State, Decorators> = {
     type: "step",
@@ -78,14 +79,13 @@ type GraphWithoutPlugin<State, Decorators> = Exclude<GraphElement<State, Decorat
 
 interface WorkflowImpl extends Workflow<unknown, unknown> {
     [kReady]: boolean
-
     /**
      * A tree containing the steps and sub-workflow in order.
      * Iterating through this tree depth-first would yield the steps in order.
      */
     [kGraph]: GraphElement<unknown, unknown>[]
-
     [kPluginAutoId]: number
+    [kRegisteredDecorators]: string[]
 }
 
 function WorkflowConstructor (this: WorkflowImpl, name: string) {
@@ -94,6 +94,7 @@ function WorkflowConstructor (this: WorkflowImpl, name: string) {
     this.name = name
     this[kGraph] = []
     this[kPluginAutoId] = 0
+    this[kRegisteredDecorators] = []
 }
 
 WorkflowConstructor.prototype.step = function step(this: WorkflowImpl, opts: StepOpts<unknown, unknown>) {
@@ -224,8 +225,13 @@ WorkflowConstructor.prototype.register = function register(this: WorkflowImpl, p
 }
 
 WorkflowConstructor.prototype.decorate = function decorate(this: WorkflowImpl, key: string, value: unknown) {
+    if (this[kRegisteredDecorators].includes(key)) {
+        throw new Error(`Cannot decorate the same property '${key}' twice`)
+    }
+
     // @ts-expect-error
     this[key] = value
+    this[kRegisteredDecorators].push(key)
     return this
 }
 
