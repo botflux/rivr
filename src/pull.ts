@@ -16,8 +16,15 @@ export type Update<State> = {
 
 export type Write<State> = Update<State> | Insert<State>
 
+export type PullOpts = {
+    limit: number
+}
+
 export interface Storage<WriteOpts> {
-    pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<WorkflowState<State>[]>
+    pull<State, Decorators>(
+      workflows: Workflow<State, Decorators>[],
+      opts: PullOpts
+    ): Promise<WorkflowState<State>[]>
     write<State>(writes: Write<State>[], opts?: WriteOpts): Promise<void>
     disconnect(): Promise<void>
 }
@@ -66,11 +73,19 @@ export class Poller<TriggerOpts> implements Worker {
     #storage: Storage<TriggerOpts>
 
     #hasFinished = false
+    #delayBetweenPulls: number
+    #countPerPull: number
 
     #onError: OnErrorHook[] = []
 
-    constructor(storage: Storage<TriggerOpts>) {
+    constructor(
+      storage: Storage<TriggerOpts>,
+      delayBetweenPulls: number,
+      countPerPull: number
+    ) {
         this.#storage = storage
+        this.#delayBetweenPulls = delayBetweenPulls
+        this.#countPerPull = countPerPull
     }
 
     async start<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<void> {
@@ -80,7 +95,7 @@ export class Poller<TriggerOpts> implements Worker {
 
         ;(async () => {
             for (const _ of this.#loop) {
-                const [tasks, tasksErr] = await tryCatch(this.#storage.pull(workflows))
+                const [tasks, tasksErr] = await tryCatch(this.#storage.pull(workflows, { limit: this.#countPerPull }))
 
                 if (tasksErr !== undefined) {
                     this.#executeErrorHooks(tasksErr)
@@ -194,6 +209,10 @@ export class Poller<TriggerOpts> implements Worker {
                             }
                         }
                     }
+                }
+
+                if (tasks.length === 0) {
+                    await setTimeout(this.#delayBetweenPulls)
                 }
             }
 

@@ -1,5 +1,5 @@
 import {DefaultTriggerOpts, type Engine, type Trigger, type Worker} from "./core.ts";
-import { Poller, PullTrigger, type Storage, type Write } from "./pull.ts";
+import {Poller, PullOpts, PullTrigger, type Storage, type Write} from "./pull.ts";
 import {
     type AnyBulkWriteOperation, ClientSession,
     type Collection, Filter,
@@ -82,10 +82,11 @@ class MongoStorage implements Storage<WriteOpts> {
         }
     }
 
-    async pull<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<WorkflowState<State>[]> {
+    async pull<State, Decorators>(workflows: Workflow<State, Decorators>[], opts: PullOpts): Promise<WorkflowState<State>[]> {
         const filter = this.#getPullFilter(workflows)
 
         const tasks = await this.#collection.find(filter)
+            .limit(opts.limit)
             .toArray()
 
         return tasks.map(({ _id, ...rest }) => ({
@@ -151,13 +152,23 @@ export class MongoEngine implements Engine<WriteOpts> {
     }
 
     createWorker(): Worker {
+        const {
+            dbName,
+            delayBetweenPulls = 1_000,
+            countPerPull = 20
+        } = this.#opts
+
         const storage = new MongoStorage(
             this.client,
-            this.#opts.dbName,
-            "tasks"
+            dbName,
+            "tasks",
         )
 
-        const poller = new Poller(storage)
+        const poller = new Poller(
+          storage,
+          delayBetweenPulls,
+          countPerPull
+        )
         this.#workers.push(poller)
 
         return poller
@@ -199,6 +210,23 @@ export type CreateEngineOpts = {
     clientOpts?: MongoClientOptions
     dbName: string
     signal?: AbortSignal
+
+    /**
+     * The delay between state pulls.
+     *
+     * Note that this delay is waited only if an incomplete or empty
+     * page is pulled.
+     *
+     * @default {1_000} 1000ms by default
+     */
+    delayBetweenPulls?: number
+
+    /**
+     * The number of states retrieved for each pull.
+     *
+     * @default {20}
+     */
+    countPerPull?: number
 }
 
 export function createEngine(opts: CreateEngineOpts) {
