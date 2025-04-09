@@ -1,0 +1,26 @@
+{
+  "name": "rivr",
+  "version": "0.0.0",
+  "description": "rivr's core component (the workflow, plugin system, and interfaces)",
+  "main": "dist/index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/botflux/rivr.git"
+  },
+  "keywords": [
+    "workflow",
+    "process-manager",
+    "async",
+    "jobs"
+  ],
+  "author": "botflux",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/botflux/rivr/issues"
+  },
+  "homepage": "https://github.com/botflux/rivr#readme"
+}

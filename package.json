@@ -41,5 +41,8 @@
   "dependencies": {
     "pg": "^8.13.0",
     "pino-std-serializers": "^7.0.0"
-  }
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }
