@@ -22,7 +22,7 @@ export type StepResult<State> =
   | Stopped
 export type HandlerOpts<State, Decorators> = {
   state: State
-  workflow: Workflow<State, Decorators>
+  workflow: ReadyWorkflow<State, Decorators>
   ok: (state: State) => Success<State>
   err: (error: unknown) => Failure
   skip: () => Skipped
@@ -50,16 +50,16 @@ export type StepOpts<State, Decorators> = {
   optional?: boolean
 }
 
-export type OnWorkflowCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, state: State) => void
-export type OnStepErrorHook<State, Decorators> = (error: unknown, workflow: Workflow<State, Decorators>, state: State) => void
-export type OnStepSkippedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
-export type OnWorkflowStoppedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
-export type OnWorkflowFailedHook<State, Decorators> = (error: unknown, workflow: Workflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
-export type OnStepCompletedHook<State, Decorators> = (workflow: Workflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
+export type OnWorkflowCompletedHook<State, Decorators> = (workflow: ReadyWorkflow<State, Decorators>, state: State) => void
+export type OnStepErrorHook<State, Decorators> = (error: unknown, workflow: ReadyWorkflow<State, Decorators>, state: State) => void
+export type OnStepSkippedHook<State, Decorators> = (workflow: ReadyWorkflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
+export type OnWorkflowStoppedHook<State, Decorators> = (workflow: ReadyWorkflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
+export type OnWorkflowFailedHook<State, Decorators> = (error: unknown, workflow: ReadyWorkflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
+export type OnStepCompletedHook<State, Decorators> = (workflow: ReadyWorkflow<State, Decorators>, step: Step<State, Decorators>, state: State) => void
 
 export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State, Decorators>) => Workflow<State, NewDecorators>
 
-export type WithContext<T, State, Decorators> = [ item: T, context: Workflow<State, Decorators> ]
+export type WithContext<T, State, Decorators> = [ item: T, context: ReadyWorkflow<State, Decorators> ]
 
 export const kWorkflow = Symbol("kWorkflow")
 
@@ -112,7 +112,7 @@ export type Workflow<State, Decorators> = {
    */
   register<NewDecorators>(plugin: Plugin<State, Decorators, NewDecorators>): Workflow<State, Decorators & NewDecorators>
   register<NewDecorators>(plugin: RivrPlugin<NewDecorators, undefined, State>): Workflow<State, Decorators & NewDecorators>
-  register<NewDecorators, Opts>(plugin: RivrPlugin<NewDecorators, Opts, State>, opts: Opts | ((workflow: Workflow<State, Decorators>) => Opts)): Workflow<State, Decorators & NewDecorators>
+  register<NewDecorators, Opts>(plugin: RivrPlugin<NewDecorators, Opts, State>, opts: Opts | ((workflow: ReadyWorkflow<State, Decorators>) => Opts)): Workflow<State, Decorators & NewDecorators>
 
   /**
    * Iterate over each step.
@@ -180,5 +180,7 @@ export type Workflow<State, Decorators> = {
    * Execute the dependency graph.
    * This function does nothing if the dependency graph was already executed.
    */
-  ready(): Promise<Workflow<State, Decorators>>
-} & Decorators
+  ready(): Promise<ReadyWorkflow<State, Decorators>>
+}
+
+export type ReadyWorkflow<State, Decorators> = Workflow<State, Decorators> & Decorators

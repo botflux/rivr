@@ -1,6 +1,6 @@
 import {setTimeout} from "node:timers/promises"
 import {DefaultTriggerOpts, OnErrorHook, type Trigger, type Worker} from "./core.ts"
-import {Step, StepResult, Workflow} from "./types.ts";
+import {ReadyWorkflow, Step, StepResult, Workflow} from "./types.ts";
 import {tryCatch, tryCatchSync} from "./inline-catch.ts";
 import {createWorkflowState, updateWorkflowState, WorkflowState} from "./state.ts";
 
@@ -89,9 +89,7 @@ export class Poller<TriggerOpts> implements Worker {
     }
 
     async start<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<void> {
-        for (const w of workflows) {
-            await w.ready()
-        }
+        const readyWorkflows = await Promise.all(workflows.map(async workflow => workflow.ready()))
 
         ;(async () => {
             for (const _ of this.#loop) {
@@ -103,7 +101,7 @@ export class Poller<TriggerOpts> implements Worker {
                 }
 
                 for (const task of tasks) {
-                    const mWorkflow = workflows.find(w => w.name === task.name)
+                    const mWorkflow = readyWorkflows.find(w => w.name === task.name)
 
                     if (!mWorkflow)
                         continue
@@ -238,7 +236,7 @@ export class Poller<TriggerOpts> implements Worker {
     async #handleStep<State, Decorators>(
         step: Step<State, Decorators>,
         state: WorkflowState<State>,
-        workflow: Workflow<State, Decorators>
+        workflow: ReadyWorkflow<State, Decorators>
     ): Promise<StepResult<State>> {
         try {
             const nextStateOrResult = await step.handler({

@@ -1,4 +1,4 @@
-import {Workflow} from "./types.ts";
+import {ReadyWorkflow, Workflow} from "./types.ts";
 
 /**
  * Claude gave me this typescript type.
@@ -25,7 +25,7 @@ export type RivrPluginOpts<State, Deps extends RivrPlugin<any, any, State>[] = [
 }
 
 export function rivrPlugin<Out, Opts = undefined, State = any, Deps extends RivrPlugin<any, any, State>[] = []> (
-  plugin: (w: Workflow<State, MergeUnionTypes<GetDecorator<UnwrapItem<Deps>, State>>>, opts: Opts) => Workflow<State, Out>,
+  plugin: (w: ReadyWorkflow<State, MergeUnionTypes<GetDecorator<UnwrapItem<Deps>, State>>>, opts: Opts) => Workflow<State, Out>,
   opts: RivrPluginOpts<State, Deps>
 ): RivrPlugin<Out, Opts, State> {
   Object.assign(plugin, {
