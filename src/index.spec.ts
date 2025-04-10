@@ -28,7 +28,8 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let hookExecuted = false
@@ -65,7 +66,8 @@ describe('basic flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let hookExecuted = false
@@ -106,7 +108,8 @@ describe('basic flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let skipped = false
@@ -158,7 +161,8 @@ describe('basic flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let stopped = false
@@ -203,7 +207,8 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let hookExecuted = false
@@ -245,7 +250,8 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let hookExecuted = false
@@ -282,7 +288,8 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let hookExecuted = false
@@ -324,7 +331,8 @@ describe('advance flow control', function () {
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
-      }
+      },
+      delayBetweenPulls: 10
     })
 
     let state: number | undefined
@@ -372,7 +380,8 @@ describe('advance flow control', function () {
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
-      }
+      },
+      delayBetweenPulls: 10
     })
 
     let state: number | undefined
@@ -421,7 +430,8 @@ describe('advance flow control', function () {
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
-      }
+      },
+      delayBetweenPulls: 10
     })
 
     let state: number | undefined
@@ -465,7 +475,8 @@ describe('advance flow control', function () {
         directConnection: true,
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let errorCount = 0
@@ -498,7 +509,8 @@ describe('advance flow control', function () {
         directConnection: true,
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let errorCount = 0
@@ -530,7 +542,8 @@ describe('advance flow control', function () {
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
-      }
+      },
+      delayBetweenPulls: 10
     })
 
     let state: number | undefined
@@ -573,7 +586,8 @@ describe('advance flow control', function () {
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true,
-      }
+      },
+      delayBetweenPulls: 10
     })
 
     let state: number | undefined
@@ -619,7 +633,8 @@ describe('extension', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let hookExecuted = false
@@ -657,7 +672,8 @@ describe('extension', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let hookExecuted = false
@@ -698,7 +714,8 @@ describe('extension', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let hookExecuted = false
@@ -743,7 +760,8 @@ describe('extension', function () {
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
-      }
+      },
+      delayBetweenPulls: 10
     })
 
     const pluginA = rivrPlugin(function pluginA(w) {
@@ -782,7 +800,8 @@ describe('extension', function () {
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
-      }
+      },
+      delayBetweenPulls: 10
     })
 
     const pluginA = rivrPlugin(function pluginA(w) {
@@ -829,7 +848,8 @@ describe('extension', function () {
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
-      }
+      },
+      delayBetweenPulls: 10
     })
 
     const greetPlugin = rivrPlugin((w, opts: { name: string }) => w.decorate("greet", function () {
@@ -885,7 +905,8 @@ describe('extension', function () {
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
-      }
+      },
+      delayBetweenPulls: 10
     })
 
     const plugin0 = rivrPlugin(function plugin0(w) {
@@ -946,7 +967,8 @@ describe('transaction', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     const db = randomUUID()
@@ -988,7 +1010,8 @@ describe('transaction', function () {
       clientOpts: {
         directConnection: true
       },
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     const states: number[] = []
@@ -1037,7 +1060,8 @@ describe('hooks', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     const workflow = rivr.workflow<number>("complex-calculation")
@@ -1073,7 +1097,8 @@ describe('hooks', function () {
       clientOpts: {
         directConnection: true
       },
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     const stepCompletedStates: number[] = []
@@ -1123,7 +1148,8 @@ describe('hooks', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let elements: number[] = []
@@ -1174,7 +1200,8 @@ describe('hooks', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let hookValue: number | undefined
@@ -1252,7 +1279,8 @@ describe("resilience", () => {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let state: number | undefined
@@ -1299,7 +1327,8 @@ describe("resilience", () => {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal
+      signal: t.signal,
+      delayBetweenPulls: 10
     })
 
     let error: unknown
