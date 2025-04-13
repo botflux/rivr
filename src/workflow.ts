@@ -6,8 +6,11 @@ import {
     OnWorkflowCompletedHook,
     OnWorkflowFailedHook,
     OnWorkflowStoppedHook,
+    Plugin,
+    ReadyWorkflow,
     Step,
     StepOpts,
+    WithContext,
     Workflow
 } from "./types.ts";
 import {RivrPlugin} from "./plugin.ts";
@@ -22,50 +25,54 @@ const kReady = Symbol("kReady");
 const kPluginAutoId = Symbol("kPluginAutoId");
 const kGraph = Symbol("kGraph");
 const kRegisteredDecorators = Symbol("kRegisteredDecorators")
+const kGetPluginAutoId = Symbol("kGetPluginId");
+const kIterateDepthFirst = Symbol("kIterateDepthFirst");
+const kApplyPlugin = Symbol("kApplyPlugin");
+const kListRegisteredPlugins = Symbol("kListRegisteredPlugins")
 
-type StepElement<State, Decorators> = {
+export type StepElement<State, Decorators> = {
     type: "step",
     step: Step<State, Decorators>
     context: WorkflowImpl
 }
-type StepCompletedElement<State, Decorators> = {
+export type StepCompletedElement<State, Decorators> = {
     type: "onStepCompleted",
     hook: OnStepCompletedHook<State, Decorators>
     context: WorkflowImpl
 }
-type StepErrorElement<State, Decorators> = {
+export type StepErrorElement<State, Decorators> = {
     type: "onStepError",
     hook: OnStepErrorHook<State, Decorators>
     context: WorkflowImpl
 }
-type StepSkippedElement<State, Decorators> = {
+export type StepSkippedElement<State, Decorators> = {
     type: "onStepSkipped",
     hook: OnStepSkippedHook<State, Decorators>
     context: WorkflowImpl
 }
-type WorkflowCompletedElement<State, Decorators> = {
+export type WorkflowCompletedElement<State, Decorators> = {
     type: "onWorkflowCompleted",
     hook: OnWorkflowCompletedHook<State, Decorators>
     context: WorkflowImpl
 }
-type WorkflowStoppedElement<State, Decorators> = {
+export type WorkflowStoppedElement<State, Decorators> = {
     type: "onWorkflowStopped",
     hook: OnWorkflowStoppedHook<State, Decorators>
     context: WorkflowImpl
 }
-type WorkflowFailedElement<State, Decorators> = {
+export type WorkflowFailedElement<State, Decorators> = {
     type: "onWorkflowFailed",
     hook: OnWorkflowFailedHook<State, Decorators>
     context: WorkflowImpl
 }
-type WorkflowPluginElement<State, Decorators> = {
+export type WorkflowPluginElement<State, Decorators> = {
     type: "plugin",
     plugin: RivrPlugin<Decorators, unknown, State>
     context: WorkflowImpl
     opts: unknown
 }
 
-type GraphElement<State, Decorators> =
+export type GraphElement<State, Decorators> =
   | StepElement<State, Decorators>
   | StepCompletedElement<State, Decorators>
   | WorkflowCompletedElement<State, Decorators>
@@ -75,7 +82,7 @@ type GraphElement<State, Decorators> =
   | WorkflowFailedElement<State, Decorators>
   | WorkflowPluginElement<State, Decorators>
 
-type GraphWithoutPlugin<State, Decorators> = Exclude<GraphElement<State, Decorators>, WorkflowPluginElement<State, Decorators>>
+export type GraphWithoutPlugin<State, Decorators> = Exclude<GraphElement<State, Decorators>, WorkflowPluginElement<State, Decorators>>
 
 interface WorkflowImpl extends Workflow<unknown, unknown> {
     [kReady]: boolean
@@ -86,6 +93,297 @@ interface WorkflowImpl extends Workflow<unknown, unknown> {
     [kGraph]: GraphElement<unknown, unknown>[]
     [kPluginAutoId]: number
     [kRegisteredDecorators]: string[]
+}
+
+interface RootWorkflow<State> extends ChildWorkflow<State> {
+    [kPluginAutoId]: number
+    [kIterateDepthFirst]: () => Iterable<GraphElement<State, Record<never, never>>>
+}
+
+interface ChildWorkflow<State> extends Workflow<State, Record<never, never>> {
+    [kReady]: boolean
+    [kGraph]: GraphElement<State, Record<never, never>>[]
+    [kRegisteredDecorators]: string[]
+    [kGetPluginAutoId]: () => number
+    [kApplyPlugin]: (
+      plugin: RivrPlugin<Record<never, never>, Record<never, never>, State>,
+      opts: unknown | ((workflow: Workflow<State, Record<never, never>>) => unknown)
+    ) => Promise<void>
+}
+
+export function createChildWorkflow<State>(
+  parent: ChildWorkflow<State>
+): Workflow<State, Record<never, never>> {
+    const child = {} as Workflow<State, Record<never, never>>
+    Object.setPrototypeOf(child, parent)
+    Object.defineProperty(child, "name", {
+        get() {
+            return parent.name
+        }
+    })
+    Object.assign(child, {
+        [kWorkflow]: true,
+        [kReady]: false,
+        [kGraph]: [],
+        [kRegisteredDecorators]: [],
+        step: addStep,
+        // @ts-expect-error
+        getHook: (...params: Parameters<typeof getHook>) => parent.getHook(...params),
+        addHook,
+        register,
+        decorate,
+        steps(): Iterable<[step: Step<State, Record<never, never>>, context: Workflow<State, Record<never, never>>]> {
+            return parent.steps()
+        },
+        async ready(): Promise<ReadyWorkflow<State, Record<never, never>>> {
+            return await parent.ready()
+        },
+        getStepAndExecutionContext(name: string): WithContext<Step<State, Record<never, never>>, State, Record<never, never>> | undefined {
+            return parent.getStepAndExecutionContext(name)
+        },
+        getNextStep(name: string): Step<State, Record<never, never>> | undefined {
+            return parent.getNextStep(name)
+        },
+        getFirstStep(): Step<State, Record<never, never>> | undefined {
+            return parent.getFirstStep()
+        },
+        [kGetPluginAutoId](): number {
+            return parent[kGetPluginAutoId]()
+        },
+        async [kApplyPlugin](
+          plugin: RivrPlugin<Record<never, never>, Record<never, never>, State>,
+          opts: unknown | ((workflow: Workflow<State, Record<never, never>>) => unknown)
+        ): Promise<void> {
+            const alreadyRegistered = this[kGraph]
+            this[kGraph] = []
+
+            const pluginOpts = typeof opts === "function"
+                ? opts(this)
+                : opts
+
+            plugin(this as unknown as Workflow<State, Record<never, never>>, pluginOpts)
+            this[kGraph].push(...alreadyRegistered)
+            this[kReady] = true
+
+            for (const node of this[kGraph]) {
+                if (node.type === "plugin") {
+                    const context = node.context as unknown as ChildWorkflow<State>
+
+                    await context[kApplyPlugin](node.plugin, node.opts)
+                }
+            }
+        },
+    } satisfies Omit<ChildWorkflow<State>, "name">)
+
+    return child
+}
+
+export function createRootWorkflow<State> (name: string): Workflow<State, Record<never, never>> {
+    const workflow = {
+        [kWorkflow]: true,
+        [kReady]: false,
+        [kGraph]: [],
+        [kPluginAutoId]: 0,
+        [kRegisteredDecorators]: [],
+        name,
+        decorate: decorate,
+        step: addStep,
+        * steps(): Iterable<[step: Step<State, Record<never, never>>, context: Workflow<State, Record<never, never>>]> {
+            for (const node of this[kIterateDepthFirst]()) {
+                if (node.type === "step") {
+                    yield [
+                        node.step,
+                        node.context as unknown as Workflow<State, Record<never, never>>
+                    ] as const
+                }
+            }
+        },
+        register: register,
+        async ready(): Promise<ReadyWorkflow<State, Record<never, never>>> {
+            for (const node of this[kGraph]) {
+                if (node.type === "plugin") {
+                    const context = node.context as unknown as ChildWorkflow<State>
+
+                    await context[kApplyPlugin](node.plugin, node.opts)
+                }
+            }
+
+            return this as unknown as ReadyWorkflow<State, Record<never, never>>
+        },
+        getNextStep(name: string): Step<State, Record<never, never>> | undefined {
+            const steps = Array.from(this[kIterateDepthFirst]())
+              .filter(node => node.type === "step")
+
+            const index = steps.findIndex(
+              node => node.step.name === name
+            )
+
+            if (index === -1) {
+                throw new Error(`No step matching the name '${name}'`)
+            }
+
+            const nextStepIndex = index + 1
+
+            const step = nextStepIndex >= steps.length
+                ? undefined
+                : steps[nextStepIndex]
+
+            return step?.step
+        },
+        getFirstStep(): Step<State, Record<never, never>> | undefined {
+            for (const node of this[kIterateDepthFirst]()) {
+                if (node.type === "step") {
+                    return node.step
+                }
+            }
+        },
+        getStepAndExecutionContext(name: string): WithContext<Step<State, Record<never, never>>, State, Record<never, never>> | undefined {
+            for (const node of this[kIterateDepthFirst]()) {
+                if (node.type === "step" && node.step.name === name) {
+                    return [
+                      node.step,
+                      node.context as unknown as Workflow<State, Record<never, never>>
+                    ]
+                }
+            }
+        },
+        getHook: getHook,
+        addHook: addHook,
+        [kGetPluginAutoId](): number {
+            return this[kPluginAutoId]++
+        },
+        *[kIterateDepthFirst]() {
+            for (const node of iterateDepthFirst2(this)) {
+                yield node
+            }
+        },
+        async [kApplyPlugin]() {
+
+        }
+    } satisfies RootWorkflow<State>
+
+    return workflow
+}
+
+function* iterateDepthFirst2<State> (
+  workflow: ChildWorkflow<State>
+): Iterable<GraphElement<State, Record<never, never>>> {
+    for (const node of workflow[kGraph]) {
+        if (node.type === "plugin") {
+            for (const child of iterateDepthFirst2(node.context as unknown as ChildWorkflow<State>)) {
+                yield child
+            }
+        } else {
+            yield node as GraphElement<State, Record<never, never>>
+        }
+    }
+}
+
+function register<State, NewDecorators>(plugin: Plugin<State, Record<never, never>, NewDecorators>): Workflow<State, Record<never, never> & NewDecorators>
+function register<State, NewDecorators>(plugin: RivrPlugin<NewDecorators, undefined, State>): Workflow<State, Record<never, never> & NewDecorators>
+function register<State, NewDecorators, Opts>(plugin: RivrPlugin<NewDecorators, Opts, State>, opts: Opts | ((workflow: ReadyWorkflow<State, Record<never, never>>) => Opts)): Workflow<State, Record<never, never> & NewDecorators>
+function register<State, NewDecorators, Opts>(
+  this: ChildWorkflow<State>,
+  plugin: RivrPlugin<NewDecorators, Opts, State>,
+  opts?: Opts | ((workflow: ReadyWorkflow<State, Record<never, never>>) => Opts) 
+): Workflow<State, NewDecorators> {
+    const nested = createChildWorkflow(this)
+
+    const {
+        opts: {
+            deps = [],
+            name = `plugin-auto-${this[kGetPluginAutoId]()}`
+        } = {}
+    } = plugin
+
+    Object.defineProperty(plugin, "opts", {
+        value: {
+            deps,
+            name
+        }
+    })
+
+    this[kGraph].push({
+        type: "plugin",
+        plugin: plugin as any,
+        context: nested as unknown as WorkflowImpl,
+        opts
+    })
+    return nested as unknown as Workflow<State, NewDecorators>
+}
+
+function addHook<State>(hook: "onWorkflowCompleted", handler: OnWorkflowCompletedHook<State, Record<never, never>>): Workflow<State, Record<never, never>>
+function addHook<State>(hook: "onStepError", handler: OnStepErrorHook<State, Record<never, never>>): Workflow<State, Record<never, never>>
+function addHook<State>(hook: "onStepSkipped", handler: OnStepSkippedHook<State, Record<never, never>>): Workflow<State, Record<never, never>>
+function addHook<State>(hook: "onWorkflowStopped", handler: OnWorkflowStoppedHook<State, Record<never, never>>): Workflow<State, Record<never, never>>
+function addHook<State>(hook: "onStepCompleted", handler: OnStepCompletedHook<State, Record<never, never>>): Workflow<State, Record<never, never>>
+function addHook<State>(hook: "onWorkflowFailed", handler: OnWorkflowFailedHook<State, Record<never, never>>): Workflow<State, Record<never, never>>
+function addHook<State>(
+  this: ChildWorkflow<State>,
+  hook: "onWorkflowCompleted" | "onStepError" | "onStepSkipped" | "onWorkflowStopped" | "onStepCompleted" | "onWorkflowFailed",
+  handler: OnWorkflowCompletedHook<State, Record<never, never>> | OnStepErrorHook<State, Record<never, never>> | OnStepSkippedHook<State, Record<never, never>> | OnWorkflowStoppedHook<State, Record<never, never>> | OnStepCompletedHook<State, Record<never, never>> | OnWorkflowFailedHook<State, Record<never, never>>
+): ChildWorkflow<State> {
+    // @ts-expect-error
+    this[kGraph].push({
+        type: hook,
+        hook: handler,
+        context: this as unknown as WorkflowImpl
+    })
+    return this
+}
+
+function addStep<State> (
+  this: ChildWorkflow<State>,
+  opts: StepOpts<State, Record<never, never>>
+): Workflow<State, Record<never, never>> {
+    const {
+        maxAttempts = 1,
+        optional = false,
+        delayBetweenAttempts = 0,
+        ...requiredFields
+    } = opts
+
+    this[kGraph].push({
+        type: "step",
+        step: {
+            ...requiredFields,
+            maxAttempts,
+            optional,
+            delayBetweenAttempts
+        },
+        context: this as unknown as WorkflowImpl
+    })
+    return this
+}
+
+function decorate<State, Key extends string, Value>(
+  this: ChildWorkflow<State>,
+  key: Key,
+  value: Value
+): Workflow<State, Record<Key, Value>> {
+    Object.defineProperty(this, key, { value })
+    return this as unknown as Workflow<State, Record<Key, Value>>
+}
+
+function getHook<State>(hook: "onStepCompleted"): WithContext<OnStepCompletedHook<State, Record<never, never>>, State, Record<never, never>>[]
+function getHook<State>(hook: "onWorkflowCompleted"): WithContext<OnWorkflowCompletedHook<State, Record<never, never>>, State, Record<never, never>>[]
+function getHook<State>(hook: "onStepError"): WithContext<OnStepErrorHook<State, Record<never, never>>, State, Record<never, never>>[]
+function getHook<State>(hook: "onStepSkipped"): WithContext<OnStepSkippedHook<State, Record<never, never>>, State, Record<never, never>>[]
+function getHook<State>(hook: "onWorkflowStopped"): WithContext<OnWorkflowStoppedHook<State, Record<never, never>>, State, Record<never, never>>[]
+function getHook<State>(hook: "onWorkflowFailed"): WithContext<OnWorkflowFailedHook<State, Record<never, never>>, State, Record<never, never>>[]
+function getHook<State>(
+  this: RootWorkflow<State>,
+  hook: "onWorkflowStopped" | "onWorkflowFailed" | "onStepCompleted" | "onWorkflowCompleted" | "onStepError" | "onStepSkipped"
+): WithContext<any, State, Record<never, never>>[] {
+    let result: WithContext<any, State, Record<never, never>>[] = []
+
+    for (const node of this[kIterateDepthFirst]()) {
+        if (node.type === hook) {
+            result.push([ node.hook, node.context as Workflow<State, Record<never, never>> ])
+        }
+    }
+
+    return result
 }
 
 function WorkflowConstructor (this: WorkflowImpl, name: string) {
@@ -410,6 +708,7 @@ async function executePlugins (root: WorkflowImpl) {
 
 export const rivr = {
     workflow<State>(name: string): Workflow<State, Record<string, unknown>> {
-        return new (WorkflowConstructor as any)(name)
+        return createRootWorkflow(name)
+        // return new (WorkflowConstructor as any)(name)
     }
 }
