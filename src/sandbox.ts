@@ -1,7 +1,7 @@
-import {createRootWorkflow} from "./workflow.ts";
+import {rivr} from "./workflow.ts";
 
 async function start() {
-  const workflow = await createRootWorkflow<number>("foo")
+  const workflow = await rivr.workflow<number>("foo")
     .addHook("onWorkflowCompleted", (w) => {})
     .step({
       name: "add-1",

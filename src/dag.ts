@@ -17,6 +17,71 @@ export function createDAG<T>(): DAG<T> {
   }
 }
 
+export class DAG2<T> {
+  #nextId = 0
+  #edges: [number, number][] = []
+  #nodes = new Map<number, Node<T>>()
+
+  addRootNode(value: T): Node<T> {
+    const id = this.#nextId ++
+
+    const node: Node<T> = {
+      value,
+      id,
+      root: true
+    }
+
+    this.#nodes.set(id, node)
+    return node
+  }
+
+  addNode<U extends T>(value: U, parent: Node<T>): Node<U> {
+    const id = this.#nextId ++
+    const node: Node<U> = {
+      value,
+      id,
+      root: false
+    }
+    this.#nodes.set(id, node)
+    this.#edges = [
+      ...this.#edges,
+      [ parent.id, id ]
+    ]
+    return node
+  }
+
+  * iterateDepthFirst(start: Node<T>): Generator<Node<T>> {
+    yield start
+
+    const edges = this.#edges
+      .filter(([from]) => from === start.id)
+      .map(([, to]) => to)
+
+    for (const edge of edges) {
+      const node = this.#nodes.get(edge)
+
+      if (node === undefined)
+        throw new Error(`No node found for id '${edge}'`)
+
+      for (const neighbor of this.iterateDepthFirst(node)) {
+        yield neighbor
+      }
+    }
+  }
+
+  iterateBottomToTop(start: Node<T>): Generator<Node<T>> {
+    const reversedEdges = this.#edges
+      .map(([from, to]) => [to, from] as const) as [number, number][]
+
+    return this.iterateDepthFirst(start)
+  }
+
+  getRootNode(): Node<T> | undefined {
+    return Array.from(this.#nodes.values())
+      .find(node => node.root)
+  }
+}
+
 export function getRootNode<T>(dag: DAG<T>): Node<T> | undefined {
   return Array.from(dag.nodes.values()).find(({ root }) => root)
 }
