@@ -1,5 +1,4 @@
 import {
-    kWorkflow,
     OnStepCompletedHook,
     OnStepErrorHook,
     OnStepSkippedHook,
@@ -13,7 +12,6 @@ import {
 } from "./types.ts";
 import {RivrPlugin} from "./plugin.ts";
 import { List, Slice, ArrayAdapter } from "./slice.ts"
-import {setTimeout} from "node:timers/promises"
 
 type EmptyDecorator = Record<never, never>
 
@@ -90,7 +88,6 @@ function isHookType<Hook> (hook: Hook) {
 
 function createPluginWorkflow<State>(parent: Workflow<State>, list: List<NodeElement<State>>): Workflow<State> {
     const workflow = {
-        [kWorkflow]: true,
         decorate<K extends string, V>(key: K, value: V): PublicWorkflow<State, EmptyDecorator & Record<K, V>> {
             // @ts-expect-error
             parent.decorate.call(parent, key, value)
@@ -104,7 +101,6 @@ function createPluginWorkflow<State>(parent: Workflow<State>, list: List<NodeEle
 
 function createChildWorkflow<State>(parent: Workflow<State>, list: List<NodeElement<State>>, startIndex: number): Workflow<State> {
     const workflow = {
-        [kWorkflow]: true,
         list,
         registeredDecorators: [] as string[],
         pluginStartIndex: startIndex,
@@ -121,7 +117,6 @@ function createRootWorkflow<State> (name: string) {
         list,
         globalList: list,
         isReady: false,
-        [kWorkflow]: true,
         nextNodeId: 0,
         autoPluginId: 0,
         name,

@@ -61,27 +61,8 @@ export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State
 
 export type WithContext<T, State, Decorators> = [ item: T, context: ReadyWorkflow<State, Decorators> ]
 
-export const kWorkflow = Symbol("kWorkflow")
-
-export type HookName = "onStepCompleted" | "onStepError" | "onWorkflowCompleted" | "onStepSkipped"
-  | "onWorkflowFailed" | "onWorkflowStopped"
-
-
-export type Hook<State, Decorators> =
-  | OnStepCompletedHook<State, Decorators>
-  | OnStepErrorHook<State, Decorators>
-  | OnWorkflowCompletedHook<State, Decorators>
-  | OnStepSkippedHook<State, Decorators>
-  | OnWorkflowFailedHook<State, Decorators>
-  | OnWorkflowStoppedHook<State, Decorators>
-
 
 export type Workflow<State, Decorators> = {
-  /**
-   * A flag to discriminates if an object is a workflow.
-   */
-  [kWorkflow]: true
-
   /**
    * The name of the workflow.
    */
