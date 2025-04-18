@@ -1,4 +1,4 @@
-export interface Appendable<T> {
+export interface List<T> {
   append(value: T): T
   insertAfter(value: T, index: number): T
   [Symbol.iterator](): Generator<T>
@@ -7,7 +7,7 @@ export interface Appendable<T> {
   length: number
 }
 
-export class ArrayAdapter<T> implements Appendable<T> {
+export class ArrayAdapter<T> implements List<T> {
   array: T[] = []
 
   append(value: T): T {
@@ -41,12 +41,12 @@ export class ArrayAdapter<T> implements Appendable<T> {
   }
 }
 
-export class Slice<T> implements Appendable<T> {
-  innerSlice: Appendable<T>
+export class Slice<T> implements List<T> {
+  innerSlice: List<T>
   startIndex: number
   appendIndex: number = 0
 
-  constructor(innerSlice: Appendable<T>, startIndex: number) {
+  constructor(innerSlice: List<T>, startIndex: number) {
     this.innerSlice = innerSlice;
     this.startIndex = startIndex;
   }

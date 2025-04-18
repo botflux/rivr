@@ -12,7 +12,7 @@ import {
     Workflow as PublicWorkflow
 } from "./types.ts";
 import {RivrPlugin} from "./plugin.ts";
-import { Appendable, Slice, ArrayAdapter } from "./slice.ts"
+import { List, Slice, ArrayAdapter } from "./slice.ts"
 import {setTimeout} from "node:timers/promises"
 
 type EmptyDecorator = Record<never, never>
@@ -60,8 +60,8 @@ type NodeElement<State> =
     | RootElement<State>
 
 interface Workflow<State> extends PublicWorkflow<State, EmptyDecorator> {
-    globalList: Appendable<NodeElement<State>>
-    list: Appendable<NodeElement<State>>
+    globalList: List<NodeElement<State>>
+    list: List<NodeElement<State>>
     pluginStartIndex: number
     registeredDecorators: string[]
     isReady: boolean
@@ -88,7 +88,7 @@ function isHookType<Hook> (hook: Hook) {
     }
 }
 
-function createPluginWorkflow<State>(parent: Workflow<State>, list: Appendable<NodeElement<State>>): Workflow<State> {
+function createPluginWorkflow<State>(parent: Workflow<State>, list: List<NodeElement<State>>): Workflow<State> {
     const workflow = {
         [kWorkflow]: true,
         decorate<K extends string, V>(key: K, value: V): PublicWorkflow<State, EmptyDecorator & Record<K, V>> {
@@ -102,7 +102,7 @@ function createPluginWorkflow<State>(parent: Workflow<State>, list: Appendable<N
     return workflow
 }
 
-function createChildWorkflow<State>(parent: Workflow<State>, list: Appendable<NodeElement<State>>, startIndex: number): Workflow<State> {
+function createChildWorkflow<State>(parent: Workflow<State>, list: List<NodeElement<State>>, startIndex: number): Workflow<State> {
     const workflow = {
         [kWorkflow]: true,
         list,
