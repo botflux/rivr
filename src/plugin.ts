@@ -13,7 +13,7 @@ export type MergeUnionTypes<T> = (T extends any ? (x: T) => any : never) extends
 
 export type RivrPlugin<Out, Opts, State> = {
   (w: Workflow<State, any>, opts: Opts): Workflow<State, Out>
-  opts?: RivrPluginOpts<State>
+  opts: RivrPluginOpts<State>
 }
 
 export type RivrPluginOpts<State, Deps extends RivrPlugin<any, any, State>[] = []> = {

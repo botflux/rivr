@@ -884,7 +884,7 @@ describe('extension', function () {
     t.assert.deepStrictEqual(state, "Hello, Daneel!")
   })
 
-  test("register a plugin with a missing dependency throw an error", {skip: true}, async (t) => {
+  test("register a plugin with a missing dependency throw an error", {only: true}, async (t) => {
     const plugin1 = rivrPlugin(w => w, {
       deps: [],
       name: "plugin-1"
@@ -1143,7 +1143,7 @@ describe('hooks', function () {
     t.assert.deepStrictEqual(stepCompletedStates, [ 6, 6, 10, 10 ])
   })
 
-  test("execute onWorkflowCompleted hooks in order",  async (t: TestContext) => {
+  test("execute onWorkflowCompleted hooks in order", {only: true}, async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),

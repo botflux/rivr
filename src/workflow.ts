@@ -67,6 +67,7 @@ interface Workflow<State> extends PublicWorkflow<State, EmptyDecorator> {
     isReady: boolean
     generateNewNodeId(): number
     nextNodeId: number
+    autoPluginId: number
 }
 
 function isStep<State>(node: NodeElement<State>): node is StepElement<State> {
@@ -122,6 +123,7 @@ function createRootWorkflow<State> (name: string) {
         isReady: false,
         [kWorkflow]: true,
         nextNodeId: 0,
+        autoPluginId: 0,
         name,
         registeredDecorators: [],
         generateNewNodeId(): number {
@@ -223,12 +225,16 @@ function createRootWorkflow<State> (name: string) {
               .filter(isHookType(hook))
               .map(node => [node.hook.hook, node.context])
         },
-        register<NewDecorators>(plugin: RivrPlugin<EmptyDecorator, unknown, State>, opts?: unknown | ((w: PublicWorkflow<State, EmptyDecorator>) => unknown)): PublicWorkflow<State, EmptyDecorator & NewDecorators> {
+        register<NewDecorators>(plugin: Function, opts?: unknown | ((w: PublicWorkflow<State, EmptyDecorator>) => unknown)): PublicWorkflow<State, EmptyDecorator & NewDecorators> {
             const child = createChildWorkflow(this, this.list, this.list.length + 1)
+
+            const rivrPlugin = isRivrPlugin<EmptyDecorator, State>(plugin)
+                ? plugin
+                : toRivrPlugin<State>(plugin, () => `auto-plugin-${this.autoPluginId++}`)
 
             this.list.append({
                 type: "plugin",
-                plugin,
+                plugin: rivrPlugin,
                 context: child,
                 pluginOpts: opts,
                 id: this.generateNewNodeId()
@@ -253,6 +259,18 @@ function createRootWorkflow<State> (name: string) {
                 if (node.type !== "plugin")
                     continue
 
+                const deps = (node.plugin.opts.deps ?? []) as RivrPlugin<any, any, any>[]
+
+                const registeredPlugins = Array.from(this.globalList.reverseIteratorFromIndex(index))
+                  .filter(isPlugin)
+                  .map(node => node.plugin.opts.name)
+
+                const unsatisfiedDeps = deps.filter(plugin => !registeredPlugins.includes(plugin.opts.name))
+
+                if (unsatisfiedDeps.length > 0) {
+                    throw new Error(`Plugin "${node.plugin.opts.name}" needs "${unsatisfiedDeps[0].opts.name}" to be registered`)
+                }
+
                 const pluginOpts = typeof node.pluginOpts === "function"
                     ? node.pluginOpts(this)
                     : node.pluginOpts
@@ -274,6 +292,23 @@ function createRootWorkflow<State> (name: string) {
     }
 
     return workflow
+}
+
+function toRivrPlugin<State>(
+  plugin: Function,
+  getRandomName: () => string
+) {
+    Object.defineProperty(plugin, "opts", {
+        value: {
+            name: getRandomName()
+        }
+    })
+
+    return plugin as RivrPlugin<EmptyDecorator, unknown, State>
+}
+
+function isRivrPlugin<NewDecorators, State>(plugin: Function): plugin is RivrPlugin<NewDecorators, unknown, State> {
+    return "opts" in plugin
 }
 
 function decorate<State, K extends string, V> (
