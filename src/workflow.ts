@@ -58,7 +58,6 @@ type NodeElement<State> =
     | RootElement<State>
 
 interface Workflow<State> extends PublicWorkflow<State, EmptyDecorator> {
-    globalList: List<NodeElement<State>>
     list: List<NodeElement<State>>
     pluginStartIndex: number
     registeredDecorators: string[]
@@ -115,7 +114,6 @@ function createRootWorkflow<State> (name: string) {
     const list = new ArrayAdapter<NodeElement<State>>()
     const workflow: Workflow<State> = {
         list,
-        globalList: list,
         isReady: false,
         nextNodeId: 0,
         autoPluginId: 0,
@@ -178,21 +176,21 @@ function createRootWorkflow<State> (name: string) {
             return this
         },
         getFirstStep(): Step<State, EmptyDecorator> | undefined {
-            for (const node of this.globalList) {
+            for (const node of this.list) {
                 if (node.type === "step") {
                     return node.step
                 }
             }
         },
         getStepAndExecutionContext(name: string): WithContext<Step<State, EmptyDecorator>, State, EmptyDecorator> | undefined {
-            for (const node of this.globalList) {
+            for (const node of this.list) {
                 if (node.type === "step" && node.step.name === name) {
                     return [ node.step, node.context ]
                 }
             }
         },
         getNextStep(name: string): Step<State, EmptyDecorator> | undefined {
-            const nodes = Array.from(this.globalList)
+            const nodes = Array.from(this.list)
               .filter(isStep)
             const index = nodes.findIndex(node => node.step.name === name)
 
@@ -209,13 +207,13 @@ function createRootWorkflow<State> (name: string) {
             return node?.step
         },
         steps(): Iterable<[step: Step<State, EmptyDecorator>, context: PublicWorkflow<State, EmptyDecorator>]> {
-            return Array.from(this.globalList)
+            return Array.from(this.list)
               .filter(isStep)
               .map(node => [ node.step, node.context ])
         },
         // @ts-expect-error
         getHook(hook) {
-            return Array.from(this.globalList)
+            return Array.from(this.list)
               .filter(isHook)
               .filter(isHookType(hook))
               .map(node => [node.hook.hook, node.context])
@@ -245,7 +243,7 @@ function createRootWorkflow<State> (name: string) {
             let visited: number[] = []
             let index = 0
 
-            for (const node of this.globalList) {
+            for (const node of this.list) {
                 if (visited.includes(node.id))
                     continue
 
@@ -256,7 +254,7 @@ function createRootWorkflow<State> (name: string) {
 
                 const deps = (node.plugin.opts.deps ?? []) as RivrPlugin<any, any, any>[]
 
-                const registeredPlugins = Array.from(this.globalList.reverseIteratorFromIndex(index))
+                const registeredPlugins = Array.from(this.list.reverseIteratorFromIndex(index))
                   .filter(isPlugin)
                   .map(node => node.plugin.opts.name)
 
