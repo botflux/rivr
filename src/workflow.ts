@@ -5,19 +5,21 @@ import {
     OnStepSkippedHook,
     OnWorkflowCompletedHook,
     OnWorkflowFailedHook,
-    OnWorkflowStoppedHook, Plugin, ReadyWorkflow,
+    OnWorkflowStoppedHook, ReadyWorkflow,
     Step,
     StepOpts,
     WithContext,
     Workflow as PublicWorkflow
 } from "./types.ts";
-import {DAG2, Node} from "./dag.ts";
 import {RivrPlugin} from "./plugin.ts";
+import { Appendable, Slice, ArrayAdapter } from "./slice.ts"
+import {setTimeout} from "node:timers/promises"
 
 type EmptyDecorator = Record<never, never>
 
 type StepElement<State> = {
     type: "step"
+    id: number
     context: Workflow<State>
     step: Step<State, EmptyDecorator>
 }
@@ -34,10 +36,12 @@ type HookElement<State> = {
     type: "hook"
     context: Workflow<State>
     hook: Hook<State>
+    id: number
 }
 
 type PluginElement<State> = {
     type: "plugin"
+    id: number
     context: Workflow<State>
     plugin: RivrPlugin<EmptyDecorator, unknown, State>
     pluginOpts?: unknown | ((w: Workflow<State>) => unknown)
@@ -45,6 +49,7 @@ type PluginElement<State> = {
 
 type RootElement<State> = {
     type: "root"
+    id: number
     context: Workflow<State>
 }
 
@@ -55,30 +60,54 @@ type NodeElement<State> =
     | RootElement<State>
 
 interface Workflow<State> extends PublicWorkflow<State, EmptyDecorator> {
-    node: Node<NodeElement<State>>
-    dag: DAG2<NodeElement<State>>
+    globalList: Appendable<NodeElement<State>>
+    list: Appendable<NodeElement<State>>
+    pluginStartIndex: number
     registeredDecorators: string[]
+    isReady: boolean
+    generateNewNodeId(): number
+    nextNodeId: number
 }
 
-function isStep<State>(node: Node<NodeElement<State>>): node is Node<StepElement<State>> {
-    return node.value.type === 'step'
+function isStep<State>(node: NodeElement<State>): node is StepElement<State> {
+    return node.type === 'step'
 }
 
-function isHook<State>(node: Node<NodeElement<State>>): node is Node<HookElement<State>> {
-    return node.value.type === 'hook'
+function isHook<State>(node: NodeElement<State>): node is HookElement<State> {
+    return node.type === 'hook'
+}
+
+function isPlugin<State>(node: NodeElement<State>): node is PluginElement<State> {
+    return node.type === 'plugin'
 }
 
 function isHookType<Hook> (hook: Hook) {
-    return function<State> (node: Node<HookElement<State>>): node is Node<HookElement<State> & { hook: { type: Hook } }> {
-        return node.value.hook.type === hook
+    return function<State> (node: HookElement<State>): node is HookElement<State> & { hook: { type: Hook } } {
+        return node.hook.type === hook
     }
 }
 
-function createChildWorkflow<State>(parent: Workflow<State>, node: Node<PluginElement<State>>) {
+function createPluginWorkflow<State>(parent: Workflow<State>, list: Appendable<NodeElement<State>>): Workflow<State> {
     const workflow = {
         [kWorkflow]: true,
-        node,
+        decorate<K extends string, V>(key: K, value: V): PublicWorkflow<State, EmptyDecorator & Record<K, V>> {
+            // @ts-expect-error
+            parent.decorate.call(parent, key, value)
+            return this as unknown as PublicWorkflow<State, EmptyDecorator & Record<K, V>>
+        },
+        list,
+    } as Workflow<State>
+    Object.setPrototypeOf(workflow, parent)
+    return workflow
+}
+
+function createChildWorkflow<State>(parent: Workflow<State>, list: Appendable<NodeElement<State>>, startIndex: number): Workflow<State> {
+    const workflow = {
+        [kWorkflow]: true,
+        list,
         registeredDecorators: [] as string[],
+        pluginStartIndex: startIndex,
+        isReady: false
     } as Workflow<State>
     Object.setPrototypeOf(workflow, parent)
 
@@ -86,27 +115,37 @@ function createChildWorkflow<State>(parent: Workflow<State>, node: Node<PluginEl
 }
 
 function createRootWorkflow<State> (name: string) {
-    const dag = new DAG2<NodeElement<State>>()
-    const rootNode = dag.addRootNode({
-        type: "root",
-        context: {} as Workflow<State>,
-    })
+    const list = new ArrayAdapter<NodeElement<State>>()
     const workflow: Workflow<State> = {
-        dag,
-        node: rootNode,
+        list,
+        globalList: list,
+        isReady: false,
         [kWorkflow]: true,
+        nextNodeId: 0,
         name,
         registeredDecorators: [],
+        generateNewNodeId(): number {
+          return this.nextNodeId ++
+        },
         decorate,
         addHook(hook, handler) {
-            this.dag.addNode({
-                type: "hook",
-                context: this as Workflow<State>,
-                hook: {
-                    type: hook,
-                    hook: handler
-                } as Hook<State>
-            }, (this as Workflow<State>).node)
+            this.list.append({
+              type: "hook",
+              id: this.generateNewNodeId(),
+              context: this as Workflow<State>,
+              hook: {
+                  type: hook,
+                  hook: handler
+              } as Hook<State>
+          })
+            // this.dag.addNode({
+            //     type: "hook",
+            //     context: this as Workflow<State>,
+            //     hook: {
+            //         type: hook,
+            //         hook: handler
+            //     } as Hook<State>
+            // }, (this as Workflow<State>).node)
             return this
         },
         step(opts: StepOpts<State, EmptyDecorator>) {
@@ -117,54 +156,48 @@ function createRootWorkflow<State> (name: string) {
                 ...requiredFields
             } = opts
 
-            this.dag.addNode({
+            this.list.append({
                 type: "step",
                 context: this,
+                id: this.generateNewNodeId(),
                 step: {
                     ...requiredFields,
                     optional,
                     delayBetweenAttempts,
                     maxAttempts
                 }
-            }, this.node)
+            })
+
+            // this.dag.addNode({
+            //     type: "step",
+            //     context: this,
+            //     step: {
+            //         ...requiredFields,
+            //         optional,
+            //         delayBetweenAttempts,
+            //         maxAttempts
+            //     }
+            // }, this.node)
             return this
         },
         getFirstStep(): Step<State, EmptyDecorator> | undefined {
-            const root = this.dag.getRootNode()
-
-            if (root === undefined) {
-                throw new Error("There is no step in the workflow")
-            }
-
-            for (const node of this.dag.iterateDepthFirst(root)) {
-                if (node.value.type === "step") {
-                    return node.value.step
+            for (const node of this.globalList) {
+                if (node.type === "step") {
+                    return node.step
                 }
             }
         },
         getStepAndExecutionContext(name: string): WithContext<Step<State, EmptyDecorator>, State, EmptyDecorator> | undefined {
-            const root = this.dag.getRootNode()
-
-            if (root === undefined) {
-                throw new Error("There is no root node")
-            }
-
-            for (const node of this.dag.iterateDepthFirst(root)) {
-                if (node.value.type === "step" && node.value.step.name === name) {
-                    return [ node.value.step, node.value.context ]
+            for (const node of this.globalList) {
+                if (node.type === "step" && node.step.name === name) {
+                    return [ node.step, node.context ]
                 }
             }
         },
         getNextStep(name: string): Step<State, EmptyDecorator> | undefined {
-            const root = this.dag.getRootNode()
-
-            if (root === undefined) {
-                throw new Error("No root node")
-            }
-
-            const nodes = Array.from(this.dag.iterateDepthFirst(root))
+            const nodes = Array.from(this.globalList)
               .filter(isStep)
-            const index = nodes.findIndex(node => node.value.step.name === name)
+            const index = nodes.findIndex(node => node.step.name === name)
 
             if (index === -1) {
                 throw new Error(`No step matching the name '${name}'`)
@@ -176,72 +209,71 @@ function createRootWorkflow<State> (name: string) {
                 ? undefined
                 : nodes[nextStepIndex]
 
-            return node?.value.step
+            return node?.step
         },
         steps(): Iterable<[step: Step<State, EmptyDecorator>, context: PublicWorkflow<State, EmptyDecorator>]> {
-            const root = this.dag.getRootNode()
-
-            if (root === undefined) {
-                throw new Error("No root node")
-            }
-
-            return Array.from(this.dag.iterateDepthFirst(root))
+            return Array.from(this.globalList)
               .filter(isStep)
-              .map(node => [ node.value.step, node.value.context ])
+              .map(node => [ node.step, node.context ])
         },
         // @ts-expect-error
         getHook(hook) {
-            const root = this.dag.getRootNode()
-
-            if (root === undefined) {
-                throw new Error("No root node")
-            }
-
-            return Array.from(this.dag.iterateDepthFirst(root))
+            return Array.from(this.globalList)
               .filter(isHook)
               .filter(isHookType(hook))
-              .map(node => [node.value.hook.hook, node.value.context])
+              .map(node => [node.hook.hook, node.context])
         },
         register<NewDecorators>(plugin: RivrPlugin<EmptyDecorator, unknown, State>, opts?: unknown | ((w: PublicWorkflow<State, EmptyDecorator>) => unknown)): PublicWorkflow<State, EmptyDecorator & NewDecorators> {
-            const node = this.dag.addNode({
+            const child = createChildWorkflow(this, this.list, this.list.length + 1)
+
+            this.list.append({
                 type: "plugin",
                 plugin,
-                context: this,
-                pluginOpts: opts
-            }, this.node)
+                context: child,
+                pluginOpts: opts,
+                id: this.generateNewNodeId()
+            })
 
-            const child = createChildWorkflow(this, node)
-            node.value.context = child
             return child as unknown as PublicWorkflow<State, EmptyDecorator & NewDecorators>
         },
         async ready(): Promise<ReadyWorkflow<State, EmptyDecorator>> {
-            const root = this.dag.getRootNode()
+            if (this.isReady) {
+                return this as unknown as ReadyWorkflow<State, EmptyDecorator>
+            }
 
-            if (root === undefined)
-                throw new Error("No root node")
+            let visited: number[] = []
+            let index = 0
 
-            for (const node of this.dag.iterateDepthFirst(this.node)) {
-                const value = node.value
-
-                if (value.type !== "plugin")
+            for (const node of this.globalList) {
+                if (visited.includes(node.id))
                     continue
 
-                const pluginOpts = typeof value.pluginOpts === "function"
-                    ? value.pluginOpts(this)
-                    : value.pluginOpts
+                visited.push(node.id)
+
+                if (node.type !== "plugin")
+                    continue
+
+                const pluginOpts = typeof node.pluginOpts === "function"
+                    ? node.pluginOpts(this)
+                    : node.pluginOpts
+
+                const pluginScope = createPluginWorkflow(
+                  node.context,
+                  new Slice(node.context.list, node.context.pluginStartIndex)
+                )
+
+                node.plugin(pluginScope, pluginOpts)
+                node.context.isReady = true
+                index++
             }
+
+            this.isReady = true
+
+            return this as unknown as ReadyWorkflow<State, EmptyDecorator>
         }
     }
 
-    rootNode.value = {
-        type: "root",
-        context: workflow
-    }
-
-    return {
-        ...workflow,
-        node: rootNode
-    }
+    return workflow
 }
 
 function decorate<State, K extends string, V> (
@@ -249,6 +281,10 @@ function decorate<State, K extends string, V> (
   key: K,
   value: V
 ) {
+    if (this.registeredDecorators.includes(key)) {
+        throw new Error(`Cannot decorate the same property '${key}' twice`)
+    }
+
     Object.defineProperty(this, key, { value })
     this.registeredDecorators.push(key)
     return this as unknown as PublicWorkflow<State, EmptyDecorator & Record<K, V>>

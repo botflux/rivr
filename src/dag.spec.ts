@@ -1,7 +1,7 @@
 import {describe, test, TestContext} from "node:test"
 import {addNode, addRootNode, createDAG, iterateBottomDown, iterateDepthFirst} from "./dag.ts";
 
-describe('dag', { only: true }, function () {
+describe('dag', function () {
   test("should be able to create a dag", (t) => {
     // Given
     // When
