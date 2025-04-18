@@ -20,7 +20,7 @@ after(async () => {
 })
 
 describe('basic flow control', function () {
-  test("execute a workflow step", {only: true}, async (t) => {
+  test("execute a workflow step",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -61,7 +61,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 7)
   })
 
-  test("execute a workflow made of multiple steps", {only: true}, async (t) => {
+  test("execute a workflow made of multiple steps",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -103,7 +103,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 9)
   })
 
-  test("skip a step", {only: true}, async (t) => {
+  test("skip a step",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -156,7 +156,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 5)
   })
 
-  test("stop a workflow", {only: true}, async (t) => {
+  test("stop a workflow",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -202,7 +202,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(stoppedState, 6)
   })
 
-  test("handle step errors", {only: true}, async (t) => {
+  test("handle step errors",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -245,7 +245,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 4)
   })
 
-  test("return a ok step result", {only: true}, async (t) => {
+  test("return a ok step result",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -283,7 +283,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 7)
   })
 
-  test("return a error step result", {only: true}, async (t) => {
+  test("return a error step result",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -326,7 +326,7 @@ describe('basic flow control', function () {
 })
 
 describe('advance flow control', function () {
-  test("register an optional step", {only: true}, async (t: TestContext) => {
+  test("register an optional step",  async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -375,7 +375,7 @@ describe('advance flow control', function () {
     t.assert.deepStrictEqual(errors, [ "oops" ])
   })
 
-  test("retry an optional step until it passes", {only: true}, async (t: TestContext) => {
+  test("retry an optional step until it passes",  async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -425,7 +425,7 @@ describe('advance flow control', function () {
     t.assert.deepStrictEqual(errors, [ "oops", "oops", "oops", "oops", "oops" ])
   })
 
-  test("emit a workflow completed if the last step is optional and is failing", {only: true}, async (t: TestContext) => {
+  test("emit a workflow completed if the last step is optional and is failing",  async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -470,7 +470,7 @@ describe('advance flow control', function () {
     t.assert.deepEqual(workflowFailedCalled, false)
   })
 
-  test("should be able to retry a failed step", {only: true}, async (t) => {
+  test("should be able to retry a failed step",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -504,7 +504,7 @@ describe('advance flow control', function () {
     t.assert.deepEqual(errorCount, 5)
   })
 
-  test("should be able to not retry failed steps by default", {only: true}, async (t) => {
+  test("should be able to not retry failed steps by default",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -537,7 +537,7 @@ describe('advance flow control', function () {
     t.assert.deepEqual(errorCount, 1)
   })
 
-  test("should be able to wait between tries", {only: true}, async (t: TestContext) => {
+  test("should be able to wait between tries",  async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -581,7 +581,7 @@ describe('advance flow control', function () {
     t.assert.strictEqual(state, 2)
   })
 
-  test("should be able to increase the delay between tries", {only: true}, async (t: TestContext) => {
+  test("should be able to increase the delay between tries",  async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -628,7 +628,7 @@ describe('advance flow control', function () {
 })
 
 describe('extension', function () {
-  test("decorate workflow", {only: true}, async (t) => {
+  test("decorate workflow",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -667,7 +667,7 @@ describe('extension', function () {
     t.assert.deepEqual(state, 6)
   })
 
-  test("register plugin", {only: true}, async (t: TestContext) => {
+  test("register plugin",  async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -709,7 +709,7 @@ describe('extension', function () {
     t.assert.deepEqual(state, 6)
   })
 
-  test("register step in a plugin", {only: true}, async (t) => {
+  test("register step in a plugin",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -755,7 +755,7 @@ describe('extension', function () {
     t.assert.deepEqual(state, 10)
   })
 
-  test("register a plugin without its dependency list", {only: true}, async (t) => {
+  test("register a plugin without its dependency list",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -795,7 +795,7 @@ describe('extension', function () {
     t.assert.deepEqual(state, 2)
   })
 
-  test("register a plugin with dependencies", {only: true}, async (t) => {
+  test("register a plugin with dependencies",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -843,7 +843,7 @@ describe('extension', function () {
     t.assert.deepEqual(state, 3)
   })
 
-  test("register a plugin with options", {only: true}, async (t: TestContext) => {
+  test("register a plugin with options",  async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -884,7 +884,7 @@ describe('extension', function () {
     t.assert.deepStrictEqual(state, "Hello, Daneel!")
   })
 
-  test("register a plugin with a missing dependency throw an error", {only: true}, async (t) => {
+  test("register a plugin with a missing dependency throw an error",  async (t) => {
     const plugin1 = rivrPlugin(w => w, {
       deps: [],
       name: "plugin-1"
@@ -900,7 +900,7 @@ describe('extension', function () {
     )
   })
 
-  test("declare a plugin options as a function", {only: true}, async (t) => {
+  test("declare a plugin options as a function",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -950,7 +950,7 @@ describe('extension', function () {
     t.assert.deepEqual(state, 2)
   })
 
-  test("should not be able to decorate using the property twice", {only: true}, (t) => {
+  test("should not be able to decorate using the property twice",  (t) => {
     // Given
     const workflow = rivr.workflow<number>("complex-calculation")
     workflow.decorate("foo", 1)
@@ -962,7 +962,7 @@ describe('extension', function () {
 })
 
 describe('transaction', function () {
-  test("should be able to execute the write in a transaction", {only: true}, async (t) => {
+  test("should be able to execute the write in a transaction",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -1005,7 +1005,7 @@ describe('transaction', function () {
     t.assert.deepEqual((await engine.client.db(db).collection("another-collection").findOne())?.n, 1)
   })
 
-  test("should be able to trigger a workflow once", {only: true}, async (t: TestContext) => {
+  test("should be able to trigger a workflow once",  async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -1055,7 +1055,7 @@ describe('transaction', function () {
 })
 
 describe('hooks', function () {
-  test("should be able to handle hook failure", {only: true}, async (t) => {
+  test("should be able to handle hook failure",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -1092,7 +1092,7 @@ describe('hooks', function () {
     t.assert.deepEqual(error, "oops")
   })
 
-  test("execute all the handler", {only: true}, async (t: TestContext) => {
+  test("execute all the handler",  async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -1143,7 +1143,7 @@ describe('hooks', function () {
     t.assert.deepStrictEqual(stepCompletedStates, [ 6, 6, 10, 10 ])
   })
 
-  test("execute onWorkflowCompleted hooks in order", {only: true}, async (t: TestContext) => {
+  test("execute onWorkflowCompleted hooks in order",  async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -1195,7 +1195,7 @@ describe('hooks', function () {
     t.assert.deepStrictEqual(elements, [ 1, 2, 3, 4 ])
   })
 
-  test("should be able to execute a hook in the correct context", {only: true}, async (t) => {
+  test("should be able to execute a hook in the correct context",  async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -1270,7 +1270,7 @@ describe("resilience", () => {
     await network.stop()
   })
 
-  test("should be able to survive a mongodb crash", {only: true}, async (t) => {
+  test("should be able to survive a mongodb crash",  async (t) => {
     // Given
     const engine = createEngine({
       url: `mongodb://${proxy.host}:${proxy.port}`,
@@ -1318,7 +1318,7 @@ describe("resilience", () => {
     t.assert.deepEqual(state, 4)
   })
 
-  test("should be able to survive a write error", {only: true}, async (t: TestContext) => {
+  test("should be able to survive a write error",  async (t: TestContext) => {
     // Given
     const engine = createEngine({
       url: `mongodb://${proxy.host}:${proxy.port}`,
