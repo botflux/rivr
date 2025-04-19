@@ -1,0 +1,50 @@
+import { fastifyPlugin } from "fastify-plugin"
+import {Engine, Trigger, Worker} from "../engine.ts";
+import {Workflow} from "../types.ts";
+import {FastifyInstance} from "fastify";
+
+export type RivrObject = {
+  getEngine<TriggerOpts extends Record<never, never>>(): Engine<TriggerOpts>
+  getTrigger<TriggerOpts extends Record<never, never>>(): Trigger<TriggerOpts>
+}
+
+export type FastifyRivrOpts<TriggerOpts extends Record<never, never>> = {
+  engine: Engine<TriggerOpts>
+  workflows: Workflow<any, any>[]
+}
+
+declare module "fastify" {
+  interface FastifyInstance {
+    rivr: RivrObject
+  }
+}
+
+export const fastifyRivr = fastifyPlugin((instance, opts: FastifyRivrOpts<Record<never, never>>) => {
+  let trigger: Trigger<Record<never, never>> | undefined
+  let worker: Worker | undefined
+
+  instance.decorate("rivr", {
+    getEngine<TriggerOpts extends Record<never, never>>() {
+      return opts.engine as Engine<TriggerOpts>
+    },
+    getTrigger<TriggerOpts extends Record<never, never>>() {
+      if (trigger === undefined) {
+        trigger = opts.engine.createTrigger()
+      }
+
+      return trigger as Trigger<TriggerOpts>
+    }
+  })
+
+  instance.addHook("onReady", async function (this: FastifyInstance) {
+    worker = this.rivr.getEngine().createWorker()
+    await worker.start(opts.workflows)
+  })
+
+  instance.addHook("onClose", async function (this: FastifyInstance) {
+    await worker?.stop()
+    await this.rivr.getEngine().close()
+  })
+}, {
+  name: "fastify-rivr",
+})

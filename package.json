@@ -30,10 +30,12 @@
     "@testcontainers/toxiproxy": "^10.22.0",
     "@types/node": "^22.7.4",
     "@types/pg": "^8.11.10",
+    "@types/supertest": "^6.0.3",
     "close-with-grace": "^2.1.0",
     "fastify": "^5.2.1",
     "fastify-plugin": "^5.0.1",
     "mongodb": "^6.9.0",
+    "supertest": "^7.1.0",
     "testcontainers": "^10.13.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.2"
