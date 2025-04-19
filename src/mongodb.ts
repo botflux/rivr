@@ -171,7 +171,7 @@ export class MongoEngine implements Engine<WriteOpts> {
         const storage = new MongoStorage(
             this.client,
             dbName,
-            "tasks",
+            this.#collectionName,
         )
 
         const poller = new Poller(
@@ -188,7 +188,7 @@ export class MongoEngine implements Engine<WriteOpts> {
         const storage = new MongoStorage(
             this.client,
             this.#opts.dbName,
-            "tasks"
+            this.#collectionName
         )
 
         this.#triggerStorage.push(storage)
@@ -200,7 +200,7 @@ export class MongoEngine implements Engine<WriteOpts> {
         const storage = new MongoStorage(
           this.client,
           this.#opts.dbName,
-          "tasks"
+          this.#collectionName
         )
 
         this.#triggerStorage.push(storage)
@@ -224,12 +224,17 @@ export class MongoEngine implements Engine<WriteOpts> {
 
         return this.#client
     }
+
+    get #collectionName(): string {
+        return this.#opts.collectionName ?? "workflow-states"
+    }
 }
 
 export type CreateEngineOpts = {
     url: string
     clientOpts?: MongoClientOptions
     dbName: string
+    collectionName?: string
     signal?: AbortSignal
 
     /**
