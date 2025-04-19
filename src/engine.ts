@@ -1,4 +1,5 @@
 import {Workflow} from "./types.ts";
+import {WorkflowState} from "./pull/state.ts";
 
 export type OnErrorHook = (error: unknown) => void;
 
@@ -16,7 +17,11 @@ export type DefaultTriggerOpts = {
 }
 
 export interface Trigger<TriggerOpts extends Record<never, never>> {
-    trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State, opts?: TriggerOpts & DefaultTriggerOpts): Promise<void>
+    trigger<State, Decorators>(
+      workflow: Workflow<State, Decorators>,
+      state: State,
+      opts?: TriggerOpts & DefaultTriggerOpts
+    ): Promise<WorkflowState<State>>
 }
 
 export interface Engine<TriggerOpts extends Record<never, never>> {

@@ -50,7 +50,7 @@ export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trig
         this.#storage = storage
     }
 
-    async trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State, opts?: TriggerOpts): Promise<void> {
+    async trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State, opts?: TriggerOpts): Promise<WorkflowState<State>> {
         const mFirstStep = workflow.getFirstStep()
 
         if (!mFirstStep) {
@@ -65,6 +65,8 @@ export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trig
                 state: s
             }
         ], opts)
+
+        return s
     }
 }
 

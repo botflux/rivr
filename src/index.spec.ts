@@ -323,6 +323,48 @@ describe('basic flow control', function () {
     t.assert.deepEqual(error, "oops")
     t.assert.deepEqual(state, 4)
   })
+
+  test("should be able to return the workflow state when triggering a workflow", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      dbName: randomUUID(),
+      signal: t.signal,
+      delayBetweenPulls: 10,
+      clientOpts: {
+        directConnection: true
+      }
+    })
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .step({
+        name: "add-1",
+        handler: ({ state }) => state + 1
+      })
+
+    await engine.createWorker().start([ workflow ])
+
+    // When
+    // Then
+    t.assert.deepStrictEqual(await engine.createTrigger().trigger(workflow, 4, { id: "1" }), {
+      id: "1",
+      name: "complex-calculation",
+      status: "in_progress",
+      steps: [
+        {
+          attempts: [],
+          name: "add-1"
+        }
+      ],
+      toExecute: {
+        areRetryExhausted: false,
+        attempt: 1,
+        state: 4,
+        status: "todo",
+        step: "add-1"
+      }
+    })
+  })
 })
 
 describe('advance flow control', function () {
