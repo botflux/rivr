@@ -26,6 +26,7 @@ export interface Storage<WriteOpts> {
       opts: PullOpts
     ): Promise<WorkflowState<State>[]>
     write<State>(writes: Write<State>[], opts?: WriteOpts): Promise<void>
+    findById<State>(id: string): Promise<WorkflowState<State> | undefined>
     disconnect(): Promise<void>
 }
 

@@ -1,5 +1,6 @@
 import {Workflow} from "./types.ts";
 import {WorkflowState} from "./pull/state.ts";
+import { Storage } from "./pull/poller.ts"
 
 export type OnErrorHook = (error: unknown) => void;
 
@@ -27,5 +28,6 @@ export interface Trigger<TriggerOpts extends Record<never, never>> {
 export interface Engine<TriggerOpts extends Record<never, never>> {
     createWorker(): Worker
     createTrigger(): Trigger<TriggerOpts>
+    createStorage(): Storage<TriggerOpts>
     close(): Promise<void>
 }

@@ -133,6 +133,16 @@ class MongoStorage implements Storage<WriteOpts> {
         })
     }
 
+    async findById<State>(id: string): Promise<WorkflowState<State> | undefined> {
+        const mRecord = await this.#collection.findOne({ id })
+
+        if (mRecord === null)
+            return undefined
+
+        const { _id, ...rest } = mRecord
+        return rest as WorkflowState<State>
+    }
+
     async disconnect(): Promise<void> {
         await this.#client.close(true)
     }
@@ -184,6 +194,17 @@ export class MongoEngine implements Engine<WriteOpts> {
         this.#triggerStorage.push(storage)
 
         return new PullTrigger(storage)
+    }
+
+    createStorage(): Storage<WriteOpts> {
+        const storage = new MongoStorage(
+          this.client,
+          this.#opts.dbName,
+          "tasks"
+        )
+
+        this.#triggerStorage.push(storage)
+        return storage
     }
 
     async close(): Promise<void> {

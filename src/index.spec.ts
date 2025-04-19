@@ -1407,6 +1407,64 @@ describe("resilience", () => {
   })
 })
 
+describe('storage', function () {
+  test("should be able to find workflow state by id", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      signal: t.signal,
+      delayBetweenPulls: 10,
+      dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true
+      },
+    })
+
+    let result: number | undefined
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .step({
+        name: "add-1",
+        handler: ({ state }) => state + 1
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+        result = s
+      })
+
+    await engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 1, { id: "1" })
+
+    // Then
+    await waitForPredicate(() => result !== undefined)
+    t.assert.deepStrictEqual(await engine.createStorage().findById("1"), {
+      id: "1",
+      name: "complex-calculation",
+      result: 1,
+      status: "successful",
+      steps: [
+        {
+          attempts: [
+            {
+              id: 1,
+              status: "successful",
+            }
+          ],
+          name: "add-1"
+        }
+      ],
+      toExecute: {
+        areRetryExhausted: false,
+        attempt: 1,
+        state: 1,
+        status: "done",
+        step: "add-1"
+      }
+    })
+  })
+})
+
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {
     let now = new Date().getTime()
     while (!fn() && new Date().getTime() - now < ms) {
