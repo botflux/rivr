@@ -118,6 +118,7 @@ describe('state', function () {
       id,
       name: "calc",
       status: "successful",
+      result: 1,
       toExecute: {
         state: 1,
         status: 'done',

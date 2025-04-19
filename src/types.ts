@@ -61,7 +61,6 @@ export type Plugin<State, Decorators, NewDecorators> = (workflow: Workflow<State
 
 export type WithContext<T, State, Decorators> = [ item: T, context: ReadyWorkflow<State, Decorators> ]
 
-
 export type Workflow<State, Decorators> = {
   /**
    * The name of the workflow.

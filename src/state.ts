@@ -28,6 +28,7 @@ export type WorkflowState<State> = {
   id: string
   name: string
   toExecute: Task<State>
+  result?: State
   status: WorkflowStatus
   steps: StepState[]
 }
@@ -83,7 +84,10 @@ export function updateWorkflowState<State>(state: WorkflowState<State>, step: St
     ...state,
     steps: updatedSteps,
     status: newStatus,
-    toExecute: nextTask
+    toExecute: nextTask,
+    ...newStatus === "successful" && {
+      result: nextTask.state
+    }
   }
 }
 
