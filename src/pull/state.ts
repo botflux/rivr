@@ -1,4 +1,4 @@
-import {Step, StepResult, Workflow} from "./types.ts";
+import {Step, StepResult, Workflow} from "../types.ts";
 import {randomUUID} from "crypto";
 
 export type AttemptStatus = "successful" | "failed" | "skipped" | "stopped"

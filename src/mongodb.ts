@@ -1,5 +1,5 @@
-import {DefaultTriggerOpts, type Engine, type Trigger, type Worker} from "./core.ts";
-import {Poller, PullOpts, PullTrigger, type Storage, type Write} from "./pull.ts";
+import {DefaultTriggerOpts, type Engine, type Trigger, type Worker} from "./engine.ts";
+import {Poller, PullOpts, PullTrigger, type Storage, type Write} from "./pull/poller.ts";
 import {
     type AnyBulkWriteOperation, ClientSession,
     type Collection, Filter,
@@ -7,7 +7,7 @@ import {
     MongoClientOptions
 } from "mongodb"
 import {Step, Workflow} from "./types.ts";
-import {WorkflowState} from "./state.ts";
+import {WorkflowState} from "./pull/state.ts";
 
 type MongoWorkflowState<State> = WorkflowState<State>
 

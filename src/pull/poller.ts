@@ -1,7 +1,7 @@
 import {setTimeout} from "node:timers/promises"
-import {DefaultTriggerOpts, OnErrorHook, type Trigger, type Worker} from "./core.ts"
-import {ReadyWorkflow, Step, StepResult, Workflow} from "./types.ts";
-import {tryCatch, tryCatchSync} from "./inline-catch.ts";
+import {DefaultTriggerOpts, OnErrorHook, type Trigger, type Worker} from "../engine.ts"
+import {ReadyWorkflow, Step, StepResult, Workflow} from "../types.ts";
+import {tryCatch, tryCatchSync} from "../inline-catch.ts";
 import {createWorkflowState, updateWorkflowState, WorkflowState} from "./state.ts";
 
 export type Insert<State> = {

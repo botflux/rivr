@@ -1,5 +1,5 @@
 import {describe, test, TestContext} from "node:test";
-import {rivr} from "./workflow.ts";
+import {rivr} from "../workflow.ts";
 import {createWorkflowState, updateWorkflowState} from "./state.ts";
 import {randomUUID} from "crypto";
 
