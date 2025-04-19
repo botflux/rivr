@@ -11,7 +11,7 @@ import {
     Workflow as PublicWorkflow
 } from "./types.ts";
 import {RivrPlugin} from "./plugin.ts";
-import { List, Slice, ArrayAdapter } from "./slice.ts"
+import { List, Slice, ArrayAdapter } from "./list.ts"
 
 type EmptyDecorator = Record<never, never>
 
