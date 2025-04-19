@@ -44,3 +44,48 @@ await engine.createWorker().start([ workflow ])
 // trigger the workflow with the start value 10.
 await engine.createTrigger().trigger(workflow, 10)
 ```
+
+# Integration with Fastify
+
+```shell
+npm i @rivr/fastify
+```
+
+This package exposes a fastify plugin that starts and stops a worker.
+Also, the plugin attaches a `getTrigger` method allowing you to easily 
+trigger a workflow.
+
+```typescript
+import { fastify } from "fastify"
+import { rivr } from "rivr"
+import { createEngine } from "@rivr/engine-mongodb"
+import { fastifyRivr } from "@rivr/fastify"
+
+const workflow = rivr.workflow<number>("complex-calculation")
+  .step({
+    name: "add-3",
+    handler: ({ state }) => state + 3
+  })
+  .step({
+    name: "multiply-by-4",
+    handler: ({ state }) => state * 4
+  })
+
+const app = fastify()
+  .register(fastifyRivr, {
+    engine: createEngine({
+      url: "mongo://localhost",
+      dbName: "my-db"
+    }),
+    workflows: [ workflow ]
+  })
+
+app.route({
+  url: "/",
+  method: "GET",
+  handler: async (req, res) => {
+    await request.server.rivr.getTrigger().trigger(workflow, 7)
+  }
+})
+
+```
