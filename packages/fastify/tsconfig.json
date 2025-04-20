@@ -113,7 +113,10 @@
   "references": [
     {
     "path": "../core/tsconfig.json"
-  }
+  },
+    {
+      "path": "../fastify/tsconfig.json"
+    }
   ],
   "exclude": ["node_modules", "dist"]
 }

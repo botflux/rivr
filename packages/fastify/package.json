@@ -4,10 +4,14 @@
   "description": "Fastify plugin for Rivr",
   "main": "dist/plugin.js",
   "devDependencies": {
+    "@testcontainers/mongodb": "^10.24.2",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.0",
+    "testcontainers": "^10.24.2",
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node -r ts-node/register --test $(find . -name \"*.spec.ts\")"
   },
   "repository": {
     "type": "git",
