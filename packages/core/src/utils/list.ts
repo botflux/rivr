@@ -81,4 +81,3 @@ export class Slice<T> implements List<T> {
     return this.appendIndex
   }
 }
-

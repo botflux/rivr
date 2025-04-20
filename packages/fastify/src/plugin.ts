@@ -1,6 +1,6 @@
 import { fastifyPlugin } from "fastify-plugin"
-import {Engine, Trigger, Worker} from "../engine.ts";
-import {Workflow} from "../types.ts";
+import {Engine, Trigger, Worker} from "rivr";
+import {Workflow} from "rivr";
 import {FastifyInstance} from "fastify";
 
 export type RivrObject = {

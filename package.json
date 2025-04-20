@@ -4,11 +4,8 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "test": "node --test -r ts-node/register $(find . -name \"*.spec.ts\")",
-    "test:only": "node --test -r ts-node/register --test-only $(find . -name \"*.spec.ts\")",
-    "typecheck": "tsc --noEmit",
-    "sandbox": "ts-node ./src/sandbox.ts",
-    "test:mongodb": "node -r ts-node/register --test --test-timeout 80000000 \"./src/mongodb/engine.test.ts\""
+    "build": "tsc --build --clean && tsc --build",
+    "typecheck": "tsc --build --noEmit"
   },
   "repository": {
     "type": "git",
@@ -24,24 +21,13 @@
   },
   "homepage": "https://github.com/botflux/workflow#readme",
   "devDependencies": {
-    "@fastify/mongodb": "^9.0.2",
-    "@testcontainers/mongodb": "^10.13.1",
-    "@testcontainers/postgresql": "^10.13.2",
-    "@testcontainers/toxiproxy": "^10.22.0",
-    "@types/node": "^22.7.4",
-    "@types/pg": "^8.11.10",
-    "@types/supertest": "^6.0.3",
-    "close-with-grace": "^2.1.0",
-    "fastify": "^5.2.1",
-    "fastify-plugin": "^5.0.1",
-    "mongodb": "^6.9.0",
-    "supertest": "^7.1.0",
-    "testcontainers": "^10.13.1",
-    "ts-node": "^10.9.2",
     "typescript": "^5.6.2"
   },
   "dependencies": {
-    "pg": "^8.13.0",
-    "pino-std-serializers": "^7.0.0"
-  }
+  },
+  "workspaces": [
+    "packages/core",
+    "packages/engine-mongodb",
+    "packages/fastify"
+  ]
 }

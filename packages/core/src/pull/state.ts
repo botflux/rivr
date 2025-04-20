@@ -1,4 +1,4 @@
-import {Step, StepResult, Workflow} from "../types.ts";
+import {Step, StepResult, Workflow} from "../types";
 import {randomUUID} from "crypto";
 
 export type AttemptStatus = "successful" | "failed" | "skipped" | "stopped"
@@ -67,7 +67,7 @@ export function createWorkflowState<State>(workflow: Workflow<State, Record<neve
 export function updateWorkflowState<State>(state: WorkflowState<State>, step: Step<State, any>, result: StepResult<State>, now = new Date()): WorkflowState<State> {
   const stepStateIndex = state.steps.findIndex(s => s.name === step.name)
   const stepState = state.steps[stepStateIndex]
-  
+
   if (stepStateIndex === -1) {
     throw new Error("Not implemented at line 54 in state.ts")
   }
@@ -164,13 +164,13 @@ function getNextTask<State>(state: WorkflowState<State>, step: Step<State, unkno
 
       if (areRetryExhausted && optional) {
         if (mNextStep === undefined) {
-         return [
-           {
-             ...state.toExecute,
-             status: "done"
-           },
-           "successful"
-         ]
+          return [
+            {
+              ...state.toExecute,
+              status: "done"
+            },
+            "successful"
+          ]
         }
 
         return [

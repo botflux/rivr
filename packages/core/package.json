@@ -1,0 +1,26 @@
+{
+  "name": "rivr",
+  "version": "0.0.0",
+  "description": "Async workflow library built on top of your database",
+  "main": "dist/index.js",
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/botflux/rivr.git"
+  },
+  "keywords": [
+    "async",
+    "workflow"
+  ],
+  "author": "botflux",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/botflux/rivr/issues"
+  },
+  "homepage": "https://github.com/botflux/rivr#readme"
+}
