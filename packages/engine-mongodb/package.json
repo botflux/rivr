@@ -4,11 +4,14 @@
   "description": "MongoDB engine that runs Rivr workflows",
   "main": "dist/mongodb.js",
   "devDependencies": {
+    "@testcontainers/mongodb": "^10.24.2",
+    "@testcontainers/toxiproxy": "^10.24.2",
     "@types/node": "^22.14.1",
+    "testcontainers": "^10.24.2",
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node -r ts-node/register --test $(find . -name \"*.spec.ts\")"
   },
   "repository": {
     "type": "git",
