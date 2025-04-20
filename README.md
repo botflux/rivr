@@ -1,91 +1,91 @@
 # Rivr
 
-An async workflow library that sits on top of your project's database.
+Rivr is a TypeScript/JavaScript library for managing asynchronous workflows in a simple and efficient way. Unlike traditional systems that rely on message queues, Rivr uses standard databases (such as MongoDB) to manage task queues and workflow states.
 
-With Rivr, you can create async workflows without introducing a complex messaging system
-such as Kafka, or RabbitMQ.
+## Features
 
-Rivr also provide a nice, high-level abstraction to execute complex async workflow.
+- **Asynchronous workflows**: Define workflows composed of multiple steps.
+- **State management**: Automatically track workflow states in a database.
+- **Custom hooks**: Add hooks to react to specific events in the workflow lifecycle.
+- **Easy integration**: Compatible with databases like MongoDB.
+- **Extensible**: Add your own steps and handlers to meet specific needs.
 
-Because Rivr is built on top of your data&base, you can trigger workflow, and persist your domain data using the 
-same transaction.
+## Core concepts
 
-# Quick start
+- **Workflow**: A sequence of steps that define a process.
+- **Step**: A single unit of work within a workflow.
+- **Engine**: The core component that manages the execution of workflows and their steps. This is the database-specific component.
 
-Rivr decouples your workflow from the engine (the DB abstraction) it runs on top.
-The following example shows a workflow made of three steps, each executed one after the other.
+## Installation
 
-```typescript
-import { rivr } from "rivr"
-import { createEngine } from "@rivr/engine-mongodb"
-
-const workflow = rivr.workflow<number>("complex-calculation")
-  .step({
-    name: "add-3",
-    handler: ({ state }) => state + 3
-  })
-  .step({
-    name: "multiply-by-4",
-    handler: ({ state }) => state * 4
-  })
-  .step({
-    name: "save-result",
-    handler: async ({ state }) => await saveResultInDb(state) 
-  })
-
-const engine = createEngine({
-  url: "mongo://localhost",
-  dbName: "my-db",
-})
-
-// starts an infinite loop that will pull new workflow tasks periodically.
-await engine.createWorker().start([ workflow ])
-
-// trigger the workflow with the start value 10.
-await engine.createTrigger().trigger(workflow, 10)
+```bash
+npm install rivr
 ```
 
-# Integration with Fastify
+### MongoDB engine
+
+```shell
+npm i @rivr/mongodb
+```
+
+### Fastify integration
+
+You can integrate Rivr to your fastify project thanks to the fastify rivr plugin.
 
 ```shell
 npm i @rivr/fastify
 ```
 
-This package exposes a fastify plugin that starts and stops a worker.
-Also, the plugin attaches a `getTrigger` method allowing you to easily 
-trigger a workflow.
+#### Quick example
 
 ```typescript
 import { fastify } from "fastify"
 import { rivr } from "rivr"
-import { createEngine } from "@rivr/engine-mongodb"
+import { createEngine } from "@rivr/mongodb"
 import { fastifyRivr } from "@rivr/fastify"
 
-const workflow = rivr.workflow<number>("complex-calculation")
+const myWorkflow = rivr.workflow<number>("my-workflow")
   .step({
-    name: "add-3",
-    handler: ({ state }) => state + 3
-  })
-  .step({
-    name: "multiply-by-4",
-    handler: ({ state }) => state * 4
+    name: "add-1",
+    handler: ({ state }) => state + 1
   })
 
 const app = fastify()
   .register(fastifyRivr, {
     engine: createEngine({
-      url: "mongo://localhost",
-      dbName: "my-db"
+      uri: "mongodb://localhost:27017",
+      dbName: "my-db",
     }),
-    workflows: [ workflow ]
+    workflows: [ myWorkflow ]
   })
 
 app.route({
-  url: "/",
   method: "GET",
+  url: "/",
   handler: async (req, res) => {
-    await request.server.rivr.getTrigger().trigger(workflow, 7)
+    await app.rivr.getTrigger().trigger(myWorkflow, 10)
   }
 })
 
+await app.listen({
+  host: "0.0.0.0",
+  port: 3000
+})
 ```
+
+#### Fastify plugin options
+
+```typescript
+export type FastifyRivrOpts<TriggerOpts extends Record<never, never>> = {
+  /**
+   * An engine instance that will be used to create the trigger and worker.
+   */
+  engine: Engine<TriggerOpts>
+  /**
+   * Workflows to be started by the worker.
+   */
+  workflows: Workflow<any, any>[]
+}
+```
+
+

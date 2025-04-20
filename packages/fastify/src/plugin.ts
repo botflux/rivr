@@ -5,11 +5,21 @@ import {FastifyInstance} from "fastify";
 
 export type RivrObject = {
   getEngine<TriggerOpts extends Record<never, never>>(): Engine<TriggerOpts>
+
+  /**
+   * Get the shared trigger instance.
+   */
   getTrigger<TriggerOpts extends Record<never, never>>(): Trigger<TriggerOpts>
 }
 
 export type FastifyRivrOpts<TriggerOpts extends Record<never, never>> = {
+  /**
+   * An engine instance that will be used to create the trigger and worker.
+   */
   engine: Engine<TriggerOpts>
+  /**
+   * Workflows to be started by the worker.
+   */
   workflows: Workflow<any, any>[]
 }
 
