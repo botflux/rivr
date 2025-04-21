@@ -182,7 +182,7 @@ function createRootWorkflow<State> (name: string) {
         }
       }
     },
-    getStepAndExecutionContext(name: string): WithContext<Step<State, EmptyDecorator>, State, EmptyDecorator> | undefined {
+    getStepByName(name: string): WithContext<Step<State, EmptyDecorator>, State, EmptyDecorator> | undefined {
       for (const node of this.list) {
         if (node.type === "step" && node.step.name === name) {
           return [ node.step, node.context ]

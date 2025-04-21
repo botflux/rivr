@@ -77,7 +77,7 @@ export type Workflow<State, Decorators> = {
    *
    * @param name
    */
-  getStepAndExecutionContext(name: string): WithContext<Step<State, Decorators>, State, Decorators> | undefined
+  getStepByName(name: string): WithContext<Step<State, Decorators>, State, Decorators> | undefined
 
   /**
    * Search the step succeeding the step matching the given name.
