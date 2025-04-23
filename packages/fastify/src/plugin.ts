@@ -20,7 +20,7 @@ export type FastifyRivrOpts<TriggerOpts extends Record<never, never>> = {
   /**
    * Workflows to be started by the worker.
    */
-  workflows: Workflow<any, any>[]
+  workflows: Workflow<any, any, any>[]
 }
 
 declare module "fastify" {

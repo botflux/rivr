@@ -867,6 +867,8 @@ describe('extension', function () {
     const workflow = rivr.workflow<number>("complex-calculation")
       .register(pluginA)
       .register(pluginB)
+
+    workflow
       .step({
         name: "add-bar",
         handler: ({ state, workflow }) => state + workflow.bar

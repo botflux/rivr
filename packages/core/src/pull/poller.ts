@@ -21,8 +21,8 @@ export type PullOpts = {
 }
 
 export interface Storage<WriteOpts> {
-  pull<State, Decorators>(
-    workflows: Workflow<State, Decorators>[],
+  pull<State, Decorators, FirstState>(
+    workflows: Workflow<State, FirstState, Decorators>[],
     opts: PullOpts
   ): Promise<WorkflowState<State>[]>
   write<State>(writes: Write<State>[], opts?: WriteOpts): Promise<void>
@@ -51,14 +51,14 @@ export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trig
     this.#storage = storage
   }
 
-  async trigger<State, Decorators>(workflow: Workflow<State, Decorators>, state: State, opts?: TriggerOpts): Promise<WorkflowState<State>> {
+  async trigger<State, FirstState, Decorators>(workflow: Workflow<State, FirstState, Decorators>, state: State, opts?: TriggerOpts): Promise<WorkflowState<State>> {
     const mFirstStep = workflow.getFirstStep()
 
     if (!mFirstStep) {
       throw new Error("Cannot trigger a workflow that has no step")
     }
 
-    const s = createWorkflowState(workflow as unknown as Workflow<State, Record<never, never>>, state, opts?.id)
+    const s = createWorkflowState(workflow as unknown as Workflow<State, FirstState, Record<never, never>>, state, opts?.id)
 
     await this.#storage.write([
       {
@@ -91,7 +91,7 @@ export class Poller<TriggerOpts> implements Worker {
     this.#countPerPull = countPerPull
   }
 
-  async start<State, Decorators>(workflows: Workflow<State, Decorators>[]): Promise<void> {
+  async start<State, FirstState, Decorators>(workflows: Workflow<State, FirstState, Decorators>[]): Promise<void> {
     const readyWorkflows = await Promise.all(workflows.map(async workflow => workflow.ready()))
 
     ;(async () => {
@@ -236,10 +236,10 @@ export class Poller<TriggerOpts> implements Worker {
     await this.#storage.disconnect()
   }
 
-  async #handleStep<State, Decorators>(
-    step: Step<State, Decorators>,
+  async #handleStep<State, FirstState, Decorators>(
+    step: Step<State, FirstState, Decorators>,
     state: WorkflowState<State>,
-    workflow: ReadyWorkflow<State, Decorators>
+    workflow: ReadyWorkflow<State, FirstState, Decorators>
   ): Promise<StepResult<State>> {
     try {
       const nextStateOrResult = await step.handler({
