@@ -115,7 +115,7 @@
     "path": "../core/tsconfig.json"
   },
     {
-      "path": "../fastify/tsconfig.json"
+      "path": "../engine-mongodb/tsconfig.json"
     }
   ],
   "exclude": ["node_modules", "dist"]

@@ -109,7 +109,7 @@ export class Poller<TriggerOpts> implements Worker {
           if (!mWorkflow)
             continue
 
-          const mStepAndContext = mWorkflow.getStepAndExecutionContext(task.toExecute.step)
+          const mStepAndContext = mWorkflow.getStepByName(task.toExecute.step)
 
           if (!mStepAndContext)
             continue
