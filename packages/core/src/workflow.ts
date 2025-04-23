@@ -143,7 +143,7 @@ function createRootWorkflow<State> (name: string) {
       // }, (this as Workflow<State>).node)
       return this
     },
-    step(opts: StepOpts<State, EmptyDecorator>) {
+    step<Name extends string>(opts: StepOpts<Name, State, EmptyDecorator>) {
       const {
         delayBetweenAttempts = 0,
         optional = false,

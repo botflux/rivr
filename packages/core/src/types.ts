@@ -36,8 +36,8 @@ export type Step<State, Decorators> = {
   delayBetweenAttempts: number | ((attempt: number) => number)
 }
 
-export type StepOpts<State, Decorators> = {
-  name: string
+export type StepOpts<Name extends string, State, Decorators> = {
+  name: Name
   handler: Handler<State, Decorators>
   maxAttempts?: number
   delayBetweenAttempts?: number | ((attempt: number) => number)
@@ -116,7 +116,7 @@ export type Workflow<State, Decorators> = {
    *
    * @param opts
    */
-  step(opts: StepOpts<State, Decorators>): Workflow<State, Decorators>
+  step<Name extends string>(opts: StepOpts<Name, State, Decorators>): Workflow<State, Decorators>
 
   /**
    * Hook on workflow completed.
