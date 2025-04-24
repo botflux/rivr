@@ -51,7 +51,11 @@ export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trig
     this.#storage = storage
   }
 
-  async trigger<State, FirstState, StateByStepName extends Record<never, never>, Decorators>(workflow: Workflow<State, FirstState, StateByStepName, Decorators>, state: State, opts?: TriggerOpts): Promise<WorkflowState<State>> {
+  async trigger<State, FirstState, StateByStepName extends Record<never, never>, Decorators>(
+    workflow: Workflow<State, FirstState, StateByStepName, Decorators>,
+    state: FirstState,
+    opts?: TriggerOpts
+  ): Promise<WorkflowState<State>> {
     const mFirstStep = workflow.getFirstStep()
 
     if (!mFirstStep) {
@@ -117,7 +121,7 @@ export class Poller<TriggerOpts> implements Worker {
           const [step, executionContext] = mStepAndContext
 
           const result = await this.#handleStep(step, task, executionContext)
-          const newState = updateWorkflowState(task, step, result)
+          const newState = updateWorkflowState(task, step as Step<unknown, unknown, FirstState, StateByStepName, Decorators>, result)
 
           await this.#write([
             {
@@ -157,7 +161,7 @@ export class Poller<TriggerOpts> implements Worker {
               }
 
               for (const [handler, context] of mWorkflow.getHook("onStepCompleted")) {
-                const [, error] = tryCatchSync(() => handler(context, step, newState))
+                const [, error] = tryCatchSync(() => handler(context, step, newState as State))
 
                 if (error !== undefined) {
                   this.#executeErrorHooks(error)
@@ -166,7 +170,7 @@ export class Poller<TriggerOpts> implements Worker {
 
               if (mNextStep === undefined) {
                 for (const [handler, context] of mWorkflow.getHook("onWorkflowCompleted")) {
-                  const [ , err ] = tryCatchSync(() => handler.call(context, context, newState))
+                  const [ , err ] = tryCatchSync(() => handler.call(context, context, newState as State))
 
                   if (err !== undefined) {
                     this.#executeErrorHooks(err)
@@ -236,11 +240,11 @@ export class Poller<TriggerOpts> implements Worker {
     await this.#storage.disconnect()
   }
 
-  async #handleStep<State, FirstState, StateByStepName extends Record<never, never>, Decorators>(
-    step: Step<State, FirstState, StateByStepName, Decorators>,
+  async #handleStep<State, StateOut, FirstState, StateByStepName extends Record<never, never>, Decorators>(
+    step: Step<State, StateOut, FirstState, StateByStepName, Decorators>,
     state: WorkflowState<State>,
     workflow: ReadyWorkflow<State, FirstState, StateByStepName, Decorators>
-  ): Promise<StepResult<State>> {
+  ): Promise<StepResult<StateOut>> {
     try {
       const nextStateOrResult = await step.handler({
         state: state.toExecute.state,

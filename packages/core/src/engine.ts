@@ -20,7 +20,7 @@ export type DefaultTriggerOpts = {
 export interface Trigger<TriggerOpts extends Record<never, never>> {
   trigger<State, FirstState, StateByStepName extends Record<never, never>, Decorators>(
     workflow: Workflow<State, FirstState, StateByStepName, Decorators>,
-    state: State,
+    state: FirstState,
     opts?: TriggerOpts & DefaultTriggerOpts
   ): Promise<WorkflowState<State>>
 }
