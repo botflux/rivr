@@ -176,10 +176,10 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
       // }, this.node)
       return this as unknown as Workflow<StateOut, FirstState, StateByStepName & Record<Name, State>>
     },
-    getFirstStep(): Step<State, unknown, FirstState, StateByStepName, EmptyDecorator> | undefined {
+    getFirstStep(): Step<FirstState, unknown, FirstState, StateByStepName, EmptyDecorator> | undefined {
       for (const node of this.list) {
         if (node.type === "step") {
-          return node.step as Step<State, unknown, FirstState, StateByStepName, EmptyDecorator>
+          return node.step as unknown as Step<FirstState, unknown, FirstState, StateByStepName, EmptyDecorator>
         }
       }
     },

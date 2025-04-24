@@ -69,7 +69,7 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
    * Get this workflow's first step.
    * Returns `undefined` if the workflow is empty.
    */
-  getFirstStep(): Step<State, unknown, FirstState, StateByStepName, Decorators> | undefined
+  getFirstStep(): Step<FirstState, unknown, FirstState, StateByStepName, Decorators> | undefined
 
   /**
    * Get a step, and its execution context, from its name.
