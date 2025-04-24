@@ -4,7 +4,7 @@ import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongo
 import { randomUUID } from "crypto"
 import { setTimeout } from "timers/promises"
 import { createEngine } from "./mongodb"
-import { rivr, rivrPlugin } from "rivr"
+import { rivr } from "rivr"
 import {Network, StartedNetwork} from "testcontainers";
 import {CreatedProxy, StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
 import {MongoBulkWriteError} from "mongodb";
@@ -789,290 +789,290 @@ describe('extension', function () {
     t.assert.deepEqual(state, 6)
   })
 
-  test("register plugin",  async (t: TestContext) => {
-    // Given
-    const engine = createEngine({
-      url: container.getConnectionString(),
-      clientOpts: {
-        directConnection: true
-      },
-      dbName: randomUUID(),
-      signal: t.signal,
-      delayBetweenPulls: 10
-    })
-
-    let hookExecuted = false
-    let state
-    let errors: unknown[] = []
-
-    const workflow = rivr.workflow<number>("complex-calculation")
-      .register(workflow => workflow.decorate("add", (x: number, y: number) => x + y))
-      .step({
-        name: "add-3",
-        handler: ({ state, workflow }) => workflow.add(state, 3)
-      })
-      .addHook("onWorkflowCompleted", (w, s) => {
-        hookExecuted = true
-        state = s
-      })
-      .addHook("onStepError", error => errors.push(error))
-
-    await engine.createWorker().start([ workflow ])
-
-    // When
-    await engine.createTrigger().trigger(workflow, 3)
-
-    // Then
-    let now = new Date().getTime()
-    while (!hookExecuted && new Date().getTime() - now < 5_000) {
-      await setTimeout(20)
-      t.assert.deepStrictEqual(errors, [])
-    }
-    t.assert.deepEqual(state, 6)
-  })
-
-  test("register step in a plugin",  async (t) => {
-    // Given
-    const engine = createEngine({
-      url: container.getConnectionString(),
-      clientOpts: {
-        directConnection: true
-      },
-      dbName: randomUUID(),
-      signal: t.signal,
-      delayBetweenPulls: 10
-    })
-
-    let hookExecuted = false
-    let state: number | undefined
-
-    const workflow = rivr.workflow<number>("complex-calculation")
-      .step({
-        name: "divide-by-2",
-        handler: ({ state }) => state / 2
-      })
-      .register(workflow => workflow
-        .decorate("add", (x: number, y: number) => x + y)
-        .step({
-          name: "add-3",
-          handler: ({ state, workflow }) => workflow.add(state, 3)
-        })
-      )
-      .step({
-        name: "multiply-by-2",
-        handler: ({ state }) => state * 2
-      })
-      .addHook("onWorkflowCompleted", (w, s) => {
-        hookExecuted = true
-        state = s
-      })
-
-    await engine.createWorker().start([ workflow ])
-
-    // When
-    await engine.createTrigger().trigger(workflow, 4)
-
-    // Then
-    await waitForPredicate(() => state !== undefined)
-    t.assert.deepEqual(state, 10)
-  })
-
-  test("register a plugin without its dependency list",  async (t) => {
-    // Given
-    const engine = createEngine({
-      url: container.getConnectionString(),
-      signal: t.signal,
-      dbName: randomUUID(),
-      clientOpts: {
-        directConnection: true
-      },
-      delayBetweenPulls: 10
-    })
-
-    const pluginA = rivrPlugin(function pluginA(w) {
-      return w.decorate("foo", 1)
-    }, {
-      name: "plugin-a"
-    })
-
-    let state: number | undefined
-
-    const workflow = rivr.workflow<number>("complex-calculation")
-      .register(pluginA)
-      .step({
-        name: "add-bar",
-        handler: ({ state, workflow }) => state + workflow.foo
-      })
-      .addHook("onWorkflowCompleted", (w, s) => {
-        state = s
-      })
-
-    await engine.createWorker().start([ workflow ])
-
-    // When
-    await engine.createTrigger().trigger(workflow, 1)
-
-    // Then
-    await waitForPredicate(() => state !== undefined)
-    t.assert.deepEqual(state, 2)
-  })
-
-  test("register a plugin with dependencies",  async (t) => {
-    // Given
-    const engine = createEngine({
-      url: container.getConnectionString(),
-      signal: t.signal,
-      dbName: randomUUID(),
-      clientOpts: {
-        directConnection: true
-      },
-      delayBetweenPulls: 10
-    })
-
-    const pluginA = rivrPlugin(function pluginA(w) {
-      return w.decorate("foo", 1)
-    }, {
-      deps: [],
-      name: "plugin-a"
-    })
-    const pluginB = rivrPlugin(function pluginB(w) {
-      return w.decorate("bar", w.foo + 1)
-    }, {
-      deps: [ pluginA ],
-      name: "plugin-b"
-    })
-
-    let state: number | undefined
-
-    const workflow = rivr.workflow<number>("complex-calculation")
-      .register(pluginA)
-      .register(pluginB)
-
-    workflow
-      .step({
-        name: "add-bar",
-        handler: ({ state, workflow }) => state + workflow.bar
-      })
-      .addHook("onWorkflowCompleted", (w, s) => {
-        state = s
-      })
-
-    await engine.createWorker().start([ workflow ])
-
-    // When
-    await engine.createTrigger().trigger(workflow, 1)
-
-    // Then
-    await waitForPredicate(() => state !== undefined)
-    t.assert.deepEqual(state, 3)
-  })
-
-  test("register a plugin with options",  async (t: TestContext) => {
-    // Given
-    const engine = createEngine({
-      url: container.getConnectionString(),
-      signal: t.signal,
-      dbName: randomUUID(),
-      clientOpts: {
-        directConnection: true
-      },
-      delayBetweenPulls: 10
-    })
-
-    const greetPlugin = rivrPlugin((w, opts: { name: string }) => w.decorate("greet", function () {
-      return `Hello, ${opts.name}!`
-    }), {
-      name: "greet-plugin",
-      deps: []
-    })
-
-    let state: string | undefined
-
-    const workflow = rivr.workflow<string>("complex-calculation")
-      .register(greetPlugin, {
-        name: "Daneel"
-      })
-      .step({
-        name: "step-1",
-        handler: ({ workflow }) => workflow.greet()
-      })
-      .addHook("onWorkflowCompleted", (w, s) => state = s)
-
-    await engine.createWorker().start([ workflow ])
-
-    // When
-    await engine.createTrigger().trigger(workflow, "")
-
-    // Then
-    await waitForPredicate(() => state !== undefined)
-    t.assert.deepStrictEqual(state, "Hello, Daneel!")
-  })
-
-  test("register a plugin with a missing dependency throw an error",  async (t) => {
-    const plugin1 = rivrPlugin(w => w, {
-      deps: [],
-      name: "plugin-1"
-    })
-    const plugin2 = rivrPlugin(w => w, {
-      deps: [ plugin1 ],
-      name: "plugin-2"
-    })
-
-    await t.assert.rejects(
-      rivr.workflow("my-workflow").register(plugin2).ready(),
-      new Error(`Plugin "plugin-2" needs "plugin-1" to be registered`)
-    )
-  })
-
-  test("declare a plugin options as a function",  async (t) => {
-    // Given
-    const engine = createEngine({
-      url: container.getConnectionString(),
-      signal: t.signal,
-      dbName: randomUUID(),
-      clientOpts: {
-        directConnection: true
-      },
-      delayBetweenPulls: 10
-    })
-
-    const plugin0 = rivrPlugin(function plugin0(w) {
-      return w.decorate("fooFromPlugin0", 1)
-    }, {
-      name: "plugin-0"
-    })
-
-    const plugin1 = rivrPlugin((w, opts: { foo: number }) => {
-      return w.decorate("foo", opts.foo)
-    }, {
-      name: "plugin-1",
-      deps: [ plugin0]
-    })
-
-    let state: number | undefined
-
-    const workflow = rivr.workflow<number>("complex-calculation")
-      .register(plugin0)
-      .register(plugin1, w => ({
-        foo: w.fooFromPlugin0
-      }))
-      .step({
-        name: "my-step",
-        handler: ctx => ctx.workflow.foo + 1
-      })
-      .addHook("onWorkflowCompleted", (w, s) => {
-        state = s
-      })
-
-    await engine.createWorker().start([ workflow ])
-
-    // When
-    await engine.createTrigger().trigger(workflow, 1)
-
-    // Then
-    await waitForPredicate(() => state !== undefined)
-    t.assert.deepEqual(state, 2)
-  })
+  // test("register plugin",  async (t: TestContext) => {
+  //   // Given
+  //   const engine = createEngine({
+  //     url: container.getConnectionString(),
+  //     clientOpts: {
+  //       directConnection: true
+  //     },
+  //     dbName: randomUUID(),
+  //     signal: t.signal,
+  //     delayBetweenPulls: 10
+  //   })
+  //
+  //   let hookExecuted = false
+  //   let state
+  //   let errors: unknown[] = []
+  //
+  //   const workflow = rivr.workflow<number>("complex-calculation")
+  //     .register(workflow => workflow.decorate("add", (x: number, y: number) => x + y))
+  //     .step({
+  //       name: "add-3",
+  //       handler: ({ state, workflow }) => workflow.add(state, 3)
+  //     })
+  //     .addHook("onWorkflowCompleted", (w, s) => {
+  //       hookExecuted = true
+  //       state = s
+  //     })
+  //     .addHook("onStepError", error => errors.push(error))
+  //
+  //   await engine.createWorker().start([ workflow ])
+  //
+  //   // When
+  //   await engine.createTrigger().trigger(workflow, 3)
+  //
+  //   // Then
+  //   let now = new Date().getTime()
+  //   while (!hookExecuted && new Date().getTime() - now < 5_000) {
+  //     await setTimeout(20)
+  //     t.assert.deepStrictEqual(errors, [])
+  //   }
+  //   t.assert.deepEqual(state, 6)
+  // })
+  //
+  // test("register step in a plugin",  async (t) => {
+  //   // Given
+  //   const engine = createEngine({
+  //     url: container.getConnectionString(),
+  //     clientOpts: {
+  //       directConnection: true
+  //     },
+  //     dbName: randomUUID(),
+  //     signal: t.signal,
+  //     delayBetweenPulls: 10
+  //   })
+  //
+  //   let hookExecuted = false
+  //   let state: number | undefined
+  //
+  //   const workflow = rivr.workflow<number>("complex-calculation")
+  //     .step({
+  //       name: "divide-by-2",
+  //       handler: ({ state }) => state / 2
+  //     })
+  //     .register(workflow => workflow
+  //       .decorate("add", (x: number, y: number) => x + y)
+  //       .step({
+  //         name: "add-3",
+  //         handler: ({ state, workflow }) => workflow.add(state, 3)
+  //       })
+  //     )
+  //     .step({
+  //       name: "multiply-by-2",
+  //       handler: ({ state }) => state * 2
+  //     })
+  //     .addHook("onWorkflowCompleted", (w, s) => {
+  //       hookExecuted = true
+  //       state = s
+  //     })
+  //
+  //   await engine.createWorker().start([ workflow ])
+  //
+  //   // When
+  //   await engine.createTrigger().trigger(workflow, 4)
+  //
+  //   // Then
+  //   await waitForPredicate(() => state !== undefined)
+  //   t.assert.deepEqual(state, 10)
+  // })
+  //
+  // test("register a plugin without its dependency list",  async (t) => {
+  //   // Given
+  //   const engine = createEngine({
+  //     url: container.getConnectionString(),
+  //     signal: t.signal,
+  //     dbName: randomUUID(),
+  //     clientOpts: {
+  //       directConnection: true
+  //     },
+  //     delayBetweenPulls: 10
+  //   })
+  //
+  //   const pluginA = rivrPlugin(function pluginA(w) {
+  //     return w.decorate("foo", 1)
+  //   }, {
+  //     name: "plugin-a"
+  //   })
+  //
+  //   let state: number | undefined
+  //
+  //   const workflow = rivr.workflow<number>("complex-calculation")
+  //     .register(pluginA)
+  //     .step({
+  //       name: "add-bar",
+  //       handler: ({ state, workflow }) => state + workflow.foo
+  //     })
+  //     .addHook("onWorkflowCompleted", (w, s) => {
+  //       state = s
+  //     })
+  //
+  //   await engine.createWorker().start([ workflow ])
+  //
+  //   // When
+  //   await engine.createTrigger().trigger(workflow, 1)
+  //
+  //   // Then
+  //   await waitForPredicate(() => state !== undefined)
+  //   t.assert.deepEqual(state, 2)
+  // })
+  //
+  // test("register a plugin with dependencies",  async (t) => {
+  //   // Given
+  //   const engine = createEngine({
+  //     url: container.getConnectionString(),
+  //     signal: t.signal,
+  //     dbName: randomUUID(),
+  //     clientOpts: {
+  //       directConnection: true
+  //     },
+  //     delayBetweenPulls: 10
+  //   })
+  //
+  //   const pluginA = rivrPlugin(function pluginA(w) {
+  //     return w.decorate("foo", 1)
+  //   }, {
+  //     deps: [],
+  //     name: "plugin-a"
+  //   })
+  //   const pluginB = rivrPlugin(function pluginB(w) {
+  //     return w.decorate("bar", w.foo + 1)
+  //   }, {
+  //     deps: [ pluginA ],
+  //     name: "plugin-b"
+  //   })
+  //
+  //   let state: number | undefined
+  //
+  //   const workflow = rivr.workflow<number>("complex-calculation")
+  //     .register(pluginA)
+  //     .register(pluginB)
+  //
+  //   workflow
+  //     .step({
+  //       name: "add-bar",
+  //       handler: ({ state, workflow }) => state + workflow.bar
+  //     })
+  //     .addHook("onWorkflowCompleted", (w, s) => {
+  //       state = s
+  //     })
+  //
+  //   await engine.createWorker().start([ workflow ])
+  //
+  //   // When
+  //   await engine.createTrigger().trigger(workflow, 1)
+  //
+  //   // Then
+  //   await waitForPredicate(() => state !== undefined)
+  //   t.assert.deepEqual(state, 3)
+  // })
+  //
+  // test("register a plugin with options",  async (t: TestContext) => {
+  //   // Given
+  //   const engine = createEngine({
+  //     url: container.getConnectionString(),
+  //     signal: t.signal,
+  //     dbName: randomUUID(),
+  //     clientOpts: {
+  //       directConnection: true
+  //     },
+  //     delayBetweenPulls: 10
+  //   })
+  //
+  //   const greetPlugin = rivrPlugin((w, opts: { name: string }) => w.decorate("greet", function () {
+  //     return `Hello, ${opts.name}!`
+  //   }), {
+  //     name: "greet-plugin",
+  //     deps: []
+  //   })
+  //
+  //   let state: string | undefined
+  //
+  //   const workflow = rivr.workflow<string>("complex-calculation")
+  //     .register(greetPlugin, {
+  //       name: "Daneel"
+  //     })
+  //     .step({
+  //       name: "step-1",
+  //       handler: ({ workflow }) => workflow.greet()
+  //     })
+  //     .addHook("onWorkflowCompleted", (w, s) => state = s)
+  //
+  //   await engine.createWorker().start([ workflow ])
+  //
+  //   // When
+  //   await engine.createTrigger().trigger(workflow, "")
+  //
+  //   // Then
+  //   await waitForPredicate(() => state !== undefined)
+  //   t.assert.deepStrictEqual(state, "Hello, Daneel!")
+  // })
+  //
+  // test("register a plugin with a missing dependency throw an error",  async (t) => {
+  //   const plugin1 = rivrPlugin(w => w, {
+  //     deps: [],
+  //     name: "plugin-1"
+  //   })
+  //   const plugin2 = rivrPlugin(w => w, {
+  //     deps: [ plugin1 ],
+  //     name: "plugin-2"
+  //   })
+  //
+  //   await t.assert.rejects(
+  //     rivr.workflow("my-workflow").register(plugin2).ready(),
+  //     new Error(`Plugin "plugin-2" needs "plugin-1" to be registered`)
+  //   )
+  // })
+  //
+  // test("declare a plugin options as a function",  async (t) => {
+  //   // Given
+  //   const engine = createEngine({
+  //     url: container.getConnectionString(),
+  //     signal: t.signal,
+  //     dbName: randomUUID(),
+  //     clientOpts: {
+  //       directConnection: true
+  //     },
+  //     delayBetweenPulls: 10
+  //   })
+  //
+  //   const plugin0 = rivrPlugin(function plugin0(w) {
+  //     return w.decorate("fooFromPlugin0", 1)
+  //   }, {
+  //     name: "plugin-0"
+  //   })
+  //
+  //   const plugin1 = rivrPlugin((w, opts: { foo: number }) => {
+  //     return w.decorate("foo", opts.foo)
+  //   }, {
+  //     name: "plugin-1",
+  //     deps: [ plugin0]
+  //   })
+  //
+  //   let state: number | undefined
+  //
+  //   const workflow = rivr.workflow<number>("complex-calculation")
+  //     .register(plugin0)
+  //     .register(plugin1, w => ({
+  //       foo: w.fooFromPlugin0
+  //     }))
+  //     .step({
+  //       name: "my-step",
+  //       handler: ctx => ctx.workflow.foo + 1
+  //     })
+  //     .addHook("onWorkflowCompleted", (w, s) => {
+  //       state = s
+  //     })
+  //
+  //   await engine.createWorker().start([ workflow ])
+  //
+  //   // When
+  //   await engine.createTrigger().trigger(workflow, 1)
+  //
+  //   // Then
+  //   await waitForPredicate(() => state !== undefined)
+  //   t.assert.deepEqual(state, 2)
+  // })
 
   test("should not be able to decorate using the property twice",  (t) => {
     // Given
@@ -1216,144 +1216,144 @@ describe('hooks', function () {
     t.assert.deepEqual(error, "oops")
   })
 
-  test("execute all the handler",  async (t: TestContext) => {
-    // Given
-    const engine = createEngine({
-      url: container.getConnectionString(),
-      dbName: randomUUID(),
-      clientOpts: {
-        directConnection: true
-      },
-      signal: t.signal,
-      delayBetweenPulls: 10
-    })
+  // test("execute all the handler",  async (t: TestContext) => {
+  //   // Given
+  //   const engine = createEngine({
+  //     url: container.getConnectionString(),
+  //     dbName: randomUUID(),
+  //     clientOpts: {
+  //       directConnection: true
+  //     },
+  //     signal: t.signal,
+  //     delayBetweenPulls: 10
+  //   })
+  //
+  //   const stepCompletedStates: number[] = []
+  //   let finished = false
+  //
+  //   const workflow = rivr.workflow<number>("complex-calculation")
+  //     .addHook("onStepCompleted", (w, s, state) => {
+  //       stepCompletedStates.push(state)
+  //     })
+  //     .addHook("onWorkflowCompleted", (w, s) => {
+  //       finished = true
+  //     })
+  //     .step({
+  //       name: "add-3",
+  //       handler: ({ state }) => state + 3
+  //     })
+  //     .register(w => {
+  //       return w
+  //         .addHook("onStepCompleted", (w, s, state) => {
+  //           stepCompletedStates.push(state)
+  //         })
+  //         .step({
+  //           name: "add-4",
+  //           handler: ({ state }) => state + 4
+  //         })
+  //     })
+  //
+  //   await engine.createWorker().start([ workflow ])
+  //
+  //   // When
+  //   await engine.createTrigger().trigger(workflow, 3)
+  //
+  //   // Then
+  //   let now = new Date().getTime()
+  //   while (!finished && new Date().getTime() - now < 5_000) {
+  //     await setTimeout(20)
+  //   }
+  //
+  //   t.assert.deepStrictEqual(stepCompletedStates, [ 6, 6, 10, 10 ])
+  // })
 
-    const stepCompletedStates: number[] = []
-    let finished = false
+  // test("execute onWorkflowCompleted hooks in order",  async (t: TestContext) => {
+  //   // Given
+  //   const engine = createEngine({
+  //     url: container.getConnectionString(),
+  //     clientOpts: {
+  //       directConnection: true
+  //     },
+  //     dbName: randomUUID(),
+  //     signal: t.signal,
+  //     delayBetweenPulls: 10
+  //   })
+  //
+  //   let elements: number[] = []
+  //   let finished = false
+  //
+  //   const workflow = rivr.workflow<number>("complex-calculation")
+  //     .addHook("onWorkflowCompleted", (w, s) => {
+  //       elements.push(1)
+  //     })
+  //     .step({
+  //       name: "add-1",
+  //       handler: ({ state }) => state + 1
+  //     })
+  //     .addHook("onWorkflowCompleted", (w, s) => {
+  //       elements.push(2)
+  //     })
+  //     .register(w => {
+  //       return w
+  //         .addHook("onWorkflowCompleted", (w, s) => {
+  //           elements.push(3)
+  //         })
+  //         .step({
+  //           name: "add-4",
+  //           handler: ({ state }) => state + 4
+  //         })
+  //     })
+  //     .addHook("onWorkflowCompleted", (w, s) => {
+  //       elements.push(4)
+  //       finished = true
+  //     })
+  //
+  //   await engine.createWorker().start([ workflow ])
+  //
+  //   // When
+  //   await engine.createTrigger().trigger(workflow, 3)
+  //
+  //   // Then
+  //   await waitForPredicate(() => finished)
+  //   t.assert.deepEqual(finished, true)
+  //   t.assert.deepStrictEqual(elements, [ 1, 2, 3, 4 ])
+  // })
 
-    const workflow = rivr.workflow<number>("complex-calculation")
-      .addHook("onStepCompleted", (w, s, state) => {
-        stepCompletedStates.push(state)
-      })
-      .addHook("onWorkflowCompleted", (w, s) => {
-        finished = true
-      })
-      .step({
-        name: "add-3",
-        handler: ({ state }) => state + 3
-      })
-      .register(w => {
-        return w
-          .addHook("onStepCompleted", (w, s, state) => {
-            stepCompletedStates.push(state)
-          })
-          .step({
-            name: "add-4",
-            handler: ({ state }) => state + 4
-          })
-      })
-
-    await engine.createWorker().start([ workflow ])
-
-    // When
-    await engine.createTrigger().trigger(workflow, 3)
-
-    // Then
-    let now = new Date().getTime()
-    while (!finished && new Date().getTime() - now < 5_000) {
-      await setTimeout(20)
-    }
-
-    t.assert.deepStrictEqual(stepCompletedStates, [ 6, 6, 10, 10 ])
-  })
-
-  test("execute onWorkflowCompleted hooks in order",  async (t: TestContext) => {
-    // Given
-    const engine = createEngine({
-      url: container.getConnectionString(),
-      clientOpts: {
-        directConnection: true
-      },
-      dbName: randomUUID(),
-      signal: t.signal,
-      delayBetweenPulls: 10
-    })
-
-    let elements: number[] = []
-    let finished = false
-
-    const workflow = rivr.workflow<number>("complex-calculation")
-      .addHook("onWorkflowCompleted", (w, s) => {
-        elements.push(1)
-      })
-      .step({
-        name: "add-1",
-        handler: ({ state }) => state + 1
-      })
-      .addHook("onWorkflowCompleted", (w, s) => {
-        elements.push(2)
-      })
-      .register(w => {
-        return w
-          .addHook("onWorkflowCompleted", (w, s) => {
-            elements.push(3)
-          })
-          .step({
-            name: "add-4",
-            handler: ({ state }) => state + 4
-          })
-      })
-      .addHook("onWorkflowCompleted", (w, s) => {
-        elements.push(4)
-        finished = true
-      })
-
-    await engine.createWorker().start([ workflow ])
-
-    // When
-    await engine.createTrigger().trigger(workflow, 3)
-
-    // Then
-    await waitForPredicate(() => finished)
-    t.assert.deepEqual(finished, true)
-    t.assert.deepStrictEqual(elements, [ 1, 2, 3, 4 ])
-  })
-
-  test("should be able to execute a hook in the correct context",  async (t) => {
-    // Given
-    const engine = createEngine({
-      url: container.getConnectionString(),
-      clientOpts: {
-        directConnection: true
-      },
-      dbName: randomUUID(),
-      signal: t.signal,
-      delayBetweenPulls: 10
-    })
-
-    let hookValue: number | undefined
-
-    const workflow = rivr.workflow<number>("complex-calculation")
-      .step({
-        name: "add-1",
-        handler: ({ state }) => state + 1
-      })
-      .register(w => {
-        return w.decorate("foo", 4)
-          .addHook("onStepCompleted", function (workflow1, step, state) {
-            hookValue = workflow1.foo + state
-          })
-      })
-
-    await engine.createWorker().start([ workflow ])
-
-    // When
-    await engine.createTrigger().trigger(workflow, 1)
-
-    // Then
-    await waitForPredicate(() => hookValue !== undefined)
-    t.assert.deepEqual(hookValue, 6)
-  })
+  // test("should be able to execute a hook in the correct context",  async (t) => {
+  //   // Given
+  //   const engine = createEngine({
+  //     url: container.getConnectionString(),
+  //     clientOpts: {
+  //       directConnection: true
+  //     },
+  //     dbName: randomUUID(),
+  //     signal: t.signal,
+  //     delayBetweenPulls: 10
+  //   })
+  //
+  //   let hookValue: number | undefined
+  //
+  //   const workflow = rivr.workflow<number>("complex-calculation")
+  //     .step({
+  //       name: "add-1",
+  //       handler: ({ state }) => state + 1
+  //     })
+  //     .register(w => {
+  //       return w.decorate("foo", 4)
+  //         .addHook("onStepCompleted", function (workflow1, step, state) {
+  //           hookValue = workflow1.foo + state
+  //         })
+  //     })
+  //
+  //   await engine.createWorker().start([ workflow ])
+  //
+  //   // When
+  //   await engine.createTrigger().trigger(workflow, 1)
+  //
+  //   // Then
+  //   await waitForPredicate(() => hookValue !== undefined)
+  //   t.assert.deepEqual(hookValue, 6)
+  // })
 })
 
 describe("resilience", () => {

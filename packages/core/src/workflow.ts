@@ -9,7 +9,6 @@ import {
   StepOpts,
   WithContext,
   Workflow as PublicWorkflow,
-  RivrPlugin
 } from "./types";
 import { List, Slice, ArrayAdapter } from "./utils/list"
 
@@ -42,7 +41,7 @@ type PluginElement<State, FirstState, StateByStepName extends EmptyStateByStep> 
   type: "plugin"
   id: number
   context: Workflow<State, FirstState, StateByStepName>
-  plugin: RivrPlugin<EmptyDecorator, unknown, State, FirstState, StateByStepName>
+  plugin: Function
   pluginOpts?: unknown | ((w: Workflow<State, FirstState, StateByStepName>) => unknown)
 }
 
@@ -161,19 +160,9 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
           optional,
           delayBetweenAttempts,
           maxAttempts
-        }
+        } as unknown as Step<State, StateOut, FirstState, EmptyDecorator, StateByStepName>
       })
 
-      // this.dag.addNode({
-      //     type: "step",
-      //     context: this,
-      //     step: {
-      //         ...requiredFields,
-      //         optional,
-      //         delayBetweenAttempts,
-      //         maxAttempts
-      //     }
-      // }, this.node)
       return this as unknown as Workflow<StateOut, FirstState, StateByStepName & Record<Name, State>>
     },
     getFirstStep(): Step<FirstState, unknown, FirstState, StateByStepName, EmptyDecorator> | undefined {
@@ -186,7 +175,7 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
     getStepByName(name: string): WithContext<Step<State, unknown, FirstState, StateByStepName, EmptyDecorator>, State, FirstState, StateByStepName, EmptyDecorator> | undefined {
       for (const node of this.list) {
         if (node.type === "step" && node.step.name === name) {
-          return [ node.step as Step<State, unknown, FirstState, StateByStepName, EmptyDecorator>, node.context ]
+          return [ node.step as unknown as Step<State, unknown, FirstState, StateByStepName, EmptyDecorator>, node.context ]
         }
       }
     },
@@ -205,7 +194,7 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
         ? undefined
         : nodes[nextStepIndex]
 
-      return node?.step as Step<State, unknown, FirstState, StateByStepName, EmptyStateByStep>
+      return node?.step as unknown as Step<State, unknown, FirstState, StateByStepName, EmptyStateByStep>
     },
     steps(): Iterable<[step: Step<State, unknown, FirstState, StateByStepName, EmptyDecorator>, context: PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator>]> {
       // @ts-expect-error
@@ -219,23 +208,6 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
         .filter(isHook)
         .filter(isHookType(hook))
         .map(node => [node.hook.hook, node.context])
-    },
-    register<NewDecorators>(plugin: Function, opts?: unknown | ((w: PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator>) => unknown)): PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator & NewDecorators> {
-      const child = createChildWorkflow(this, this.list, this.list.length + 1)
-
-      const rivrPlugin = isRivrPlugin<EmptyDecorator, State, FirstState, StateByStepName>(plugin)
-        ? plugin
-        : toRivrPlugin<State, FirstState, StateByStepName>(plugin, () => `auto-plugin-${this.autoPluginId++}`)
-
-      this.list.append({
-        type: "plugin",
-        plugin: rivrPlugin,
-        context: child,
-        pluginOpts: opts,
-        id: this.generateNewNodeId()
-      })
-
-      return child as unknown as PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator & NewDecorators>
     },
     async ready(): Promise<ReadyWorkflow<State, FirstState, StateByStepName, EmptyDecorator>> {
       if (this.isReady) {
@@ -254,15 +226,19 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
         if (node.type !== "plugin")
           continue
 
-        const deps = (node.plugin.opts.deps ?? []) as RivrPlugin<any, any, any, any, any>[]
+        // @ts-expect-error
+        const deps = (node.plugin.opts.deps ?? []) as Function[]
 
         const registeredPlugins = Array.from(this.list.reverseIteratorFromIndex(index))
           .filter(isPlugin)
+          // @ts-expect-error
           .map(node => node.plugin.opts.name)
 
+        // @ts-expect-error
         const unsatisfiedDeps = deps.filter(plugin => !registeredPlugins.includes(plugin.opts.name))
 
         if (unsatisfiedDeps.length > 0) {
+          // @ts-expect-error
           throw new Error(`Plugin "${node.plugin.opts.name}" needs "${unsatisfiedDeps[0].opts.name}" to be registered`)
         }
 
@@ -287,23 +263,6 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
   }
 
   return workflow
-}
-
-function toRivrPlugin<State, FirstState, StateByStepName extends EmptyStateByStep>(
-  plugin: Function,
-  getRandomName: () => string
-) {
-  Object.defineProperty(plugin, "opts", {
-    value: {
-      name: getRandomName()
-    }
-  })
-
-  return plugin as RivrPlugin<EmptyDecorator, unknown, State, FirstState, StateByStepName>
-}
-
-function isRivrPlugin<NewDecorators, State, FirstState, StateByStepName extends Record<never, never>>(plugin: Function): plugin is RivrPlugin<NewDecorators, unknown, State, FirstState, StateByStepName> {
-  return "opts" in plugin
 }
 
 function decorate<State, FirstState, StateByStepName extends EmptyStateByStep, K extends string, V> (

@@ -55,8 +55,6 @@ export type OnWorkflowStoppedHook<State, FirstState, StateByStepName extends Rec
 export type OnWorkflowFailedHook<State, FirstState, StateByStepName extends Record<never, never>, Decorators> = (error: unknown, workflow: ReadyWorkflow<State, FirstState, StateByStepName, Decorators>, step: Step<State, unknown, FirstState, StateByStepName, Decorators>, state: State) => void
 export type OnStepCompletedHook<State, FirstState, StateByStepName extends Record<never, never>, Decorators> = (workflow: ReadyWorkflow<State, FirstState, StateByStepName, Decorators>, step: Step<State, unknown, FirstState, StateByStepName, Decorators>, state: State) => void
 
-export type Plugin<State, FirstState, StateByStepName extends Record<never, never>, Decorators, NewDecorators> = (workflow: Workflow<State, FirstState, StateByStepName, Decorators>) => Workflow<State, FirstState, StateByStepName, NewDecorators>
-
 export type WithContext<T, State, FirstState, StateByStepName extends Record<never, never>, Decorators> = [ item: T, context: ReadyWorkflow<State, FirstState, StateByStepName, Decorators> ]
 
 export type Workflow<State, FirstState, StateByStepName extends Record<never, never>, Decorators> = {
@@ -95,15 +93,6 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
    * @param value
    */
   decorate<K extends string, V>(key: K, value: V): Workflow<State, FirstState, StateByStepName, Decorators & Record<K, V>>
-
-  /**
-   * Register a plugin.
-   *
-   * @param plugin
-   */
-  register<NewDecorators>(plugin: Plugin<State, FirstState, StateByStepName, Decorators, NewDecorators>): Workflow<State, FirstState, StateByStepName, Decorators & NewDecorators>
-  register<NewDecorators>(plugin: RivrPlugin<NewDecorators, undefined, State, FirstState, StateByStepName>): Workflow<State, FirstState, StateByStepName, Decorators & NewDecorators>
-  register<NewDecorators, Opts>(plugin: RivrPlugin<NewDecorators, Opts, State, FirstState, StateByStepName>, opts: Opts | ((workflow: ReadyWorkflow<State, FirstState, StateByStepName, Decorators>) => Opts)): Workflow<State, FirstState, StateByStepName, Decorators & NewDecorators>
 
   /**
    * Iterate over each step.
@@ -175,41 +164,3 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
 }
 
 export type ReadyWorkflow<State, FirstState, StateByStepName extends Record<never, never>, Decorators> = Workflow<State, FirstState, StateByStepName, Decorators> & Decorators
-
-/**
- * Claude gave me this typescript type.
- * I don't understand the hack that make this works, but essentially
- * this type merges unions.
- *
- * So, this type will map this: `{ foo: string } | { bar: string }`,
- * to this `{ foo: string } & { bar: string }`.
- */
-export type MergeUnionTypes<T> = (T extends any ? (x: T) => any : never) extends
-  (x: infer R) => any ? R : never;
-
-export type RivrPlugin<Out, Opts, State, FirstState, StateByStepName extends Record<never, never>> = {
-  (w: Workflow<State, FirstState, StateByStepName, any>, opts: Opts): Workflow<State, FirstState, StateByStepName, Out>
-  opts: RivrPluginOpts<State, FirstState, StateByStepName>
-}
-
-export type RivrPluginOpts<State, FirstState, StateByStepName extends Record<never, never>, Deps extends RivrPlugin<any, any, State, FirstState, StateByStepName>[] = []> = {
-  deps?: Deps
-  /**
-   * The plugin's name
-   */
-  name: string
-}
-
-export function rivrPlugin<Out, Opts = undefined, State = any, FirstState = any, StateByStepName extends Record<never, never> = Record<never, never>, Deps extends RivrPlugin<any, any, State, FirstState, StateByStepName>[] = []> (
-  plugin: (w: ReadyWorkflow<State, FirstState, StateByStepName, MergeUnionTypes<GetDecorator<UnwrapItem<Deps>, State, FirstState, StateByStepName>>>, opts: Opts) => Workflow<State, FirstState, StateByStepName, Out>,
-  opts: RivrPluginOpts<State, FirstState, StateByStepName, Deps>
-): RivrPlugin<Out, Opts, State, FirstState, StateByStepName> {
-  Object.assign(plugin, {
-    opts,
-  })
-
-  return plugin as RivrPlugin<Out, Opts, State, FirstState, StateByStepName>
-}
-
-type UnwrapItem<T> = T extends (infer U)[] ? U : never
-type GetDecorator<T, State, FirstState, StateByStepName extends Record<never, never>> = T extends RivrPlugin<infer U, any, State, FirstState, StateByStepName> ? U : never
