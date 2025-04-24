@@ -14,51 +14,52 @@ import {
 import { List, Slice, ArrayAdapter } from "./utils/list"
 
 type EmptyDecorator = Record<never, never>
+type EmptyStateByStep = Record<never, never>
 
-type StepElement<State, FirstState> = {
+type StepElement<State, FirstState, StateByStepName extends EmptyStateByStep> = {
   type: "step"
   id: number
-  context: Workflow<State, FirstState>
-  step: Step<State, FirstState, EmptyDecorator>
+  context: Workflow<State, FirstState, StateByStepName>
+  step: Step<State, FirstState, EmptyDecorator, StateByStepName>
 }
 
-type Hook<State, FirstState> =
-  | { type: "onStepCompleted", hook: OnStepCompletedHook<State, EmptyDecorator, FirstState> }
-  | { type: "onStepError", hook: OnStepErrorHook<State, EmptyDecorator, FirstState> }
-  | { type: "onStepSkipped", hook: OnStepSkippedHook<State, EmptyDecorator, FirstState> }
-  | { type: "onWorkflowCompleted", hook: OnWorkflowCompletedHook<State, EmptyDecorator, FirstState> }
-  | { type: "onWorkflowFailed", hook: OnWorkflowFailedHook<State, EmptyDecorator, FirstState> }
-  | { type: "onWorkflowStopped", hook: OnWorkflowStoppedHook<State, EmptyDecorator, FirstState> }
+type Hook<State, FirstState, StateByStepName extends EmptyStateByStep> =
+  | { type: "onStepCompleted", hook: OnStepCompletedHook<State, FirstState, StateByStepName, EmptyDecorator> }
+  | { type: "onStepError", hook: OnStepErrorHook<State, FirstState, StateByStepName, EmptyDecorator> }
+  | { type: "onStepSkipped", hook: OnStepSkippedHook<State, FirstState, StateByStepName, EmptyDecorator> }
+  | { type: "onWorkflowCompleted", hook: OnWorkflowCompletedHook<State, FirstState, StateByStepName, EmptyDecorator> }
+  | { type: "onWorkflowFailed", hook: OnWorkflowFailedHook<State, FirstState, StateByStepName, EmptyDecorator> }
+  | { type: "onWorkflowStopped", hook: OnWorkflowStoppedHook<State, FirstState, StateByStepName, EmptyDecorator> }
 
-type HookElement<State, FirstState> = {
+type HookElement<State, FirstState, StateByStepName extends EmptyStateByStep> = {
   type: "hook"
-  context: Workflow<State, FirstState>
-  hook: Hook<State, FirstState>
+  context: Workflow<State, FirstState, StateByStepName>
+  hook: Hook<State, FirstState, StateByStepName>
   id: number
 }
 
-type PluginElement<State, FirstState> = {
+type PluginElement<State, FirstState, StateByStepName extends EmptyStateByStep> = {
   type: "plugin"
   id: number
-  context: Workflow<State, FirstState>
-  plugin: RivrPlugin<EmptyDecorator, unknown, State, FirstState>
-  pluginOpts?: unknown | ((w: Workflow<State, FirstState>) => unknown)
+  context: Workflow<State, FirstState, StateByStepName>
+  plugin: RivrPlugin<EmptyDecorator, unknown, State, FirstState, StateByStepName>
+  pluginOpts?: unknown | ((w: Workflow<State, FirstState, StateByStepName>) => unknown)
 }
 
-type RootElement<State, FirstState> = {
+type RootElement<State, FirstState, StateByStepName extends EmptyStateByStep> = {
   type: "root"
   id: number
-  context: Workflow<State, FirstState>
+  context: Workflow<State, FirstState, StateByStepName>
 }
 
-type NodeElement<State, FirstState> =
-  | StepElement<State, FirstState>
-  | HookElement<State, FirstState>
-  | PluginElement<State, FirstState>
-  | RootElement<State, FirstState>
+type NodeElement<State, FirstState, StateByStepName extends EmptyStateByStep> =
+  | StepElement<State, FirstState, StateByStepName>
+  | HookElement<State, FirstState, StateByStepName>
+  | PluginElement<State, FirstState, StateByStepName>
+  | RootElement<State, FirstState, StateByStepName>
 
-interface Workflow<State, FirstState> extends PublicWorkflow<State, FirstState, EmptyDecorator> {
-  list: List<NodeElement<State, FirstState>>
+interface Workflow<State, FirstState, StateByStepName extends EmptyStateByStep> extends PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator> {
+  list: List<NodeElement<State, FirstState, StateByStepName>>
   pluginStartIndex: number
   registeredDecorators: string[]
   isReady: boolean
@@ -67,52 +68,52 @@ interface Workflow<State, FirstState> extends PublicWorkflow<State, FirstState, 
   autoPluginId: number
 }
 
-function isStep<State, FirstState>(node: NodeElement<State, FirstState>): node is StepElement<State, FirstState> {
+function isStep<State, FirstState, StateByStepName extends EmptyStateByStep>(node: NodeElement<State, FirstState, StateByStepName>): node is StepElement<State, FirstState, StateByStepName> {
   return node.type === 'step'
 }
 
-function isHook<State, FirstState>(node: NodeElement<State, FirstState>): node is HookElement<State, FirstState> {
+function isHook<State, FirstState, StateByStepName extends EmptyStateByStep>(node: NodeElement<State, FirstState, StateByStepName>): node is HookElement<State, FirstState, StateByStepName> {
   return node.type === 'hook'
 }
 
-function isPlugin<State, FirstState>(node: NodeElement<State, FirstState>): node is PluginElement<State, FirstState> {
+function isPlugin<State, FirstState, StateByStepName extends EmptyStateByStep>(node: NodeElement<State, FirstState, StateByStepName>): node is PluginElement<State, FirstState, StateByStepName> {
   return node.type === 'plugin'
 }
 
 function isHookType<Hook> (hook: Hook) {
-  return function<State, FirstState> (node: HookElement<State, FirstState>): node is HookElement<State, FirstState> & { hook: { type: Hook } } {
+  return function<State, FirstState, StateByStepName extends Record<never, never>> (node: HookElement<State, FirstState, StateByStepName>): node is HookElement<State, FirstState, StateByStepName> & { hook: { type: Hook } } {
     return node.hook.type === hook
   }
 }
 
-function createPluginWorkflow<State, FirstState>(parent: Workflow<State, FirstState>, list: List<NodeElement<State, FirstState>>): Workflow<State, FirstState> {
+function createPluginWorkflow<State, FirstState, StateByStepName extends Record<never, never>>(parent: Workflow<State, FirstState, StateByStepName>, list: List<NodeElement<State, FirstState, StateByStepName>>): Workflow<State, FirstState, StateByStepName> {
   const workflow = {
-    decorate<K extends string, V>(key: K, value: V): PublicWorkflow<State, FirstState, EmptyDecorator & Record<K, V>> {
+    decorate<K extends string, V>(key: K, value: V): PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator & Record<K, V>> {
       // @ts-expect-error
       parent.decorate.call(parent, key, value)
-      return this as unknown as PublicWorkflow<State, FirstState, EmptyDecorator & Record<K, V>>
+      return this as unknown as PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator & Record<K, V>>
     },
     list,
-  } as Workflow<State, FirstState>
+  } as Workflow<State, FirstState, StateByStepName>
   Object.setPrototypeOf(workflow, parent)
   return workflow
 }
 
-function createChildWorkflow<State, FirstState>(parent: Workflow<State, FirstState>, list: List<NodeElement<State, FirstState>>, startIndex: number): Workflow<State, FirstState> {
+function createChildWorkflow<State, FirstState, StateByStepName extends EmptyStateByStep>(parent: Workflow<State, FirstState, StateByStepName>, list: List<NodeElement<State, FirstState, StateByStepName>>, startIndex: number): Workflow<State, FirstState, StateByStepName> {
   const workflow = {
     list,
     registeredDecorators: [] as string[],
     pluginStartIndex: startIndex,
     isReady: false
-  } as Workflow<State, FirstState>
+  } as Workflow<State, FirstState, StateByStepName>
   Object.setPrototypeOf(workflow, parent)
 
   return workflow
 }
 
-function createRootWorkflow<State, FirstState> (name: string) {
-  const list = new ArrayAdapter<NodeElement<State, FirstState>>()
-  const workflow: Workflow<State, FirstState> = {
+function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStateByStep> (name: string) {
+  const list = new ArrayAdapter<NodeElement<State, FirstState, StateByStepName>>()
+  const workflow: Workflow<State, FirstState, StateByStepName> = {
     list,
     isReady: false,
     nextNodeId: 0,
@@ -127,11 +128,11 @@ function createRootWorkflow<State, FirstState> (name: string) {
       this.list.append({
         type: "hook",
         id: this.generateNewNodeId(),
-        context: this as Workflow<State, FirstState>,
+        context: this as Workflow<State, FirstState, StateByStepName>,
         hook: {
           type: hook,
           hook: handler
-        } as Hook<State, FirstState>
+        } as Hook<State, FirstState, StateByStepName>
       })
       // this.dag.addNode({
       //     type: "hook",
@@ -143,7 +144,7 @@ function createRootWorkflow<State, FirstState> (name: string) {
       // }, (this as Workflow<State>).node)
       return this
     },
-    step<Name extends string>(opts: StepOpts<Name, State, FirstState, EmptyDecorator>) {
+    step<Name extends string>(opts: StepOpts<Name, State, FirstState, StateByStepName, EmptyDecorator>) {
       const {
         delayBetweenAttempts = 0,
         optional = false,
@@ -175,21 +176,21 @@ function createRootWorkflow<State, FirstState> (name: string) {
       // }, this.node)
       return this
     },
-    getFirstStep(): Step<State, FirstState, EmptyDecorator> | undefined {
+    getFirstStep(): Step<State, FirstState, StateByStepName, EmptyDecorator> | undefined {
       for (const node of this.list) {
         if (node.type === "step") {
-          return node.step
+          return node.step as Step<State, FirstState, StateByStepName, EmptyDecorator>
         }
       }
     },
-    getStepByName(name: string): WithContext<Step<State, FirstState, EmptyDecorator>, State, FirstState, EmptyDecorator> | undefined {
+    getStepByName(name: string): WithContext<Step<State, FirstState, StateByStepName, EmptyDecorator>, State, FirstState, StateByStepName, EmptyDecorator> | undefined {
       for (const node of this.list) {
         if (node.type === "step" && node.step.name === name) {
-          return [ node.step, node.context ]
+          return [ node.step as Step<State, FirstState, StateByStepName, EmptyDecorator>, node.context ]
         }
       }
     },
-    getNextStep(name: string): Step<State, FirstState, EmptyDecorator> | undefined {
+    getNextStep(name: string): Step<State, FirstState, StateByStepName, EmptyDecorator> | undefined {
       const nodes = Array.from(this.list)
         .filter(isStep)
       const index = nodes.findIndex(node => node.step.name === name)
@@ -204,11 +205,12 @@ function createRootWorkflow<State, FirstState> (name: string) {
         ? undefined
         : nodes[nextStepIndex]
 
-      return node?.step
+      return node?.step as Step<State, FirstState, StateByStepName, EmptyStateByStep>
     },
-    steps(): Iterable<[step: Step<State, FirstState, EmptyDecorator>, context: PublicWorkflow<State, FirstState, EmptyDecorator>]> {
+    steps(): Iterable<[step: Step<State, FirstState, StateByStepName, EmptyDecorator>, context: PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator>]> {
+      // @ts-expect-error
       return Array.from(this.list)
-        .filter(isStep)
+        .filter(node => isStep<State, FirstState, StateByStepName>(node))
         .map(node => [ node.step, node.context ])
     },
     // @ts-expect-error
@@ -218,12 +220,12 @@ function createRootWorkflow<State, FirstState> (name: string) {
         .filter(isHookType(hook))
         .map(node => [node.hook.hook, node.context])
     },
-    register<NewDecorators>(plugin: Function, opts?: unknown | ((w: PublicWorkflow<State, FirstState, EmptyDecorator>) => unknown)): PublicWorkflow<State, FirstState, EmptyDecorator & NewDecorators> {
+    register<NewDecorators>(plugin: Function, opts?: unknown | ((w: PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator>) => unknown)): PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator & NewDecorators> {
       const child = createChildWorkflow(this, this.list, this.list.length + 1)
 
-      const rivrPlugin = isRivrPlugin<EmptyDecorator, State, FirstState>(plugin)
+      const rivrPlugin = isRivrPlugin<EmptyDecorator, State, FirstState, StateByStepName>(plugin)
         ? plugin
-        : toRivrPlugin<State, FirstState>(plugin, () => `auto-plugin-${this.autoPluginId++}`)
+        : toRivrPlugin<State, FirstState, StateByStepName>(plugin, () => `auto-plugin-${this.autoPluginId++}`)
 
       this.list.append({
         type: "plugin",
@@ -233,11 +235,11 @@ function createRootWorkflow<State, FirstState> (name: string) {
         id: this.generateNewNodeId()
       })
 
-      return child as unknown as PublicWorkflow<State, FirstState, EmptyDecorator & NewDecorators>
+      return child as unknown as PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator & NewDecorators>
     },
-    async ready(): Promise<ReadyWorkflow<State, FirstState, EmptyDecorator>> {
+    async ready(): Promise<ReadyWorkflow<State, FirstState, StateByStepName, EmptyDecorator>> {
       if (this.isReady) {
-        return this as unknown as ReadyWorkflow<State, FirstState, EmptyDecorator>
+        return this as unknown as ReadyWorkflow<State, FirstState, StateByStepName, EmptyDecorator>
       }
 
       let visited: number[] = []
@@ -252,7 +254,7 @@ function createRootWorkflow<State, FirstState> (name: string) {
         if (node.type !== "plugin")
           continue
 
-        const deps = (node.plugin.opts.deps ?? []) as RivrPlugin<any, any, any, any>[]
+        const deps = (node.plugin.opts.deps ?? []) as RivrPlugin<any, any, any, any, any>[]
 
         const registeredPlugins = Array.from(this.list.reverseIteratorFromIndex(index))
           .filter(isPlugin)
@@ -280,14 +282,14 @@ function createRootWorkflow<State, FirstState> (name: string) {
 
       this.isReady = true
 
-      return this as unknown as ReadyWorkflow<State, FirstState, EmptyDecorator>
+      return this as unknown as ReadyWorkflow<State, FirstState, StateByStepName, EmptyDecorator>
     }
   }
 
   return workflow
 }
 
-function toRivrPlugin<State, FirstState>(
+function toRivrPlugin<State, FirstState, StateByStepName extends EmptyStateByStep>(
   plugin: Function,
   getRandomName: () => string
 ) {
@@ -297,15 +299,15 @@ function toRivrPlugin<State, FirstState>(
     }
   })
 
-  return plugin as RivrPlugin<EmptyDecorator, unknown, State, FirstState>
+  return plugin as RivrPlugin<EmptyDecorator, unknown, State, FirstState, StateByStepName>
 }
 
-function isRivrPlugin<NewDecorators, State, FirstState>(plugin: Function): plugin is RivrPlugin<NewDecorators, unknown, State, FirstState> {
+function isRivrPlugin<NewDecorators, State, FirstState, StateByStepName extends Record<never, never>>(plugin: Function): plugin is RivrPlugin<NewDecorators, unknown, State, FirstState, StateByStepName> {
   return "opts" in plugin
 }
 
-function decorate<State, FirstState, K extends string, V> (
-  this: Workflow<State, FirstState>,
+function decorate<State, FirstState, StateByStepName extends EmptyStateByStep, K extends string, V> (
+  this: Workflow<State, FirstState, StateByStepName>,
   key: K,
   value: V
 ) {
@@ -315,11 +317,11 @@ function decorate<State, FirstState, K extends string, V> (
 
   Object.defineProperty(this, key, { value })
   this.registeredDecorators.push(key)
-  return this as unknown as PublicWorkflow<State, FirstState, EmptyDecorator & Record<K, V>>
+  return this as unknown as PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator & Record<K, V>>
 }
 
 export const rivr = {
-  workflow<State>(name: string): PublicWorkflow<State, State, Record<never, never>> {
+  workflow<State>(name: string): PublicWorkflow<State, State, EmptyStateByStep, Record<never, never>> {
     return createRootWorkflow(name)
   }
 }

@@ -28,7 +28,7 @@ class MongoStorage implements Storage<WriteOpts> {
     this.#collection = this.#client.db(dbName).collection(collectionName)
   }
 
-  #getPullFilter<State, FirstState, Decorators>(workflows: Workflow<State, FirstState, Decorators>[]): Filter<MongoWorkflowState<unknown>> {
+  #getPullFilter<State, FirstState, StateByStepName extends Record<never, never>, Decorators>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Filter<MongoWorkflowState<unknown>> {
     const steps = workflows
       .map(workflow => Array.from(workflow.steps()))
       .flat()
@@ -50,7 +50,7 @@ class MongoStorage implements Storage<WriteOpts> {
 
           return acc.set(id, { ...existing, steps: [ ...existing.steps, step ] })
         },
-        new Map<string, { workflow: string, maxAttempts: number, steps: Step<State, FirstState, Decorators>[] }>()
+        new Map<string, { workflow: string, maxAttempts: number, steps: Step<State, FirstState, StateByStepName, Decorators>[] }>()
       )
 
     const filter = Array.from(steps.entries())
@@ -82,7 +82,7 @@ class MongoStorage implements Storage<WriteOpts> {
     }
   }
 
-  async pull<State, FirstState, Decorators>(workflows: Workflow<State, FirstState, Decorators>[], opts: PullOpts): Promise<WorkflowState<State>[]> {
+  async pull<State, FirstState, StateByStepName extends Record<never, never>, Decorators>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[], opts: PullOpts): Promise<WorkflowState<State>[]> {
     const filter = this.#getPullFilter(workflows)
 
     const tasks = await this.#collection.find(filter)
