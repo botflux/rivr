@@ -365,6 +365,44 @@ describe('basic flow control', function () {
       }
     })
   })
+
+  test("should be able to change the state's type from a step to another", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      dbName: randomUUID(),
+      delayBetweenPulls: 10,
+      clientOpts: {
+        directConnection: true,
+      },
+    })
+
+    t.after(async () => await engine.close())
+
+    let result: string | undefined
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .step({
+        name: "heavy-computation",
+        handler: ({ state }) => state + 1
+      })
+      .step({
+        name: "format",
+        handler: ({ state }) => `The result is '${state}'`,
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+        result = s
+      })
+
+    await engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 4)
+
+    // Then
+    await waitForPredicate(() => result !== undefined, 5_000)
+    t.assert.deepStrictEqual(result, "The result is '5'")
+  })
 })
 
 describe('advance flow control', function () {
