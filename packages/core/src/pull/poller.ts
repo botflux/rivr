@@ -62,7 +62,41 @@ export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trig
       throw new Error("Cannot trigger a workflow that has no step")
     }
 
-    const s = createWorkflowState(workflow as unknown as Workflow<State, FirstState, StateByStepName, Record<never, never>>, state, opts?.id)
+    const s = createWorkflowState(
+      workflow as unknown as Workflow<State, FirstState, StateByStepName, Record<never, never>>,
+      mFirstStep.name as keyof StateByStepName,
+      state as StateByStepName[keyof StateByStepName],
+      opts?.id
+    )
+
+    await this.#storage.write([
+      {
+        type: "insert",
+        state: s
+      }
+    ], opts)
+
+    return s
+  }
+
+  async triggerFrom<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName, Decorators>(
+    workflow: Workflow<State, FirstState, StateByStepName, Decorators>,
+    name: Name,
+    state: StateByStepName[Name],
+    opts?: TriggerOpts & DefaultTriggerOpts
+  ): Promise<WorkflowState<State>> {
+    const mStep = workflow.getStepByName(name as string)
+
+    if (!mStep) {
+      throw new Error("Not implemented at line 81 in poller.ts")
+    }
+
+    const s = createWorkflowState(
+      workflow as unknown as Workflow<State, FirstState, StateByStepName, Record<never, never>>,
+      name,
+      state,
+      opts?.id
+    )
 
     await this.#storage.write([
       {

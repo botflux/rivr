@@ -23,6 +23,13 @@ export interface Trigger<TriggerOpts extends Record<never, never>> {
     state: FirstState,
     opts?: TriggerOpts & DefaultTriggerOpts
   ): Promise<WorkflowState<State>>
+
+  triggerFrom<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName, Decorators>(
+    workflow: Workflow<State, FirstState, StateByStepName, Decorators>,
+    name: Name,
+    state: StateByStepName[Name],
+    opts?: TriggerOpts & DefaultTriggerOpts
+  ): Promise<WorkflowState<State>>
 }
 
 export interface Engine<TriggerOpts extends Record<never, never>> {

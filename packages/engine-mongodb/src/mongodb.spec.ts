@@ -403,6 +403,48 @@ describe('basic flow control', function () {
     await waitForPredicate(() => result !== undefined, 5_000)
     t.assert.deepStrictEqual(result, "The result is '5'")
   })
+
+  test("should be able to start a workflow from a specific step", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true
+      },
+      delayBetweenPulls: 10
+    })
+
+    t.after(async () => await engine.close())
+
+    let result: string | undefined = undefined
+
+    const workflow = rivr.workflow<boolean>("complex-calculation")
+      .step({
+        name: "add-4",
+        handler: async ({ state }) => 10
+      })
+      .step({
+        name: "multiply-10",
+        handler: async ({ state }) => state * 10
+      })
+      .step({
+        name: "format",
+        handler: async ({ state }) => `The result is '${state}'`
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+        result = s
+      })
+
+    await engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().triggerFrom(workflow, "multiply-10", 4)
+
+    // Then
+    await waitForPredicate(() => result !== undefined, 5_000)
+    t.assert.deepStrictEqual(result, "The result is '40'")
+  })
 })
 
 describe('advance flow control', function () {

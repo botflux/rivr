@@ -33,10 +33,25 @@ export type WorkflowState<State> = {
   steps: StepState[]
 }
 
-export function createWorkflowState<State, FirstState, StateByStepName extends Record<never, never>>(workflow: Workflow<State, FirstState, StateByStepName, Record<never, never>>, state: FirstState, id: string = randomUUID()): WorkflowState<State> {
-  const [ mFirst, ...rest ] = Array.from(workflow.steps()).map(([ step ]) => step)
+export function createWorkflowState<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName>(
+  workflow: Workflow<State, FirstState, StateByStepName, Record<never, never>>,
+  name: Name,
+  state: StateByStepName[Name],
+  id: string = randomUUID()
+): WorkflowState<State> {
+  const steps = Array.from(workflow.steps())
+    .map(([ step ]) => step)
+  const index = steps.findIndex((step) => step.name === name)
 
-  if (mFirst === undefined) {
+  if (index === -1) {
+    throw new Error("Not implemented at line 46 in state.ts")
+  }
+  
+  const previousSteps = steps.slice(0, index)
+  const mStep = steps[index]
+  const nextSteps = steps.slice(index + 1)
+  
+  if (mStep === undefined) {
     throw new Error("Cannot create a workflow state from an empty workflow.")
   }
 
@@ -47,16 +62,25 @@ export function createWorkflowState<State, FirstState, StateByStepName extends R
     toExecute: {
       state: state as unknown as State,
       status: "todo",
-      step: mFirst.name,
+      step: name as string,
       attempt: 1,
       areRetryExhausted: false
     },
     steps: [
+      ...previousSteps.map(step => ({
+        name: step.name,
+        attempts: [
+          {
+            status: "skipped" as const,
+            id: 0
+          }
+        ]
+      })),
       {
-        name: mFirst.name,
+        name: mStep.name,
         attempts: []
       },
-      ...rest.map(step => ({
+      ...nextSteps.map(step => ({
         name: step.name,
         attempts: []
       }))
