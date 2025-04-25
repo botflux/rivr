@@ -79,7 +79,7 @@ export type OnStepCompletedHook<Decorators extends Record<never, never>> = (
 
 export type WithContext<T, Decorators extends Record<never, never>> = {
   item: T
-  context: ReadyWorkflow<any, any, any, Decorators>
+  context: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>
 }
 
 export type Workflow<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>> = {
