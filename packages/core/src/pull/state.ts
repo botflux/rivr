@@ -40,7 +40,7 @@ export function createWorkflowState<State, FirstState, StateByStepName extends R
   id: string = randomUUID()
 ): WorkflowState<State> {
   const steps = Array.from(workflow.steps())
-    .map(([ step ]) => step)
+    .map(({ item }) => item)
   const index = steps.findIndex((step) => step.name === name)
 
   if (index === -1) {
@@ -88,7 +88,7 @@ export function createWorkflowState<State, FirstState, StateByStepName extends R
   }
 }
 
-export function updateWorkflowState<State, FirstState, StateByStepName extends Record<never, never>>(state: WorkflowState<State>, step: Step<State, unknown, FirstState, StateByStepName, any>, result: StepResult<State>, now = new Date()): WorkflowState<State> {
+export function updateWorkflowState<State, Decorators>(state: WorkflowState<State>, step: Step<Decorators>, result: StepResult<State>, now = new Date()): WorkflowState<State> {
   const stepStateIndex = state.steps.findIndex(s => s.name === step.name)
   const stepState = state.steps[stepStateIndex]
 
@@ -132,7 +132,7 @@ function resultToAttemptStatus (result: StepResult<unknown>): AttemptStatus {
  * @param result
  * @param now
  */
-function getNextTask<State, FirstState, StateByStepName extends Record<never, never>>(state: WorkflowState<State>, step: Step<State, unknown, FirstState, StateByStepName, unknown>, result: StepResult<State>, now: Date): [Task<State>, WorkflowStatus] {
+function getNextTask<State, Decorators>(state: WorkflowState<State>, step: Step<Decorators>, result: StepResult<State>, now: Date): [Task<State>, WorkflowStatus] {
   const { delayBetweenAttempts: delayFnOrNumber, maxAttempts, optional } = step
   const currentStepIndex = state.steps.findIndex(s => s.name === step.name)
 

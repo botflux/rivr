@@ -16,11 +16,11 @@ import {ArrayAdapter, List, Slice} from "./utils/list"
 type EmptyDecorator = Record<never, never>
 type EmptyStateByStep = Record<never, never>
 
-type StepElement<State, StateOut, FirstState, StateByStepName extends EmptyStateByStep> = {
+type StepElement<State, FirstState, StateByStepName extends EmptyStateByStep> = {
   type: "step"
   id: number
   context: Workflow<State, FirstState, StateByStepName>
-  step: Step<State, StateOut, FirstState, EmptyDecorator, StateByStepName>
+  step: Step<EmptyDecorator>
 }
 
 type Hook =
@@ -53,7 +53,7 @@ type RootElement<State, FirstState, StateByStepName extends EmptyStateByStep> = 
 }
 
 type NodeElement<State, FirstState, StateByStepName extends EmptyStateByStep> =
-  | StepElement<State, unknown, FirstState, StateByStepName>
+  | StepElement<State, FirstState, StateByStepName>
   | HookElement<State, FirstState, StateByStepName>
   | PluginElement<State, FirstState, StateByStepName>
   | RootElement<State, FirstState, StateByStepName>
@@ -68,7 +68,7 @@ interface Workflow<State, FirstState, StateByStepName extends EmptyStateByStep> 
   autoPluginId: number
 }
 
-function isStep<State, FirstState, StateByStepName extends EmptyStateByStep>(node: NodeElement<State, FirstState, StateByStepName>): node is StepElement<State, unknown, FirstState, StateByStepName> {
+function isStep<State, FirstState, StateByStepName extends EmptyStateByStep>(node: NodeElement<State, FirstState, StateByStepName>): node is StepElement<State, FirstState, StateByStepName> {
   return node.type === 'step'
 }
 
@@ -153,26 +153,26 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
           optional,
           delayBetweenAttempts,
           maxAttempts
-        } as unknown as Step<State, StateOut, FirstState, EmptyDecorator, StateByStepName>
+        } as Step<EmptyDecorator>
       })
 
       return this as unknown as Workflow<StateOut, FirstState, StateByStepName & Record<Name, State>>
     },
-    getFirstStep(): Step<FirstState, unknown, FirstState, StateByStepName, EmptyDecorator> | undefined {
+    getFirstStep(): Step<EmptyDecorator> | undefined {
       for (const node of this.list) {
         if (node.type === "step") {
-          return node.step as unknown as Step<FirstState, unknown, FirstState, StateByStepName, EmptyDecorator>
+          return node.step as unknown as Step<EmptyDecorator>
         }
       }
     },
-    getStepByName(name: string): WithContext<Step<State, unknown, FirstState, StateByStepName, EmptyDecorator>, EmptyDecorator> | undefined {
+    getStepByName(name: string): WithContext<Step<EmptyDecorator>, EmptyDecorator> | undefined {
       for (const node of this.list) {
         if (node.type === "step" && node.step.name === name) {
-          return { item: node.step as unknown as Step<State, unknown, FirstState, StateByStepName, EmptyDecorator>, context: node.context }
+          return { item: node.step as unknown as Step<EmptyDecorator>, context: node.context }
         }
       }
     },
-    getNextStep(name: string): Step<State, unknown, FirstState, StateByStepName, EmptyDecorator> | undefined {
+    getNextStep(name: string): Step<EmptyDecorator> | undefined {
       const nodes = Array.from(this.list)
         .filter(isStep)
       const index = nodes.findIndex(node => node.step.name === name)
@@ -187,16 +187,12 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
         ? undefined
         : nodes[nextStepIndex]
 
-      return node?.step as unknown as Step<State, unknown, FirstState, StateByStepName, EmptyStateByStep>
+      return node?.step as unknown as Step<EmptyStateByStep>
     },
-    steps(): Iterable<[
-      step: Step<unknown, unknown, unknown, Record<never, never>, EmptyDecorator>,
-      context: PublicWorkflow<unknown, unknown, Record<never, never>, EmptyDecorator>
-    ]> {
-      // @ts-expect-error
+    steps(): Iterable<WithContext<Step<EmptyDecorator>, EmptyDecorator>> {
       return Array.from(this.list)
         .filter(node => isStep<State, FirstState, StateByStepName>(node))
-        .map(node => [ node.step, node.context ])
+        .map(node => ({ item: node.step, context: node.context } as WithContext<Step<EmptyDecorator>, EmptyDecorator>))
     },
     // @ts-expect-error
     getHook(hook) {

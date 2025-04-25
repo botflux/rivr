@@ -32,11 +32,11 @@ class MongoStorage implements Storage<WriteOpts> {
     const steps = workflows
       .map(workflow => Array.from(workflow.steps()))
       .flat()
-      .map(([ step, workflow ]) => [
-        `${workflow.name}-${step.maxAttempts}`,
+      .map(({ item, context }) => [
+        `${context.name}-${item.maxAttempts}`,
         {
-          step,
-          workflow
+          step: item,
+          workflow: context
         }
       ] as const)
       .reduce(
@@ -50,7 +50,7 @@ class MongoStorage implements Storage<WriteOpts> {
 
           return acc.set(id, { ...existing, steps: [ ...existing.steps, step ] })
         },
-        new Map<string, { workflow: string, maxAttempts: number, steps: Step<unknown, unknown, unknown, Record<never, never>, Decorators>[] }>()
+        new Map<string, { workflow: string, maxAttempts: number, steps: Step<Decorators>[] }>()
       )
 
     const filter = Array.from(steps.entries())

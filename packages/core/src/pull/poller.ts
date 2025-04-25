@@ -155,7 +155,7 @@ export class Poller<TriggerOpts> implements Worker {
           const {item: step, context: executionContext} = mStepAndContext
 
           const result = await this.#handleStep(step, task, executionContext)
-          const newState = updateWorkflowState(task, step as Step<unknown, unknown, FirstState, StateByStepName, Decorators>, result)
+          const newState = updateWorkflowState(task, step, result)
 
           await this.#write([
             {
@@ -274,11 +274,11 @@ export class Poller<TriggerOpts> implements Worker {
     await this.#storage.disconnect()
   }
 
-  async #handleStep<State, StateOut, FirstState, StateByStepName extends Record<never, never>, Decorators>(
-    step: Step<State, StateOut, FirstState, StateByStepName, Decorators>,
+  async #handleStep<State, Decorators>(
+    step: Step<Decorators>,
     state: WorkflowState<State>,
-    workflow: ReadyWorkflow<State, FirstState, StateByStepName, Decorators>
-  ): Promise<StepResult<StateOut>> {
+    workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>
+  ): Promise<StepResult<unknown>> {
     try {
       const nextStateOrResult = await step.handler({
         state: state.toExecute.state,

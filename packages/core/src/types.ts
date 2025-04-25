@@ -28,9 +28,9 @@ export type HandlerOpts<State, FirstState, StateByStepName extends Record<never,
   attempt: number
 }
 export type Handler<StateIn, StateOut, FirstState, StateByStepName extends Record<never, never>, Decorators> = (opts: HandlerOpts<StateIn, FirstState, StateByStepName, Decorators>) => StateOut | StepResult<StateOut> | Promise<StateOut> | Promise<StepResult<StateOut>>
-export type Step<State, StateOut, FirstState, StateByStepName extends Record<never, never>, Decorators> = {
+export type Step<Decorators> = {
   name: string
-  handler: Handler<State, StateOut, FirstState, StateByStepName, Decorators>
+  handler: Handler<unknown, unknown, unknown, Record<never, never>, Decorators>
   maxAttempts: number
   optional: boolean
   delayBetweenAttempts: number | ((attempt: number) => number)
@@ -58,20 +58,20 @@ export type OnStepErrorHook<Decorators> = (
 ) => void
 export type OnStepSkippedHook<Decorators> = (
   workflow: ReadyWorkflow<any, any, any, Decorators>,
-  step: Step<any, any, any, any, Decorators>, state: unknown
+  step: Step<Decorators>, state: unknown
 ) => void
 export type OnWorkflowStoppedHook<Decorators> = (
   workflow: ReadyWorkflow<any, any, any, Decorators>,
-  step: Step<any, any, any, any, Decorators>, state: unknown
+  step: Step<Decorators>, state: unknown
 ) => void
 export type OnWorkflowFailedHook<Decorators> = (
   error: unknown,
   workflow: ReadyWorkflow<any, any, any, Decorators>,
-  step: Step<any, any, any, any, Decorators>,
+  step: Step<Decorators>,
   state: unknown
 ) => void
 export type OnStepCompletedHook<Decorators> = (
-  workflow: ReadyWorkflow<any, any, any, Decorators>, step: Step<any, any, any, any, Decorators>, state: unknown) => void
+  workflow: ReadyWorkflow<any, any, any, Decorators>, step: Step<Decorators>, state: unknown) => void
 
 export type WithContext<T, Decorators> = {
   item: T
@@ -88,7 +88,7 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
    * Get this workflow's first step.
    * Returns `undefined` if the workflow is empty.
    */
-  getFirstStep(): Step<FirstState, unknown, FirstState, StateByStepName, Decorators> | undefined
+  getFirstStep(): Step<Decorators> | undefined
 
   /**
    * Get a step, and its execution context, from its name.
@@ -96,7 +96,7 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
    *
    * @param name
    */
-  getStepByName(name: string): WithContext<Step<State, unknown, FirstState, StateByStepName, Decorators>, Decorators> | undefined
+  getStepByName(name: string): WithContext<Step<Decorators>, Decorators> | undefined
 
   /**
    * Search the step succeeding the step matching the given name.
@@ -105,7 +105,7 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
    *
    * @param name
    */
-  getNextStep(name: string): Step<State, unknown, FirstState, StateByStepName, Decorators> | undefined
+  getNextStep(name: string): Step<Decorators> | undefined
 
   /**
    * Add a property to the current workflow.
@@ -119,10 +119,7 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
    * Iterate over each step.
    * The iterator yields a tuple containing the step, and the context within which the step must be executed.
    */
-  steps(): Iterable<[
-    step: Step<unknown, unknown, unknown, Record<never, never>, Decorators>,
-    context: Workflow<unknown, unknown, Record<never, never>, Decorators>
-  ]>
+  steps(): Iterable<WithContext<Step<Decorators>, Decorators>>
 
   /**
    * Add a step
