@@ -49,29 +49,30 @@ export type StepOpts<Name extends string, StateIn, StateOut, FirstState, StateBy
 }
 
 export type OnWorkflowCompletedHook<Decorators> = (
-  workflow: ReadyWorkflow<any, any, any, Decorators>, state: unknown
+  workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>, state: unknown
 ) => void
 export type OnStepErrorHook<Decorators> = (
   error: unknown,
-  workflow: ReadyWorkflow<any, any, any, Decorators>,
+  workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   state: unknown
 ) => void
 export type OnStepSkippedHook<Decorators> = (
-  workflow: ReadyWorkflow<any, any, any, Decorators>,
+  workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step<Decorators>, state: unknown
 ) => void
 export type OnWorkflowStoppedHook<Decorators> = (
-  workflow: ReadyWorkflow<any, any, any, Decorators>,
+  workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step<Decorators>, state: unknown
 ) => void
 export type OnWorkflowFailedHook<Decorators> = (
   error: unknown,
-  workflow: ReadyWorkflow<any, any, any, Decorators>,
+  workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step<Decorators>,
   state: unknown
 ) => void
 export type OnStepCompletedHook<Decorators> = (
-  workflow: ReadyWorkflow<any, any, any, Decorators>, step: Step<Decorators>, state: unknown) => void
+  workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>, step: Step<Decorators>, state: unknown
+) => void
 
 export type WithContext<T, Decorators> = {
   item: T
