@@ -50,7 +50,7 @@ class MongoStorage implements Storage<WriteOpts> {
 
           return acc.set(id, { ...existing, steps: [ ...existing.steps, step ] })
         },
-        new Map<string, { workflow: string, maxAttempts: number, steps: Step<State, unknown, FirstState, StateByStepName, Decorators>[] }>()
+        new Map<string, { workflow: string, maxAttempts: number, steps: Step<unknown, unknown, unknown, Record<never, never>, Decorators>[] }>()
       )
 
     const filter = Array.from(steps.entries())

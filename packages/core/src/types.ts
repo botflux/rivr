@@ -119,7 +119,10 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
    * Iterate over each step.
    * The iterator yields a tuple containing the step, and the context within which the step must be executed.
    */
-  steps(): Iterable<[step: Step<State, unknown, FirstState, StateByStepName, Decorators>, context: Workflow<State, FirstState, StateByStepName, Decorators>]>
+  steps(): Iterable<[
+    step: Step<unknown, unknown, unknown, Record<never, never>, Decorators>,
+    context: Workflow<unknown, unknown, Record<never, never>, Decorators>
+  ]>
 
   /**
    * Add a step

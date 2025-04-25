@@ -189,7 +189,10 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
 
       return node?.step as unknown as Step<State, unknown, FirstState, StateByStepName, EmptyStateByStep>
     },
-    steps(): Iterable<[step: Step<State, unknown, FirstState, StateByStepName, EmptyDecorator>, context: PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator>]> {
+    steps(): Iterable<[
+      step: Step<unknown, unknown, unknown, Record<never, never>, EmptyDecorator>,
+      context: PublicWorkflow<unknown, unknown, Record<never, never>, EmptyDecorator>
+    ]> {
       // @ts-expect-error
       return Array.from(this.list)
         .filter(node => isStep<State, FirstState, StateByStepName>(node))
