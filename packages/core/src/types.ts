@@ -186,6 +186,47 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
    * This function does nothing if the dependency graph was already executed.
    */
   ready(): Promise<ReadyWorkflow<State, FirstState, StateByStepName, Decorators>>
+
+  /**
+   * Register a plugin using a plain function.
+   * You can't pass option to this plugin type.
+   *
+   * @param plugin
+   */
+  register<OutState, OutStateByStepName extends StateByStepName, OutDecorators extends Decorators>(
+    plugin: PlainPlugin<State, FirstState, StateByStepName, Decorators, OutState, OutStateByStepName, OutDecorators>
+  ): Workflow<OutState, FirstState, OutStateByStepName, OutDecorators>
 }
 
 export type ReadyWorkflow<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>> = Workflow<State, FirstState, StateByStepName, Decorators> & Decorators
+
+/**
+ * A plain plugin is function without a plugin name and deps.
+ * This type should be used when you want to create plugin using anonymous function.
+ *
+ * Rivr will assign the plugin a name automatically (e.g. 'plugin-auto-ID').
+ */
+export type PlainPlugin<
+  InState,
+  FirstState,
+  InStateByStepName extends Record<string, never>,
+  InDecorators extends Record<never, never>,
+  OutState,
+  OutStateByStepName extends InStateByStepName,
+  OutDecorators extends InDecorators
+> = (
+  workflow: ReadyWorkflow<InState, FirstState, InStateByStepName, InDecorators>
+) => Workflow<OutState, FirstState, OutStateByStepName, OutDecorators>
+
+export type RivrPlugin<
+  InState,
+  FirstState,
+  InStateByStepName extends Record<string, never>,
+  InDecorators extends Record<never, never>,
+  OutState,
+  OutStateByStepName extends InStateByStepName,
+  OutDecorators extends InDecorators
+> = {
+  (workflow: ReadyWorkflow<InState, FirstState, InStateByStepName, InDecorators>): Workflow<OutState, FirstState, OutStateByStepName, OutDecorators>
+  name: string
+}

@@ -789,47 +789,47 @@ describe('extension', function () {
     t.assert.deepEqual(state, 6)
   })
 
-  // test("register plugin",  async (t: TestContext) => {
-  //   // Given
-  //   const engine = createEngine({
-  //     url: container.getConnectionString(),
-  //     clientOpts: {
-  //       directConnection: true
-  //     },
-  //     dbName: randomUUID(),
-  //     signal: t.signal,
-  //     delayBetweenPulls: 10
-  //   })
-  //
-  //   let hookExecuted = false
-  //   let state
-  //   let errors: unknown[] = []
-  //
-  //   const workflow = rivr.workflow<number>("complex-calculation")
-  //     .register(workflow => workflow.decorate("add", (x: number, y: number) => x + y))
-  //     .step({
-  //       name: "add-3",
-  //       handler: ({ state, workflow }) => workflow.add(state, 3)
-  //     })
-  //     .addHook("onWorkflowCompleted", (w, s) => {
-  //       hookExecuted = true
-  //       state = s
-  //     })
-  //     .addHook("onStepError", error => errors.push(error))
-  //
-  //   await engine.createWorker().start([ workflow ])
-  //
-  //   // When
-  //   await engine.createTrigger().trigger(workflow, 3)
-  //
-  //   // Then
-  //   let now = new Date().getTime()
-  //   while (!hookExecuted && new Date().getTime() - now < 5_000) {
-  //     await setTimeout(20)
-  //     t.assert.deepStrictEqual(errors, [])
-  //   }
-  //   t.assert.deepEqual(state, 6)
-  // })
+  test("register plugin",  async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      clientOpts: {
+        directConnection: true
+      },
+      dbName: randomUUID(),
+      signal: t.signal,
+      delayBetweenPulls: 10
+    })
+
+    let hookExecuted = false
+    let state
+    let errors: unknown[] = []
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .register(workflow => workflow.decorate("add", (x: number, y: number) => x + y))
+      .step({
+        name: "add-3",
+        handler: ({ state, workflow }) => workflow.add(state, 3)
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+        hookExecuted = true
+        state = s
+      })
+      .addHook("onStepError", error => errors.push(error))
+
+    await engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 3)
+
+    // Then
+    let now = new Date().getTime()
+    while (!hookExecuted && new Date().getTime() - now < 5_000) {
+      await setTimeout(20)
+      t.assert.deepStrictEqual(errors, [])
+    }
+    t.assert.deepEqual(state, 6)
+  })
   //
   // test("register step in a plugin",  async (t) => {
   //   // Given
