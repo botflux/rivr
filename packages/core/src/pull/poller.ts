@@ -152,7 +152,7 @@ export class Poller<TriggerOpts> implements Worker {
           if (!mStepAndContext)
             continue
 
-          const [step, executionContext] = mStepAndContext
+          const {item: step, context: executionContext} = mStepAndContext
 
           const result = await this.#handleStep(step, task, executionContext)
           const newState = updateWorkflowState(task, step as Step<unknown, unknown, FirstState, StateByStepName, Decorators>, result)

@@ -168,7 +168,7 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
     getStepByName(name: string): WithContext<Step<State, unknown, FirstState, StateByStepName, EmptyDecorator>, State, FirstState, StateByStepName, EmptyDecorator> | undefined {
       for (const node of this.list) {
         if (node.type === "step" && node.step.name === name) {
-          return [ node.step as unknown as Step<State, unknown, FirstState, StateByStepName, EmptyDecorator>, node.context ]
+          return { item: node.step as unknown as Step<State, unknown, FirstState, StateByStepName, EmptyDecorator>, context: node.context }
         }
       }
     },

@@ -57,7 +57,7 @@ describe('state', function () {
     await workflow.ready()
 
     // When
-    const [ step ] = workflow.getStepByName("add-1")!
+    const { item: step } = workflow.getStepByName("add-1")!
     const state = createWorkflowState(workflow, "add-1", 1, id)
     const newState = updateWorkflowState(state, step, {
       type: "success",
@@ -106,7 +106,7 @@ describe('state', function () {
     await workflow.ready()
 
     // When
-    const [ step ] = workflow.getStepByName("add-1")!
+    const { item: step } = workflow.getStepByName("add-1")!
     const state = createWorkflowState(workflow, "add-1", 1, id)
     const newState = updateWorkflowState(state, step, {
       type: "success",
@@ -157,7 +157,7 @@ describe('state', function () {
     await workflow.ready()
 
     // When
-    const [ step ] = workflow.getStepByName("add-1")!
+    const { item: step } = workflow.getStepByName("add-1")!
     const state = createWorkflowState(workflow, "add-1", 1, id)
     const newState = updateWorkflowState(state, step, {
       type: "skipped",
@@ -210,7 +210,7 @@ describe('state', function () {
     await workflow.ready()
 
     // When
-    const [ step ] = workflow.getStepByName("add-1")!
+    const { item: step } = workflow.getStepByName("add-1")!
     const state = createWorkflowState(workflow, "add-1", 1, id)
     const newState = updateWorkflowState(state, step, {
       type: "stopped",
@@ -261,7 +261,7 @@ describe('state', function () {
     await workflow.ready()
 
     // When
-    const [ step ] = workflow.getStepByName("add-1")!
+    const { item: step } = workflow.getStepByName("add-1")!
     const state = createWorkflowState(workflow, "add-1", 1, id)
     const newState = updateWorkflowState(state, step, {
       type: "failure",
@@ -310,7 +310,7 @@ describe('state', function () {
     await workflow.ready()
 
     // When
-    const [ step ] = workflow.getStepByName("add-1")!
+    const { item: step } = workflow.getStepByName("add-1")!
     const state = createWorkflowState(workflow, "add-1", 1, id)
     const newState = updateWorkflowState(state, step, {
       type: "failure",
@@ -362,7 +362,7 @@ describe('state', function () {
     await workflow.ready()
 
     // When
-    const [ step ] = workflow.getStepByName("add-1")!
+    const { item: step } = workflow.getStepByName("add-1")!
     const state = createWorkflowState(workflow, "add-1", 1, id)
     const newState = updateWorkflowState(state, step, {
       type: "failure",
