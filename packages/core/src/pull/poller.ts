@@ -166,7 +166,7 @@ export class Poller<TriggerOpts> implements Worker {
 
           switch(result.type) {
             case "stopped": {
-              for (const [handler, context] of mWorkflow.getHook("onWorkflowStopped")) {
+              for (const { item: handler, context } of mWorkflow.getHook("onWorkflowStopped")) {
                 const [, error] = tryCatchSync(() => handler(context, step, task.toExecute.state))
 
                 if (error !== undefined) {
@@ -185,7 +185,7 @@ export class Poller<TriggerOpts> implements Worker {
               const mNextStep = mWorkflow.getNextStep(task.toExecute.step)
 
               if (result.type === "skipped") {
-                for (const [handler, context] of mWorkflow.getHook("onStepSkipped")) {
+                for (const { item: handler, context } of mWorkflow.getHook("onStepSkipped")) {
                   const [, error] = tryCatchSync(() => handler(context, step, task.toExecute.state))
 
                   if (error !== undefined) {
@@ -194,7 +194,7 @@ export class Poller<TriggerOpts> implements Worker {
                 }
               }
 
-              for (const [handler, context] of mWorkflow.getHook("onStepCompleted")) {
+              for (const { item: handler, context } of mWorkflow.getHook("onStepCompleted")) {
                 const [, error] = tryCatchSync(() => handler(context, step, newState as State))
 
                 if (error !== undefined) {
@@ -203,7 +203,7 @@ export class Poller<TriggerOpts> implements Worker {
               }
 
               if (mNextStep === undefined) {
-                for (const [handler, context] of mWorkflow.getHook("onWorkflowCompleted")) {
+                for (const { item: handler, context } of mWorkflow.getHook("onWorkflowCompleted")) {
                   const [ , err ] = tryCatchSync(() => handler.call(context, context, newState as State))
 
                   if (err !== undefined) {
@@ -219,8 +219,8 @@ export class Poller<TriggerOpts> implements Worker {
               const hasExhaustedRetry = task.toExecute.attempt + 1 > step.maxAttempts
               const mNextStep = mWorkflow.getNextStep(task.toExecute.step)
 
-              for (const [hook, context] of mWorkflow.getHook("onStepError")) {
-                const [, error] = tryCatchSync(() => hook(result.error, context, task.toExecute.state))
+              for (const { item: handler, context } of mWorkflow.getHook("onStepError")) {
+                const [, error] = tryCatchSync(() => handler(result.error, context, task.toExecute.state))
 
                 if (error !== undefined) {
                   this.#executeErrorHooks(error)
@@ -228,8 +228,8 @@ export class Poller<TriggerOpts> implements Worker {
               }
 
               if (hasExhaustedRetry && !step.optional) {
-                for (const [hook, context] of mWorkflow.getHook("onWorkflowFailed")) {
-                  const [, error] = tryCatchSync(() => hook(result.error, context, step, task.toExecute.state))
+                for (const { item: handler, context } of mWorkflow.getHook("onWorkflowFailed")) {
+                  const [, error] = tryCatchSync(() => handler(result.error, context, step, task.toExecute.state))
 
                   if (error !== undefined) {
                     this.#executeErrorHooks(error)
@@ -238,8 +238,8 @@ export class Poller<TriggerOpts> implements Worker {
               }
 
               if (hasExhaustedRetry && step.optional && mNextStep === undefined) {
-                for (const [hook, context] of mWorkflow.getHook("onWorkflowCompleted")) {
-                  const [, error] = tryCatchSync(() => hook(context, task.toExecute.state))
+                for (const { item: handler, context } of mWorkflow.getHook("onWorkflowCompleted")) {
+                  const [, error] = tryCatchSync(() => handler(context, task.toExecute.state))
 
                   if (error !== undefined) {
                     this.#executeErrorHooks(error)

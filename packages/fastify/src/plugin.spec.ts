@@ -21,7 +21,7 @@ after(async () => {
 describe('fastify integration', function () {
   test("should be able to start a worker", async (t: TestContext) => {
     // Given
-    let result: number | undefined
+    let result: unknown
 
     const workflow = rivr.workflow<number>("calc")
       .step({

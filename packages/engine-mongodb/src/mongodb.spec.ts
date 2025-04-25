@@ -379,7 +379,7 @@ describe('basic flow control', function () {
 
     t.after(async () => await engine.close())
 
-    let result: string | undefined
+    let result: unknown
 
     const workflow = rivr.workflow<number>("complex-calculation")
       .step({
@@ -417,7 +417,7 @@ describe('basic flow control', function () {
 
     t.after(async () => await engine.close())
 
-    let result: string | undefined = undefined
+    let result: unknown
 
     const workflow = rivr.workflow<boolean>("complex-calculation")
       .step({
@@ -460,7 +460,7 @@ describe('advance flow control', function () {
       delayBetweenPulls: 10
     })
 
-    let state: number | undefined
+    let state: unknown
     let errors: unknown[] = []
 
     const workflow = rivr.workflow<number>("complex-calculation")
@@ -509,7 +509,7 @@ describe('advance flow control', function () {
       delayBetweenPulls: 10
     })
 
-    let state: number | undefined
+    let state: unknown
     let errors: unknown[] = []
 
     const workflow = rivr.workflow<number>("complex-calculation")
@@ -559,7 +559,7 @@ describe('advance flow control', function () {
       delayBetweenPulls: 10
     })
 
-    let state: number | undefined
+    let state: unknown
     let workflowFailedCalled = false
 
     const workflow = rivr.workflow<number>("complex-calculation")
@@ -671,7 +671,7 @@ describe('advance flow control', function () {
       delayBetweenPulls: 10
     })
 
-    let state: number | undefined
+    let state: unknown
 
     const workflow = rivr.workflow<number>("complex-calculation")
       .step({
@@ -715,7 +715,7 @@ describe('advance flow control', function () {
       delayBetweenPulls: 10
     })
 
-    let state: number | undefined
+    let state: unknown
 
     const workflow = rivr.workflow<number>("complex-calculation")
       .step({
@@ -1100,7 +1100,7 @@ describe('transaction', function () {
 
     const db = randomUUID()
 
-    let state: number | undefined
+    let state: unknown
 
     const workflow = rivr.workflow<number>("complex-calculation")
       .step({
@@ -1141,7 +1141,7 @@ describe('transaction', function () {
       delayBetweenPulls: 10
     })
 
-    const states: number[] = []
+    const states: unknown[] = []
 
     const workflow = rivr.workflow<number>("complex-calculation")
       .step({
@@ -1410,7 +1410,7 @@ describe("resilience", () => {
       delayBetweenPulls: 10
     })
 
-    let state: number | undefined
+    let state: unknown
 
     const workflow = rivr.workflow<number>("complex-calculation")
       .step({
@@ -1502,7 +1502,7 @@ describe('storage', function () {
       },
     })
 
-    let result: number | undefined
+    let result: unknown
 
     const workflow = rivr.workflow<number>("complex-calculation")
       .step({

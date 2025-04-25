@@ -4,13 +4,14 @@ import {
   OnStepSkippedHook,
   OnWorkflowCompletedHook,
   OnWorkflowFailedHook,
-  OnWorkflowStoppedHook, ReadyWorkflow,
+  OnWorkflowStoppedHook,
+  ReadyWorkflow,
   Step,
   StepOpts,
   WithContext,
   Workflow as PublicWorkflow,
 } from "./types";
-import { List, Slice, ArrayAdapter } from "./utils/list"
+import {ArrayAdapter, List, Slice} from "./utils/list"
 
 type EmptyDecorator = Record<never, never>
 type EmptyStateByStep = Record<never, never>
@@ -22,18 +23,18 @@ type StepElement<State, StateOut, FirstState, StateByStepName extends EmptyState
   step: Step<State, StateOut, FirstState, EmptyDecorator, StateByStepName>
 }
 
-type Hook<State, FirstState, StateByStepName extends EmptyStateByStep> =
-  | { type: "onStepCompleted", hook: OnStepCompletedHook<State, FirstState, StateByStepName, EmptyDecorator> }
-  | { type: "onStepError", hook: OnStepErrorHook<State, FirstState, StateByStepName, EmptyDecorator> }
-  | { type: "onStepSkipped", hook: OnStepSkippedHook<State, FirstState, StateByStepName, EmptyDecorator> }
-  | { type: "onWorkflowCompleted", hook: OnWorkflowCompletedHook<State, FirstState, StateByStepName, EmptyDecorator> }
-  | { type: "onWorkflowFailed", hook: OnWorkflowFailedHook<State, FirstState, StateByStepName, EmptyDecorator> }
-  | { type: "onWorkflowStopped", hook: OnWorkflowStoppedHook<State, FirstState, StateByStepName, EmptyDecorator> }
+type Hook =
+  | { type: "onStepCompleted", hook: OnStepCompletedHook<EmptyDecorator> }
+  | { type: "onStepError", hook: OnStepErrorHook<EmptyDecorator> }
+  | { type: "onStepSkipped", hook: OnStepSkippedHook<EmptyDecorator> }
+  | { type: "onWorkflowCompleted", hook: OnWorkflowCompletedHook<EmptyDecorator> }
+  | { type: "onWorkflowFailed", hook: OnWorkflowFailedHook<EmptyDecorator> }
+  | { type: "onWorkflowStopped", hook: OnWorkflowStoppedHook<EmptyDecorator> }
 
 type HookElement<State, FirstState, StateByStepName extends EmptyStateByStep> = {
   type: "hook"
   context: Workflow<State, FirstState, StateByStepName>
-  hook: Hook<State, FirstState, StateByStepName>
+  hook: Hook
   id: number
 }
 
@@ -131,7 +132,7 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
         hook: {
           type: hook,
           hook: handler
-        } as Hook<State, FirstState, StateByStepName>
+        } as Hook
       })
       return this
     },
@@ -199,7 +200,10 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
       return Array.from(this.list)
         .filter(isHook)
         .filter(isHookType(hook))
-        .map(node => [node.hook.hook, node.context])
+        .map(node => ({
+          item: node.hook.hook,
+          context: node.context
+        }))
     },
     async ready(): Promise<ReadyWorkflow<State, FirstState, StateByStepName, EmptyDecorator>> {
       if (this.isReady) {
