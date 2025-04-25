@@ -18,7 +18,7 @@ export type StepResult<State> =
   | Failure<State>
   | Skipped<State>
   | Stopped<State>
-export type HandlerOpts<State, FirstState, StateByStepName extends Record<never, never>, Decorators> = {
+export type HandlerOpts<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>> = {
   state: State
   workflow: ReadyWorkflow<State, FirstState, StateByStepName, Decorators>
   ok: (state: State) => Success<State>
@@ -27,8 +27,8 @@ export type HandlerOpts<State, FirstState, StateByStepName extends Record<never,
   stop: () => Stopped<State>
   attempt: number
 }
-export type Handler<StateIn, StateOut, FirstState, StateByStepName extends Record<never, never>, Decorators> = (opts: HandlerOpts<StateIn, FirstState, StateByStepName, Decorators>) => StateOut | StepResult<StateOut> | Promise<StateOut> | Promise<StepResult<StateOut>>
-export type Step<Decorators> = {
+export type Handler<StateIn, StateOut, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>> = (opts: HandlerOpts<StateIn, FirstState, StateByStepName, Decorators>) => StateOut | StepResult<StateOut> | Promise<StateOut> | Promise<StepResult<StateOut>>
+export type Step<Decorators extends Record<never, never>> = {
   name: string
   handler: Handler<unknown, unknown, unknown, Record<never, never>, Decorators>
   maxAttempts: number
@@ -36,7 +36,7 @@ export type Step<Decorators> = {
   delayBetweenAttempts: number | ((attempt: number) => number)
 }
 
-export type StepOpts<Name extends string, StateIn, StateOut, FirstState, StateByStepName extends Record<never, never>, Decorators> = {
+export type StepOpts<Name extends string, StateIn, StateOut, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>> = {
   name: Name
   handler: Handler<StateIn, StateOut, FirstState, StateByStepName, Decorators>
   maxAttempts?: number
@@ -48,38 +48,41 @@ export type StepOpts<Name extends string, StateIn, StateOut, FirstState, StateBy
   optional?: boolean
 }
 
-export type OnWorkflowCompletedHook<Decorators> = (
-  workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>, state: unknown
+export type OnWorkflowCompletedHook<Decorators extends Record<never, never>> = (
+  workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
+  state: unknown
 ) => void
-export type OnStepErrorHook<Decorators> = (
+export type OnStepErrorHook<Decorators extends Record<never, never>> = (
   error: unknown,
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   state: unknown
 ) => void
-export type OnStepSkippedHook<Decorators> = (
+export type OnStepSkippedHook<Decorators extends Record<never, never>> = (
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step<Decorators>, state: unknown
 ) => void
-export type OnWorkflowStoppedHook<Decorators> = (
+export type OnWorkflowStoppedHook<Decorators extends Record<never, never>> = (
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step<Decorators>, state: unknown
 ) => void
-export type OnWorkflowFailedHook<Decorators> = (
+export type OnWorkflowFailedHook<Decorators extends Record<never, never>> = (
   error: unknown,
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step<Decorators>,
   state: unknown
 ) => void
-export type OnStepCompletedHook<Decorators> = (
-  workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>, step: Step<Decorators>, state: unknown
+export type OnStepCompletedHook<Decorators extends Record<never, never>> = (
+  workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
+  step: Step<Decorators>,
+  state: unknown
 ) => void
 
-export type WithContext<T, Decorators> = {
+export type WithContext<T, Decorators extends Record<never, never>> = {
   item: T
   context: ReadyWorkflow<any, any, any, Decorators>
 }
 
-export type Workflow<State, FirstState, StateByStepName extends Record<never, never>, Decorators> = {
+export type Workflow<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>> = {
   /**
    * The name of the workflow.
    */
@@ -185,4 +188,4 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
   ready(): Promise<ReadyWorkflow<State, FirstState, StateByStepName, Decorators>>
 }
 
-export type ReadyWorkflow<State, FirstState, StateByStepName extends Record<never, never>, Decorators> = Workflow<State, FirstState, StateByStepName, Decorators> & Decorators
+export type ReadyWorkflow<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>> = Workflow<State, FirstState, StateByStepName, Decorators> & Decorators

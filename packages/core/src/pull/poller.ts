@@ -21,7 +21,7 @@ export type PullOpts = {
 }
 
 export interface Storage<WriteOpts> {
-  pull<State, Decorators, FirstState, StateByStepName extends Record<never, never>>(
+  pull<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<never, never>>(
     workflows: Workflow<State, FirstState, StateByStepName, Decorators>[],
     opts: PullOpts
   ): Promise<WorkflowState<State>[]>
@@ -51,7 +51,7 @@ export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trig
     this.#storage = storage
   }
 
-  async trigger<State, FirstState, StateByStepName extends Record<never, never>, Decorators>(
+  async trigger<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(
     workflow: Workflow<State, FirstState, StateByStepName, Decorators>,
     state: FirstState,
     opts?: TriggerOpts
@@ -79,7 +79,7 @@ export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trig
     return s
   }
 
-  async triggerFrom<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName, Decorators>(
+  async triggerFrom<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName, Decorators extends Record<never, never>>(
     workflow: Workflow<State, FirstState, StateByStepName, Decorators>,
     name: Name,
     state: StateByStepName[Name],
@@ -129,7 +129,7 @@ export class Poller<TriggerOpts> implements Worker {
     this.#countPerPull = countPerPull
   }
 
-  async start<State, FirstState, StateByStepName extends Record<never, never>, Decorators>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<void> {
+  async start<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<void> {
     const readyWorkflows = await Promise.all(workflows.map(async workflow => workflow.ready()))
 
     ;(async () => {
@@ -274,7 +274,7 @@ export class Poller<TriggerOpts> implements Worker {
     await this.#storage.disconnect()
   }
 
-  async #handleStep<State, Decorators>(
+  async #handleStep<State, Decorators extends Record<never, never>>(
     step: Step<Decorators>,
     state: WorkflowState<State>,
     workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>

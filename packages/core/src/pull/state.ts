@@ -88,7 +88,7 @@ export function createWorkflowState<State, FirstState, StateByStepName extends R
   }
 }
 
-export function updateWorkflowState<State, Decorators>(state: WorkflowState<State>, step: Step<Decorators>, result: StepResult<State>, now = new Date()): WorkflowState<State> {
+export function updateWorkflowState<State, Decorators extends Record<never, never>>(state: WorkflowState<State>, step: Step<Decorators>, result: StepResult<State>, now = new Date()): WorkflowState<State> {
   const stepStateIndex = state.steps.findIndex(s => s.name === step.name)
   const stepState = state.steps[stepStateIndex]
 
@@ -132,7 +132,7 @@ function resultToAttemptStatus (result: StepResult<unknown>): AttemptStatus {
  * @param result
  * @param now
  */
-function getNextTask<State, Decorators>(state: WorkflowState<State>, step: Step<Decorators>, result: StepResult<State>, now: Date): [Task<State>, WorkflowStatus] {
+function getNextTask<State, Decorators extends Record<never, never>>(state: WorkflowState<State>, step: Step<Decorators>, result: StepResult<State>, now: Date): [Task<State>, WorkflowStatus] {
   const { delayBetweenAttempts: delayFnOrNumber, maxAttempts, optional } = step
   const currentStepIndex = state.steps.findIndex(s => s.name === step.name)
 
