@@ -73,9 +73,9 @@ export type OnWorkflowFailedHook<Decorators> = (
 export type OnStepCompletedHook<Decorators> = (
   workflow: ReadyWorkflow<any, any, any, Decorators>, step: Step<any, any, any, any, Decorators>, state: unknown) => void
 
-export type WithContext<T, State, FirstState, StateByStepName extends Record<never, never>, Decorators> = {
+export type WithContext<T, Decorators> = {
   item: T
-  context: ReadyWorkflow<State, FirstState, StateByStepName, Decorators>
+  context: ReadyWorkflow<any, any, any, Decorators>
 }
 
 export type Workflow<State, FirstState, StateByStepName extends Record<never, never>, Decorators> = {
@@ -96,7 +96,7 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
    *
    * @param name
    */
-  getStepByName(name: string): WithContext<Step<State, unknown, FirstState, StateByStepName, Decorators>, State, FirstState, StateByStepName, Decorators> | undefined
+  getStepByName(name: string): WithContext<Step<State, unknown, FirstState, StateByStepName, Decorators>, Decorators> | undefined
 
   /**
    * Search the step succeeding the step matching the given name.
@@ -170,12 +170,12 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
 
   addHook(hook: "onWorkflowFailed", handler: OnWorkflowFailedHook<Decorators>): Workflow<State, FirstState, StateByStepName, Decorators>
 
-  getHook(hook: "onStepCompleted"): WithContext<OnStepCompletedHook<Decorators>, State, FirstState, StateByStepName, Decorators>[]
-  getHook(hook: "onWorkflowCompleted"): WithContext<OnWorkflowCompletedHook<Decorators>, State, FirstState, StateByStepName, Decorators>[]
-  getHook(hook: "onStepError"): WithContext<OnStepErrorHook<Decorators>, State, FirstState, StateByStepName, Decorators>[]
-  getHook(hook: "onStepSkipped"): WithContext<OnStepSkippedHook<Decorators>, State, FirstState, StateByStepName, Decorators>[]
-  getHook(hook: "onWorkflowStopped"): WithContext<OnWorkflowStoppedHook<Decorators>, State, FirstState, StateByStepName, Decorators>[]
-  getHook(hook: "onWorkflowFailed"): WithContext<OnWorkflowFailedHook<Decorators>, State, FirstState, StateByStepName, Decorators>[]
+  getHook(hook: "onStepCompleted"): WithContext<OnStepCompletedHook<Decorators>, Decorators>[]
+  getHook(hook: "onWorkflowCompleted"): WithContext<OnWorkflowCompletedHook<Decorators>, Decorators>[]
+  getHook(hook: "onStepError"): WithContext<OnStepErrorHook<Decorators>, Decorators>[]
+  getHook(hook: "onStepSkipped"): WithContext<OnStepSkippedHook<Decorators>, Decorators>[]
+  getHook(hook: "onWorkflowStopped"): WithContext<OnWorkflowStoppedHook<Decorators>, Decorators>[]
+  getHook(hook: "onWorkflowFailed"): WithContext<OnWorkflowFailedHook<Decorators>, Decorators>[]
 
   /**
    * Execute the dependency graph.
