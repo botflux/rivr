@@ -133,14 +133,6 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
           hook: handler
         } as Hook<State, FirstState, StateByStepName>
       })
-      // this.dag.addNode({
-      //     type: "hook",
-      //     context: this as Workflow<State>,
-      //     hook: {
-      //         type: hook,
-      //         hook: handler
-      //     } as Hook<State>
-      // }, (this as Workflow<State>).node)
       return this
     },
     step<Name extends string, StateOut>(opts: StepOpts<Name, State, StateOut, FirstState, StateByStepName, EmptyDecorator>) {
