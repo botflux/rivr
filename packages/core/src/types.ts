@@ -272,6 +272,8 @@ export function rivrPlugin<
   })
 
   Object.defineProperty(plugin, "name", { value: opts.name })
+
+  // @ts-expect-error TODO: find out why I need this ts-expect-error
   return plugin
 }
 
@@ -291,7 +293,7 @@ export type MergeUnionTypes<T> = (T extends any ? (x: T) => any : never) extends
 
 export type EnsureRecord<T> = T extends Record<never, never>
     ? T
-    : never
+    : Record<never, never>
 
 export type DecoratorsFromDeps<Deps extends RivrPlugin<any, any, any, any, any>[]> =
   EnsureRecord<MergeUnionTypes<GetDecorator<UnwrapItem<Deps>>>>
@@ -299,15 +301,18 @@ export type DecoratorsFromDeps<Deps extends RivrPlugin<any, any, any, any, any>[
 const plugin1 = rivrPlugin({
   name: "my-plugin",
   plugin: p => {
-    const w = p.input().decorate("foo", 1)
-
-    return w
+    return p.input().decorate("foo", 1)
   }
 })
 
 const plugin2 = rivrPlugin({
   name: "plugin-2",
-  plugin: p => p.input().decorate("bar", 2)
+  deps: [ plugin1 ],
+  plugin: p => {
+    const w = p.input()
+
+    return w.decorate("bar", 2 + w.foo)
+  }
 })
 
 
