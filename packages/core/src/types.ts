@@ -197,6 +197,10 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
     plugin: PlainPlugin<State, FirstState, StateByStepName, Decorators, OutState, OutStateByStepName, OutDecorators>
   ): Workflow<OutState, FirstState, OutStateByStepName, OutDecorators>
 
+  register<OutDecorators extends Record<never, never>>(
+    plugin: RivrPlugin<Nothing, Nothing, Record<string, never>, OutDecorators>
+  ): Workflow<State, FirstState, StateByStepName, Decorators & OutDecorators>
+
   register<OutState, OutStateByStepName extends Record<string, never>, OutDecorators extends Record<never, never>>(
     plugin: RivrPlugin<OutState, State, OutStateByStepName, OutDecorators>
   ): Workflow<OutState, FirstState, StateByStepName & OutStateByStepName, Decorators & OutDecorators>
@@ -232,8 +236,11 @@ export type RivrPlugin<
   name: string
 }
 
+const kNothing = Symbol("nothing")
+type Nothing = { [kNothing]: true }
+
 interface PluginBuilder {
-  input<T> (): ReadyWorkflow<T, T, Record<string, never>, Record<never, never>>
+  input<T = Nothing> (): ReadyWorkflow<T, T, Record<string, never>, Record<never, never>>
 }
 
 export type RivrPlugin2Opts<
