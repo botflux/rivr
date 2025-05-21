@@ -4,7 +4,7 @@ import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongo
 import { randomUUID } from "crypto"
 import { setTimeout } from "timers/promises"
 import { createEngine } from "./mongodb"
-import {rivr, rivrPlugin2} from "rivr"
+import {rivr, rivrPlugin} from "rivr"
 import {Network, StartedNetwork} from "testcontainers";
 import {CreatedProxy, StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
 import {MongoBulkWriteError} from "mongodb";
@@ -843,7 +843,7 @@ describe('extension', function () {
       }
     })
 
-    const plugin = rivrPlugin2({
+    const plugin = rivrPlugin({
       name: "my-plugin",
       plugin: p => p.input<number>().step({
         name: "add-1",
@@ -930,7 +930,7 @@ describe('extension', function () {
       delayBetweenPulls: 10
     })
 
-    const pluginA = rivrPlugin2({
+    const pluginA = rivrPlugin({
       name: "plugin-a",
       plugin: p => p.input().decorate("foo", 1)
     })

@@ -243,7 +243,7 @@ interface PluginBuilder {
   input<T = Nothing> (): ReadyWorkflow<T, T, Record<string, never>, Record<never, never>>
 }
 
-export type RivrPlugin2Opts<
+export type RivrPluginOpts<
   OutState,
   FirstPluginState,
   PluginStateByStepName extends Record<string, never>,
@@ -253,13 +253,13 @@ export type RivrPlugin2Opts<
   plugin: (w: PluginBuilder) => Workflow<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators>
 }
 
-export function rivrPlugin2<
+export function rivrPlugin<
   OutState,
   FirstPluginState,
   PluginStateByStepName extends Record<string, never>,
   PluginDecorators extends Record<never, never>
 > (
-  opts: RivrPlugin2Opts<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators>
+  opts: RivrPluginOpts<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators>
 ): RivrPlugin<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators> {
   const plugin = (w: ReadyWorkflow<any, any, Record<string, never>, Record<never, never>>) => opts.plugin({
     input<T>(): ReadyWorkflow<T, T, Record<string, never>, Record<never, never>> {
