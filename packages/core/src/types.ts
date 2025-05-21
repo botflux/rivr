@@ -230,7 +230,7 @@ export type RivrPlugin<
   OutState,
   FirstPluginState,
   PluginStateByStepName extends Record<string, never>,
-  PluginDecorators extends Record<never, never>
+  PluginDecorators extends Record<never, never>,
 > = {
   (w: ReadyWorkflow<any, any, Record<string, never>, Record<never, never>>): Workflow<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators>
   name: string
@@ -247,7 +247,7 @@ export type RivrPluginOpts<
   OutState,
   FirstPluginState,
   PluginStateByStepName extends Record<string, never>,
-  PluginDecorators extends Record<never, never>
+  PluginDecorators extends Record<never, never>,
 > = {
   name: string
   plugin: (w: PluginBuilder) => Workflow<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators>
@@ -269,4 +269,53 @@ export function rivrPlugin<
 
   Object.defineProperty(plugin, "name", { value: opts.name })
   return plugin
+}
+
+
+export type UnwrapItem<T> = T extends (infer U)[] ? U : never
+export type GetDecorator<T> = T extends RivrPlugin<any, any, any, infer U> ? U : never
+/**
+ * Claude gave me this typescript type.
+ * I don't understand the hack that make this works, but essentially
+ * this type merges unions.
+ *
+ * So, this type will map this: `{ foo: string } | { bar: string }`,
+ * to this `{ foo: string } & { bar: string }`.
+ */
+export type MergeUnionTypes<T> = (T extends any ? (x: T) => any : never) extends
+  (x: infer R) => any ? R : never;
+
+export type EnsureRecord<T> = T extends Record<never, never>
+    ? T
+    : never
+
+export type DecoratorsFromDeps<Deps extends RivrPlugin<any, any, any, any>[]> =
+  EnsureRecord<MergeUnionTypes<GetDecorator<UnwrapItem<Deps>>>>
+
+const plugin1 = rivrPlugin({
+  name: "my-plugin",
+  plugin: p => p.input().decorate("foo", 1)
+})
+
+const plugin2 = rivrPlugin({
+  name: "plugin-2",
+  plugin: p => p.input().decorate("bar", 2)
+})
+
+const plugin3 = rivrPlugin({
+  name: "plugin-3",
+  deps: [ plugin1, plugin2 ],
+  plugin: p => {
+    const w = p.input()
+
+
+    return w.decorate("foobar", w.foo + w.bar)
+  }
+})
+
+type D = DecoratorsFromDeps<[ typeof plugin1, typeof plugin2 ]>
+
+const d: D = {
+  bar: 2,
+  foo: 1
 }
