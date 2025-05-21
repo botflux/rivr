@@ -198,11 +198,11 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
   ): Workflow<OutState, FirstState, OutStateByStepName, OutDecorators>
 
   register<OutDecorators extends Record<never, never>>(
-    plugin: RivrPlugin<Nothing, Nothing, Record<string, never>, OutDecorators>
+    plugin: RivrPlugin<Nothing, Nothing, Record<string, never>, OutDecorators, any>
   ): Workflow<State, FirstState, StateByStepName, Decorators & OutDecorators>
 
   register<OutState, OutStateByStepName extends Record<string, never>, OutDecorators extends Record<never, never>>(
-    plugin: RivrPlugin<OutState, State, OutStateByStepName, OutDecorators>
+    plugin: RivrPlugin<OutState, State, OutStateByStepName, OutDecorators, any>
   ): Workflow<OutState, FirstState, StateByStepName & OutStateByStepName, Decorators & OutDecorators>
 }
 
@@ -231,16 +231,17 @@ export type RivrPlugin<
   FirstPluginState,
   PluginStateByStepName extends Record<string, never>,
   PluginDecorators extends Record<never, never>,
+  Deps extends RivrPlugin<any, any, any, any, any>[]
 > = {
-  (w: ReadyWorkflow<any, any, Record<string, never>, Record<never, never>>): Workflow<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators>
+  (w: ReadyWorkflow<any, any, Record<string, never>, DecoratorsFromDeps<Deps>>): Workflow<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators>
   name: string
 }
 
 const kNothing = Symbol("nothing")
 type Nothing = { [kNothing]: true }
 
-interface PluginBuilder {
-  input<T = Nothing> (): ReadyWorkflow<T, T, Record<string, never>, Record<never, never>>
+interface PluginBuilder<Deps extends RivrPlugin<any, any, any, Record<never, never>, any>[]> {
+  input<T = Nothing> (): ReadyWorkflow<T, T, Record<string, never>, DecoratorsFromDeps<Deps>>
 }
 
 export type RivrPluginOpts<
@@ -248,21 +249,24 @@ export type RivrPluginOpts<
   FirstPluginState,
   PluginStateByStepName extends Record<string, never>,
   PluginDecorators extends Record<never, never>,
+  Deps extends RivrPlugin<any, any, any, Record<never, never>, any>[] = []
 > = {
   name: string
-  plugin: (w: PluginBuilder) => Workflow<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators>
+  deps?: Deps
+  plugin: (w: PluginBuilder<Deps>) => Workflow<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators>
 }
 
 export function rivrPlugin<
   OutState,
   FirstPluginState,
   PluginStateByStepName extends Record<string, never>,
-  PluginDecorators extends Record<never, never>
+  PluginDecorators extends Record<never, never>,
+  Deps extends RivrPlugin<any, any, any, Record<never, never>, any>[]
 > (
-  opts: RivrPluginOpts<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators>
-): RivrPlugin<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators> {
-  const plugin = (w: ReadyWorkflow<any, any, Record<string, never>, Record<never, never>>) => opts.plugin({
-    input<T>(): ReadyWorkflow<T, T, Record<string, never>, Record<never, never>> {
+  opts: RivrPluginOpts<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators, Deps>
+): RivrPlugin<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators, any> {
+  const plugin = (w: ReadyWorkflow<any, any, Record<string, never>, DecoratorsFromDeps<Deps>>) => opts.plugin({
+    input<T>(): ReadyWorkflow<T, T, Record<string, never>, DecoratorsFromDeps<Deps>> {
       return w
     }
   })
@@ -273,7 +277,7 @@ export function rivrPlugin<
 
 
 export type UnwrapItem<T> = T extends (infer U)[] ? U : never
-export type GetDecorator<T> = T extends RivrPlugin<any, any, any, infer U> ? U : never
+export type GetDecorator<T> = T extends RivrPlugin<any, any, any, infer U, any> ? U : never
 /**
  * Claude gave me this typescript type.
  * I don't understand the hack that make this works, but essentially
@@ -289,12 +293,16 @@ export type EnsureRecord<T> = T extends Record<never, never>
     ? T
     : never
 
-export type DecoratorsFromDeps<Deps extends RivrPlugin<any, any, any, any>[]> =
+export type DecoratorsFromDeps<Deps extends RivrPlugin<any, any, any, any, any>[]> =
   EnsureRecord<MergeUnionTypes<GetDecorator<UnwrapItem<Deps>>>>
 
 const plugin1 = rivrPlugin({
   name: "my-plugin",
-  plugin: p => p.input().decorate("foo", 1)
+  plugin: p => {
+    const w = p.input().decorate("foo", 1)
+
+    return w
+  }
 })
 
 const plugin2 = rivrPlugin({
@@ -302,20 +310,4 @@ const plugin2 = rivrPlugin({
   plugin: p => p.input().decorate("bar", 2)
 })
 
-const plugin3 = rivrPlugin({
-  name: "plugin-3",
-  deps: [ plugin1, plugin2 ],
-  plugin: p => {
-    const w = p.input()
 
-
-    return w.decorate("foobar", w.foo + w.bar)
-  }
-})
-
-type D = DecoratorsFromDeps<[ typeof plugin1, typeof plugin2 ]>
-
-const d: D = {
-  bar: 2,
-  foo: 1
-}
