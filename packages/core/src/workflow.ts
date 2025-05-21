@@ -43,7 +43,7 @@ type PluginElement<State, FirstState, StateByStepName extends EmptyStateByStep> 
   type: "plugin"
   id: number
   context: Workflow<State, FirstState, StateByStepName>
-  plugin: RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>, any>
+  plugin: RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>, unknown, any>
   pluginOpts?: unknown | ((w: Workflow<State, FirstState, StateByStepName>) => unknown)
 }
 
@@ -204,15 +204,15 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
           context: node.context
         }))
     },
-    register<OutState, OutStateByStepName extends StateByStepName, OutDecorators extends EmptyDecorator>(plugin: PlainPlugin<State, FirstState, StateByStepName, EmptyDecorator, OutState, OutStateByStepName, OutDecorators>): PublicWorkflow<OutState, FirstState, OutStateByStepName, OutDecorators> {
+    register<OutState, OutStateByStepName extends StateByStepName, OutDecorators extends EmptyDecorator, PluginOpts>(plugin: PlainPlugin<State, FirstState, StateByStepName, EmptyDecorator, OutState, OutStateByStepName, OutDecorators>, opts?: PluginOpts): PublicWorkflow<OutState, FirstState, OutStateByStepName, OutDecorators> {
       const child = createChildWorkflow(this, this.list, this.list.length + 1)
       const pluginWithName = toRivrPlugin(plugin, () => this.autoPluginId ++)
 
       this.list.append({
         type: "plugin",
-        plugin: pluginWithName as unknown as RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>, any>,
+        plugin: pluginWithName as unknown as RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>, unknown, any>,
         context: child,
-        pluginOpts: undefined,
+        pluginOpts: opts,
         id: this.generateNewNodeId()
       })
 
@@ -241,7 +241,7 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
         )
 
         // TODO: find out why I need to cast with `as never`.
-        node.plugin(pluginScope as never)
+        node.plugin(pluginScope as never, node.pluginOpts)
         node.context.isReady = true
         index++
       }
