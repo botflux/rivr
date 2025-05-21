@@ -274,10 +274,10 @@ export class Poller<TriggerOpts> implements Worker {
     await this.#storage.disconnect()
   }
 
-  async #handleStep<State, Decorators extends Record<never, never>>(
-    step: Step<Decorators>,
+  async #handleStep<State>(
+    step: Step,
     state: WorkflowState<State>,
-    workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>
+    workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Record<never, never>>
   ): Promise<StepResult<unknown>> {
     try {
       const nextStateOrResult = await step.handler({

@@ -21,7 +21,7 @@ type StepElement<State, FirstState, StateByStepName extends EmptyStateByStep> = 
   type: "step"
   id: number
   context: Workflow<State, FirstState, StateByStepName>
-  step: Step<EmptyDecorator>
+  step: Step
 }
 
 type Hook =
@@ -43,7 +43,7 @@ type PluginElement<State, FirstState, StateByStepName extends EmptyStateByStep> 
   type: "plugin"
   id: number
   context: Workflow<State, FirstState, StateByStepName>
-  plugin: RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>>
+  plugin: RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>, any>
   pluginOpts?: unknown | ((w: Workflow<State, FirstState, StateByStepName>) => unknown)
 }
 
@@ -90,7 +90,6 @@ function isHookType<Hook> (hook: Hook) {
 function createPluginWorkflow<State, FirstState, StateByStepName extends Record<never, never>>(parent: Workflow<State, FirstState, StateByStepName>, list: List<NodeElement<State, FirstState, StateByStepName>>): Workflow<State, FirstState, StateByStepName> {
   const workflow = {
     decorate<K extends string, V>(key: K, value: V): PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator & Record<K, V>> {
-      // @ts-expect-error
       parent.decorate.call(parent, key, value)
       return this as unknown as PublicWorkflow<State, FirstState, StateByStepName, EmptyDecorator & Record<K, V>>
     },
@@ -154,26 +153,26 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
           optional,
           delayBetweenAttempts,
           maxAttempts
-        } as Step<EmptyDecorator>
+        } as Step
       })
 
       return this as unknown as Workflow<StateOut, FirstState, StateByStepName & Record<Name, State>>
     },
-    getFirstStep(): Step<EmptyDecorator> | undefined {
+    getFirstStep(): Step | undefined {
       for (const node of this.list) {
         if (node.type === "step") {
-          return node.step as unknown as Step<EmptyDecorator>
+          return node.step
         }
       }
     },
-    getStepByName(name: string): WithContext<Step<EmptyDecorator>, EmptyDecorator> | undefined {
+    getStepByName(name: string): WithContext<Step> | undefined {
       for (const node of this.list) {
         if (node.type === "step" && node.step.name === name) {
-          return { item: node.step as unknown as Step<EmptyDecorator>, context: node.context as ReadyWorkflow<unknown, unknown, Record<string, never>, Record<never, never>> }
+          return { item: node.step, context: node.context as ReadyWorkflow<unknown, unknown, Record<string, never>, Record<never, never>> }
         }
       }
     },
-    getNextStep(name: string): Step<EmptyDecorator> | undefined {
+    getNextStep(name: string): Step | undefined {
       const nodes = Array.from(this.list)
         .filter(isStep)
       const index = nodes.findIndex(node => node.step.name === name)
@@ -188,12 +187,12 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
         ? undefined
         : nodes[nextStepIndex]
 
-      return node?.step as unknown as Step<EmptyStateByStep>
+      return node?.step
     },
-    steps(): Iterable<WithContext<Step<EmptyDecorator>, EmptyDecorator>> {
+    steps(): Iterable<WithContext<Step>> {
       return Array.from(this.list)
         .filter(node => isStep<State, FirstState, StateByStepName>(node))
-        .map(node => ({ item: node.step, context: node.context } as WithContext<Step<EmptyDecorator>, EmptyDecorator>))
+        .map(node => ({ item: node.step, context: node.context } as WithContext<Step>))
     },
     // @ts-expect-error
     getHook(hook) {
@@ -211,7 +210,7 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
 
       this.list.append({
         type: "plugin",
-        plugin: pluginWithName as unknown as RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>>,
+        plugin: pluginWithName as unknown as RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>, any>,
         context: child,
         pluginOpts: undefined,
         id: this.generateNewNodeId()
@@ -241,7 +240,8 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
           new Slice(node.context.list, node.context.pluginStartIndex)
         )
 
-        node.plugin(pluginScope as PublicWorkflow<unknown, unknown, Record<string, never>, Record<never, never>>)
+        // TODO: find out why I need to cast with `as never`.
+        node.plugin(pluginScope as never)
         node.context.isReady = true
         index++
       }
