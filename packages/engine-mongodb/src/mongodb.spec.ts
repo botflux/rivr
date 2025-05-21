@@ -4,7 +4,7 @@ import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongo
 import { randomUUID } from "crypto"
 import { setTimeout } from "timers/promises"
 import { createEngine } from "./mongodb"
-import { rivr } from "rivr"
+import {rivr, rivrPlugin2} from "rivr"
 import {Network, StartedNetwork} from "testcontainers";
 import {CreatedProxy, StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
 import {MongoBulkWriteError} from "mongodb";
@@ -830,6 +830,49 @@ describe('extension', function () {
     }
     t.assert.deepEqual(state, 6)
   })
+
+  test("should be able to register a plugin with a step", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      signal: t.signal,
+      delayBetweenPulls: 10,
+      dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true
+      }
+    })
+
+    const plugin = rivrPlugin2({
+      name: "my-plugin",
+      plugin: p => p.input<number>().step({
+        name: "add-1",
+        handler: ({ state }) => ({ result: state + 1 })
+      })
+    })
+
+    let result: unknown
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .register(plugin)
+      .step({
+        name: "format",
+        handler: ({ state }) => `Result is ${state.result}`,
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+        result = s
+      })
+
+    await engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 1)
+
+    // Then
+    await waitForPredicate(() => result !== undefined, 5_000)
+    t.assert.deepStrictEqual(result, "Result is 2")
+  })
+
   //
   // test("register step in a plugin",  async (t) => {
   //   // Given

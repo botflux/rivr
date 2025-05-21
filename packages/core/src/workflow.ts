@@ -43,7 +43,7 @@ type PluginElement<State, FirstState, StateByStepName extends EmptyStateByStep> 
   type: "plugin"
   id: number
   context: Workflow<State, FirstState, StateByStepName>
-  plugin: RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>, unknown, Record<string, never>, Record<never, never>>
+  plugin: RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>>
   pluginOpts?: unknown | ((w: Workflow<State, FirstState, StateByStepName>) => unknown)
 }
 
@@ -211,7 +211,7 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
 
       this.list.append({
         type: "plugin",
-        plugin: pluginWithName as unknown as RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>, unknown, Record<string, never>, Record<never, never>>,
+        plugin: pluginWithName as unknown as RivrPlugin<unknown, unknown, Record<string, never>, Record<never, never>>,
         context: child,
         pluginOpts: undefined,
         id: this.generateNewNodeId()
@@ -277,6 +277,7 @@ function toRivrPlugin<State, FirstState, StateByStepName extends Record<string, 
     value: `auto-plugin-${getAutoPluginId()}`,
   })
 
+  // @ts-expect-error
   return plain as RivrPlugin<State, FirstState, StateByStepName, EmptyDecorator, OutState, OutStateByStepName, OutDecorators>
 }
 
