@@ -1102,56 +1102,54 @@ describe('extension', function () {
     )
   })
 
-  //
-  // test("declare a plugin options as a function",  async (t) => {
-  //   // Given
-  //   const engine = createEngine({
-  //     url: container.getConnectionString(),
-  //     signal: t.signal,
-  //     dbName: randomUUID(),
-  //     clientOpts: {
-  //       directConnection: true
-  //     },
-  //     delayBetweenPulls: 10
-  //   })
-  //
-  //   const plugin0 = rivrPlugin(function plugin0(w) {
-  //     return w.decorate("fooFromPlugin0", 1)
-  //   }, {
-  //     name: "plugin-0"
-  //   })
-  //
-  //   const plugin1 = rivrPlugin((w, opts: { foo: number }) => {
-  //     return w.decorate("foo", opts.foo)
-  //   }, {
-  //     name: "plugin-1",
-  //     deps: [ plugin0]
-  //   })
-  //
-  //   let state: number | undefined
-  //
-  //   const workflow = rivr.workflow<number>("complex-calculation")
-  //     .register(plugin0)
-  //     .register(plugin1, w => ({
-  //       foo: w.fooFromPlugin0
-  //     }))
-  //     .step({
-  //       name: "my-step",
-  //       handler: ctx => ctx.workflow.foo + 1
-  //     })
-  //     .addHook("onWorkflowCompleted", (w, s) => {
-  //       state = s
-  //     })
-  //
-  //   await engine.createWorker().start([ workflow ])
-  //
-  //   // When
-  //   await engine.createTrigger().trigger(workflow, 1)
-  //
-  //   // Then
-  //   await waitForPredicate(() => state !== undefined)
-  //   t.assert.deepEqual(state, 2)
-  // })
+  test("declare a plugin options as a function",  async (t) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      signal: t.signal,
+      dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true
+      },
+      delayBetweenPulls: 10
+    })
+
+    const plugin0 = rivrPlugin({
+      name: "plugin-0",
+      plugin: p => p.input()
+        .decorate("fooFromPlugin0", 1)
+    })
+
+    const plugin1 = rivrPlugin({
+      name: "plugin-1",
+      deps: [ plugin0],
+      plugin: (p, opts: { foo: number }) => p.input().decorate("foo", opts.foo)
+    })
+
+    let state: unknown
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .register(plugin0)
+      .register(plugin1, w => ({
+        foo: w.fooFromPlugin0
+      }))
+      .step({
+        name: "my-step",
+        handler: ctx => ctx.workflow.foo + 1
+      })
+      .addHook("onWorkflowCompleted", (w, s) => {
+        state = s
+      })
+
+    await engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 1)
+
+    // Then
+    await waitForPredicate(() => state !== undefined)
+    t.assert.deepEqual(state, 2)
+  })
 
   test("should not be able to decorate using the property twice",  (t) => {
     // Given

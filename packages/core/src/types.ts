@@ -199,7 +199,7 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
 
   register<OutDecorators extends Record<never, never>, PluginOpts>(
     plugin: RivrPlugin<Nothing, Nothing, Record<string, never>, OutDecorators, PluginOpts, any>,
-    opts: PluginOpts
+    opts: PluginOpts | ((w: ReadyWorkflow<State, FirstState, StateByStepName, Decorators>) => PluginOpts)
   ): Workflow<State, FirstState, StateByStepName, Decorators & OutDecorators>
 
   register<OutDecorators extends Record<never, never>>(
@@ -209,7 +209,7 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
 
   register<OutState, OutStateByStepName extends Record<string, never>, OutDecorators extends Record<never, never>, PluginOpts>(
     plugin: RivrPlugin<OutState, State, OutStateByStepName, OutDecorators, PluginOpts, any>,
-    opts: PluginOpts
+    opts: PluginOpts | ((w: ReadyWorkflow<State, FirstState, StateByStepName, Decorators>) => PluginOpts)
   ): Workflow<OutState, FirstState, StateByStepName & OutStateByStepName, Decorators & OutDecorators>
 
   register<OutState, OutStateByStepName extends Record<string, never>, OutDecorators extends Record<never, never>>(

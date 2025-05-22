@@ -261,8 +261,12 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
           new Slice(node.context.list, node.context.pluginStartIndex)
         )
 
+        const pluginOpts = typeof node.pluginOpts === "function"
+          ? node.pluginOpts(this)
+          : node.pluginOpts
+
         // TODO: find out why I need to cast with `as never`.
-        node.plugin(pluginScope as never, node.pluginOpts)
+        node.plugin(pluginScope as never, pluginOpts)
         node.context.isReady = true
         index++
       }
