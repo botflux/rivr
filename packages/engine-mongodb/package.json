@@ -7,11 +7,12 @@
     "@testcontainers/mongodb": "^10.24.2",
     "@testcontainers/toxiproxy": "^10.24.2",
     "@types/node": "^22.14.1",
+    "borp": "^0.20.0",
     "testcontainers": "^10.24.2",
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "test": "node -r ts-node/register --test $(find . -name \"*.spec.ts\")"
+    "test": "borp *.spec.ts"
   },
   "repository": {
     "type": "git",

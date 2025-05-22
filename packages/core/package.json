@@ -4,11 +4,12 @@
   "description": "Async workflow library built on top of your database",
   "main": "dist/index.js",
   "devDependencies": {
+    "borp": "^0.20.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "test": "node -r ts-node/register --test $(find . -name \"*.spec.ts\")"
+    "test": "borp **/*.spec.ts"
   },
   "repository": {
     "type": "git",
