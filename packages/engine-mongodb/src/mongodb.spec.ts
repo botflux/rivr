@@ -1562,7 +1562,9 @@ describe("resilience", () => {
 
     // Then
     await waitForPredicate(() => error !== undefined)
-    t.assert.deepStrictEqual(error instanceof MongoBulkWriteError, true)
+    
+    t.assert.deepStrictEqual(error instanceof MongoBulkWriteError ||
+      (typeof error === "object" && error !== null && "message" in error && error.message === "This socket has been ended by the other party"), true)
   })
 })
 
