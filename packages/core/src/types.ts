@@ -247,6 +247,7 @@ export type RivrPlugin<
 > = {
   (w: ReadyWorkflow<any, any, Record<string, never>, DecoratorsFromDeps<Deps>>, opts: PluginOpts): Workflow<OutState, FirstPluginState, PluginStateByStepName, PluginDecorators>
   name: string
+  deps: RivrPlugin<any, any, any, any, any, any>[]
 }
 
 const kNothing = Symbol("nothing")
@@ -298,6 +299,7 @@ export function rivrPlugin<
   }, pluginOpts)
 
   Object.defineProperty(plugin, "name", { value: opts.name })
+  Object.defineProperty(plugin, "deps", { value: opts.deps })
 
   // @ts-expect-error TODO: find out why I need this ts-expect-error
   return plugin
