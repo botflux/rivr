@@ -22,6 +22,57 @@ Rivr is a TypeScript/JavaScript library for managing asynchronous workflows in a
 npm install rivr
 ```
 
+## Example
+
+### Creating a workflow
+
+A rivr workflow is a collection of step executed in sequence.
+
+```typescript
+import { rivr } from "rivr"
+
+const workflow = rivr.workflow<number>("computation")
+  .step({
+    name: "add-4",
+    handler: ({ state }) => state + 4
+  })
+  .step({
+    name: "multiply-by-5",
+    handler: ({ state }) => state * 5
+  })
+  .step({
+    name: "format-result",
+    handler: ({ state }) => `Result is '${state}'`
+  })
+```
+
+Once the workflow is created, you need an engine to run the workflow.
+Engines are facade that allows to create:
+- **triggers** allow you to, well, trigger workflows. They are the producers in Kafka terms.
+- **workers** execute the actual workflows. They are the consumers in Kafka terms.
+
+> Engines implementation are database/messaging system specific.
+
+
+
+```typescript
+import { createEngine } from "@rivr/engine-mongodb"
+
+const engine = createEngine({
+  url: "mongo://localhost:27017",
+  dbName: "my-db"
+})
+
+// As mentionned before, workers executes the actual workflow that 
+// were triggered.
+const worker = engine.createWorker()
+await worker.start([ workflow ])
+
+// On the other hand, triggers start workflow executions.
+const trigger = engine.getTrigger()
+await trigger.trigger(workflow, 5)
+```
+
 ### MongoDB engine
 
 ```shell
