@@ -29,9 +29,10 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let hookExecuted = false
     let state
@@ -70,9 +71,10 @@ describe('basic flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let hookExecuted = false
     let state
@@ -112,9 +114,10 @@ describe('basic flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let skipped = false
     let skippedState
@@ -165,9 +168,10 @@ describe('basic flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let stopped = false
     let stoppedState
@@ -211,9 +215,10 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let hookExecuted = false
     let state
@@ -254,9 +259,10 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let hookExecuted = false
     let state
@@ -292,9 +298,10 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let hookExecuted = false
     let state
@@ -330,12 +337,13 @@ describe('basic flow control', function () {
     const engine = createEngine({
       url: container.getConnectionString(),
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10,
       clientOpts: {
         directConnection: true
       }
     })
+
+    t.after(() => engine.close())
 
     const workflow = rivr.workflow<number>("complex-calculation")
       .step({
@@ -416,7 +424,7 @@ describe('basic flow control', function () {
       delayBetweenPulls: 10
     })
 
-    t.after(async () => await engine.close())
+    t.after(() => engine.close())
 
     let result: unknown
 
@@ -453,13 +461,14 @@ describe('advance flow control', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      signal: t.signal,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
       },
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let state: unknown
     let errors: unknown[] = []
@@ -502,13 +511,14 @@ describe('advance flow control', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      signal: t.signal,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
       },
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let state: unknown
     let errors: unknown[] = []
@@ -552,13 +562,14 @@ describe('advance flow control', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      signal: t.signal,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
       },
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let state: unknown
     let workflowFailedCalled = false
@@ -601,9 +612,10 @@ describe('advance flow control', function () {
         directConnection: true,
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let errorCount = 0
     let failed = false
@@ -635,9 +647,10 @@ describe('advance flow control', function () {
         directConnection: true,
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let errorCount = 0
     let failed = false
@@ -664,13 +677,14 @@ describe('advance flow control', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      signal: t.signal,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
       },
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let state: unknown
 
@@ -708,13 +722,14 @@ describe('advance flow control', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      signal: t.signal,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true,
       },
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let state: unknown
 
@@ -759,9 +774,10 @@ describe('extension', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let hookExecuted = false
     let state
@@ -798,9 +814,10 @@ describe('extension', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let hookExecuted = false
     let state
@@ -836,13 +853,14 @@ describe('extension', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      signal: t.signal,
       delayBetweenPulls: 10,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
       }
     })
+
+    t.after(() => engine.close())
 
     const plugin = rivrPlugin({
       name: "my-plugin",
@@ -882,9 +900,10 @@ describe('extension', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let state: unknown
 
@@ -922,13 +941,14 @@ describe('extension', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      signal: t.signal,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
       },
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     const pluginA = rivrPlugin({
       name: "plugin-a",
@@ -961,13 +981,14 @@ describe('extension', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      signal: t.signal,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
       },
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     const pluginA = rivrPlugin({
       name: "plugin-a",
@@ -1012,13 +1033,14 @@ describe('extension', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      signal: t.signal,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
       },
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     const greetPlugin = rivrPlugin({
       name: "greet-plugin",
@@ -1106,13 +1128,14 @@ describe('extension', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      signal: t.signal,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
       },
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     const plugin0 = rivrPlugin({
       name: "plugin-0",
@@ -1171,9 +1194,10 @@ describe('transaction', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     const db = randomUUID()
 
@@ -1214,9 +1238,10 @@ describe('transaction', function () {
       clientOpts: {
         directConnection: true
       },
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     const states: unknown[] = []
 
@@ -1264,9 +1289,10 @@ describe('hooks', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     const workflow = rivr.workflow<number>("complex-calculation")
       .addHook("onWorkflowCompleted", (w, s) => {
@@ -1483,9 +1509,10 @@ describe("resilience", () => {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let state: unknown
 
@@ -1531,9 +1558,10 @@ describe("resilience", () => {
         directConnection: true
       },
       dbName: randomUUID(),
-      signal: t.signal,
       delayBetweenPulls: 10
     })
+
+    t.after(() => engine.close())
 
     let error: unknown
 
@@ -1573,13 +1601,14 @@ describe('storage', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      signal: t.signal,
       delayBetweenPulls: 10,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
       },
     })
+
+    t.after(() => engine.close())
 
     let result: unknown
 
