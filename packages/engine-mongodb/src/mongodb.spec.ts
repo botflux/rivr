@@ -1420,41 +1420,42 @@ describe('hooks', function () {
     t.assert.deepStrictEqual(elements, [ 1, 2, 3, 4 ])
   })
 
-  // test("should be able to execute a hook in the correct context",  async (t) => {
-  //   // Given
-  //   const engine = createEngine({
-  //     url: container.getConnectionString(),
-  //     clientOpts: {
-  //       directConnection: true
-  //     },
-  //     dbName: randomUUID(),
-  //     signal: t.signal,
-  //     delayBetweenPulls: 10
-  //   })
-  //
-  //   let hookValue: number | undefined
-  //
-  //   const workflow = rivr.workflow<number>("complex-calculation")
-  //     .step({
-  //       name: "add-1",
-  //       handler: ({ state }) => state + 1
-  //     })
-  //     .register(w => {
-  //       return w.decorate("foo", 4)
-  //         .addHook("onStepCompleted", function (workflow1, step, state) {
-  //           hookValue = workflow1.foo + state
-  //         })
-  //     })
-  //
-  //   await engine.createWorker().start([ workflow ])
-  //
-  //   // When
-  //   await engine.createTrigger().trigger(workflow, 1)
-  //
-  //   // Then
-  //   await waitForPredicate(() => hookValue !== undefined)
-  //   t.assert.deepEqual(hookValue, 6)
-  // })
+  test("should be able to execute a hook in the correct context",  async (t) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      clientOpts: {
+        directConnection: true
+      },
+      dbName: randomUUID(),
+      delayBetweenPulls: 10
+    })
+
+    t.after(() => engine.close())
+
+    let hookValue: unknown
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .step({
+        name: "add-1",
+        handler: ({ state }) => state + 1
+      })
+      .register(w => {
+        return w.decorate("foo", 4)
+          .addHook("onStepCompleted", function (workflow1, step, state) {
+            hookValue = workflow1.foo + (state as number)
+          })
+      })
+
+    await engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 1)
+
+    // Then
+    await waitForPredicate(() => hookValue !== undefined)
+    t.assert.deepEqual(hookValue, 6)
+  })
 })
 
 describe("resilience", () => {
