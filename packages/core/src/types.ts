@@ -299,7 +299,7 @@ export function rivrPlugin<
   }, pluginOpts)
 
   Object.defineProperty(plugin, "name", { value: opts.name })
-  Object.defineProperty(plugin, "deps", { value: opts.deps })
+  Object.defineProperty(plugin, "deps", { value: opts.deps ?? [] })
 
   // @ts-expect-error TODO: find out why I need this ts-expect-error
   return plugin

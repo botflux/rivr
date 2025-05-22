@@ -1048,21 +1048,23 @@ describe('extension', function () {
     t.assert.deepStrictEqual(state, "Hello, Daneel!")
   })
 
-  // test("register a plugin with a missing dependency throw an error",  async (t) => {
-  //   const plugin1 = rivrPlugin(w => w, {
-  //     deps: [],
-  //     name: "plugin-1"
-  //   })
-  //   const plugin2 = rivrPlugin(w => w, {
-  //     deps: [ plugin1 ],
-  //     name: "plugin-2"
-  //   })
-  //
-  //   await t.assert.rejects(
-  //     rivr.workflow("my-workflow").register(plugin2).ready(),
-  //     new Error(`Plugin "plugin-2" needs "plugin-1" to be registered`)
-  //   )
-  // })
+  test("register a plugin with a missing dependency throw an error",  async (t) => {
+    const plugin1 = rivrPlugin({
+      deps: [],
+      name: "plugin-1",
+      plugin: p => p.input()
+    })
+    const plugin2 = rivrPlugin({
+      deps: [ plugin1 ],
+      name: "plugin-2",
+      plugin: p => p.input()
+    })
+
+    await t.assert.rejects(
+      rivr.workflow("my-workflow").register(plugin2).ready(),
+      new Error(`Plugin "plugin-2" needs "plugin-1" to be registered`)
+    )
+  })
   //
   // test("declare a plugin options as a function",  async (t) => {
   //   // Given

@@ -63,6 +63,7 @@ interface Workflow<State, FirstState, StateByStepName extends EmptyStateByStep> 
   list: List<NodeElement<State, FirstState, StateByStepName>>
   pluginStartIndex: number
   registeredDecorators: string[]
+  registeredPlugins: string[]
   isReady: boolean
   generateNewNodeId(): number
   nextNodeId: number
@@ -119,6 +120,7 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
     nextNodeId: 0,
     autoPluginId: 0,
     name,
+    registeredPlugins: [],
     registeredDecorators: [],
     generateNewNodeId(): number {
       return this.nextNodeId ++
@@ -240,6 +242,20 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
         if (node.type !== "plugin")
           continue
 
+        const unregisteredPluginList = node.plugin.deps
+          .map(pl => pl.name)
+          .filter(depName => !this.registeredPlugins.find(name => name === depName))
+
+        if (unregisteredPluginList.length > 0) {
+          const formattedPluginList = unregisteredPluginList
+            .map(name => `"${name}"`)
+            .join(", ")
+
+          throw new Error(`Plugin "${node.plugin.name}" needs ${formattedPluginList} to be registered`)
+        }
+
+        this.registeredPlugins.push(node.plugin.name)
+
         const pluginScope = createPluginWorkflow(
           node.context,
           new Slice(node.context.list, node.context.pluginStartIndex)
@@ -283,7 +299,7 @@ function isPlainPlugin<State, FirstState, StateByStepName extends Record<string,
 function toRivrPlugin<State, FirstState, StateByStepName extends Record<string, never>, OutState, OutStateByStepName extends StateByStepName, OutDecorators extends EmptyDecorator>(
   plain: PlainPlugin<State, FirstState, StateByStepName, EmptyDecorator, OutState, OutStateByStepName, OutDecorators>,
   getAutoPluginId: () => number
-) {
+): RivrPlugin<State, FirstState, StateByStepName, EmptyDecorator, never, any> {
   Object.defineProperty(plain, "name", {
     value: `auto-plugin-${getAutoPluginId()}`,
   })
@@ -291,7 +307,7 @@ function toRivrPlugin<State, FirstState, StateByStepName extends Record<string, 
   Object.defineProperty(plain, "deps", { value: [] })
 
   // @ts-expect-error
-  return plain as RivrPlugin<State, FirstState, StateByStepName, EmptyDecorator, OutState, OutStateByStepName, OutDecorators>
+  return plain as RivrPlugin<State, FirstState, StateByStepName, EmptyDecorator, never, any>
 }
 
 export const rivr = {
