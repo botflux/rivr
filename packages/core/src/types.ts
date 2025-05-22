@@ -324,21 +324,5 @@ export type EnsureRecord<T> = T extends Record<never, never>
 export type DecoratorsFromDeps<Deps extends RivrPlugin<any, any, any, any, any, any>[]> =
   EnsureRecord<MergeUnionTypes<GetDecorator<UnwrapItem<Deps>>>>
 
-const plugin1 = rivrPlugin({
-  name: "my-plugin",
-  plugin: (p, o) => {
-    return p.input().decorate("foo", 1)
-  }
-})
-
-const plugin2 = rivrPlugin({
-  name: "plugin-2",
-  deps: [ plugin1 ],
-  plugin: (p) => {
-    const w = p.input()
-
-    return w.decorate("bar", 2 + w.foo)
-  }
-})
 
 
