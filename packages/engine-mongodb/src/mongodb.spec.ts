@@ -8,6 +8,7 @@ import {rivr, rivrPlugin} from "rivr"
 import {Network, StartedNetwork} from "testcontainers";
 import {CreatedProxy, StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
 import {MongoBulkWriteError} from "mongodb";
+import {rejects} from "node:assert";
 
 let container!: StartedMongoDBContainer
 
@@ -1065,6 +1066,42 @@ describe('extension', function () {
       new Error(`Plugin "plugin-2" needs "plugin-1" to be registered`)
     )
   })
+
+  test("should be able to list all the missing dependencies", async (t) => {
+    // Given
+    const p1 = rivrPlugin({
+      name: "plugin-1",
+      plugin: p => p.input()
+    })
+
+    const p2 = rivrPlugin({
+      name: "plugin-2",
+      plugin: p => p.input()
+    })
+
+    const p3 = rivrPlugin({
+      name: "plugin-3",
+      plugin: p => p.input()
+    })
+
+    const p4 = rivrPlugin({
+      name: "plugin-4",
+      deps: [ p1, p2, p3 ],
+      plugin: p => p.input()
+    })
+
+    const workflow = rivr.workflow("p")
+      .register(p2)
+      .register(p4)
+
+    // When
+    // Then
+    await t.assert.rejects(
+      workflow.ready(),
+      new Error('Plugin "plugin-4" needs "plugin-1", "plugin-3" to be registered')
+    )
+  })
+
   //
   // test("declare a plugin options as a function",  async (t) => {
   //   // Given
