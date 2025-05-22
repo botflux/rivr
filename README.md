@@ -1,4 +1,4 @@
-# Rivr (Work in progress)
+# Rivr (Work in progress, not published yet)
 
 Rivr is a TypeScript/JavaScript library for managing asynchronous workflows in a simple and efficient way. Unlike traditional systems that rely on message queues, Rivr uses standard databases (such as MongoDB) to manage task queues and workflow states.
 
