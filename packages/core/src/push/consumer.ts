@@ -1,22 +1,22 @@
-import {Consumption, WorkflowTask} from "./consumption";
+import {Queue, WorkflowTask} from "./queue";
 import {DefaultTriggerOpts, OnErrorHook, Trigger, Worker} from "../engine"
 import {ReadyWorkflow, Step, StepResult, Workflow} from "../types";
 import { WorkflowState } from "../pull/state";
 import {randomUUID} from "crypto";
 
 export class Consumer implements Worker {
-  #consumption: Consumption
+  #queue: Queue
   #onErrorHooks: OnErrorHook[] = []
 
-  constructor(consumption: Consumption) {
-    this.#consumption = consumption
+  constructor(queue: Queue) {
+    this.#queue = queue
   }
 
   async start<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<void> {
     const readyWorkflows = await Promise.all(workflows.map(w => w.ready()))
 
     ;(async () => {
-      for await (const task of this.#consumption.consume(readyWorkflows)) {
+      for await (const task of this.#queue.consume(readyWorkflows)) {
         const mWorkflow = readyWorkflows.find(w => w.name === task.workflow)
 
         if (!mWorkflow) {
@@ -35,7 +35,7 @@ export class Consumer implements Worker {
         const mNextTask = this.#getNextTask(task, result, mWorkflow, step, new Date())
 
         if (mNextTask) {
-          await this.#consumption.write([mNextTask])
+          await this.#queue.enqueue([mNextTask])
         }
       }
     })().catch(err => {
@@ -49,7 +49,7 @@ export class Consumer implements Worker {
   }
 
   async stop(): Promise<void> {
-    await this.#consumption.disconnect()
+    await this.#queue.disconnect()
   }
 
   #executeErrorHooks(err: unknown): void {
@@ -175,10 +175,10 @@ export class Consumer implements Worker {
 }
 
 export class Producer<TriggerOpts extends DefaultTriggerOpts> implements Trigger<TriggerOpts> {
-  #consumption: Consumption
+  #queue: Queue
 
-  constructor(consumption: Consumption) {
-    this.#consumption = consumption
+  constructor(queue: Queue) {
+    this.#queue = queue
   }
 
   async trigger<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(workflow: Workflow<State, FirstState, StateByStepName, Decorators>, state: FirstState, opts?: (TriggerOpts & DefaultTriggerOpts) | undefined): Promise<WorkflowState<State>> {
@@ -188,7 +188,7 @@ export class Producer<TriggerOpts extends DefaultTriggerOpts> implements Trigger
       throw new Error("Cannot trigger a workflow that has no step")
     }
 
-    await this.#consumption.write([
+    await this.#queue.enqueue([
       {
         state,
         step: mFirstStep.name,
@@ -224,7 +224,7 @@ export class Producer<TriggerOpts extends DefaultTriggerOpts> implements Trigger
       throw new Error("Not implemented at line 81 in poller.ts")
     }
 
-    await this.#consumption.write([
+    await this.#queue.enqueue([
       {
         state,
         step: mStep.name,

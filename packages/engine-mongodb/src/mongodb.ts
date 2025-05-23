@@ -1,9 +1,8 @@
 import {
   DefaultTriggerOpts, Engine, type Trigger, type Worker,
   Poller, PullOpts, PullTrigger, type Storage, type Write,
-  Step, Workflow, WorkflowState, Consumption,
-  ConsumptionWrite,
-  WorkflowTask, InfiniteLoop, Nack, Consumer, Producer
+  Step, Workflow, WorkflowState, Queue,
+  WorkflowTask, Consumer, Producer
 } from "rivr";
 import {
   type AnyBulkWriteOperation, ChangeStream, ChangeStreamDocument, ClientSession,
@@ -156,7 +155,7 @@ type Checkpoint = {
 
 }
 
-export class MongoConsumption implements Consumption {
+export class MongoQueue implements Queue {
   #client: MongoClient
   #taskCollection: Collection<WorkflowTask<unknown>>
   #checkpointCollection: Collection<Checkpoint>
@@ -197,7 +196,7 @@ export class MongoConsumption implements Consumption {
     }
   }
 
-  async write<State>(writes: WorkflowTask<State>[]): Promise<void> {
+  async enqueue<State>(writes: WorkflowTask<State>[]): Promise<void> {
     const nackWrites = writes
       .map(task => ({
        insertOne: {
@@ -236,7 +235,7 @@ export class MongoEngine implements Engine<WriteOpts> {
 
     if (useChangeStream) {
       const worker = new Consumer(
-        new MongoConsumption(
+        new MongoQueue(
           this.client,
           dbName,
           "tasks-stream",
@@ -272,7 +271,7 @@ export class MongoEngine implements Engine<WriteOpts> {
 
     if (useChangeStream) {
       return new Producer(
-        new MongoConsumption(
+        new MongoQueue(
           this.client,
           dbName,
           "tasks-stream",
