@@ -1,12 +1,15 @@
 import {
   DefaultTriggerOpts, Engine, type Trigger, type Worker,
   Poller, PullOpts, PullTrigger, type Storage, type Write,
-  Step, Workflow, WorkflowState} from "rivr";
+  Step, Workflow, WorkflowState, Consumption,
+  ConsumptionWrite,
+  WorkflowTask, InfiniteLoop, Nack, Consumer, Producer
+} from "rivr";
 import {
-  type AnyBulkWriteOperation, ClientSession,
+  type AnyBulkWriteOperation, ChangeStream, ChangeStreamDocument, ClientSession,
   type Collection, Filter,
   MongoClient,
-  MongoClientOptions
+  MongoClientOptions, ObjectId, Timestamp
 } from "mongodb"
 
 type MongoWorkflowState<State> = WorkflowState<State>
@@ -32,7 +35,7 @@ class MongoStorage implements Storage<WriteOpts> {
     const steps = workflows
       .map(workflow => Array.from(workflow.steps()))
       .flat()
-      .map(({ item, context }) => [
+      .map(({item, context}) => [
         `${context.name}-${item.maxAttempts}`,
         {
           step: item,
@@ -40,37 +43,37 @@ class MongoStorage implements Storage<WriteOpts> {
         }
       ] as const)
       .reduce(
-        (acc, [ id, { step, workflow } ]) => {
+        (acc, [id, {step, workflow}]) => {
           const existing = acc.get(id)
 
           if (!existing) {
-            acc.set(id, { steps: [ step ], workflow: workflow.name, maxAttempts: step.maxAttempts })
+            acc.set(id, {steps: [step], workflow: workflow.name, maxAttempts: step.maxAttempts})
             return acc
           }
 
-          return acc.set(id, { ...existing, steps: [ ...existing.steps, step ] })
+          return acc.set(id, {...existing, steps: [...existing.steps, step]})
         },
         new Map<string, { workflow: string, maxAttempts: number, steps: Step[] }>()
       )
 
     const filter = Array.from(steps.entries())
-      .map(([ , { maxAttempts, workflow, steps }]) => ({
+      .map(([, {maxAttempts, workflow, steps}]) => ({
         $and: [
           {
             name: workflow,
-            "toExecute.step": { $in: steps.map(step => step.name) },
+            "toExecute.step": {$in: steps.map(step => step.name)},
           },
           {
             $or: [
               {
                 "toExecute.status": "todo",
-                "toExecute.attempt": { $lte: maxAttempts },
-                "toExecute.pickAfter": { $exists: false }
+                "toExecute.attempt": {$lte: maxAttempts},
+                "toExecute.pickAfter": {$exists: false}
               },
               {
                 "toExecute.status": "todo",
-                "toExecute.attempt": { $lte: maxAttempts },
-                "toExecute.pickAfter": { $lte: new Date() }
+                "toExecute.attempt": {$lte: maxAttempts},
+                "toExecute.pickAfter": {$lte: new Date()}
               }
             ]
           }
@@ -89,16 +92,16 @@ class MongoStorage implements Storage<WriteOpts> {
       .limit(opts.limit)
       .toArray()
 
-    return tasks.map(({ _id, ...rest }) => ({
+    return tasks.map(({_id, ...rest}) => ({
       ...rest,
     } as WorkflowState<State>))
   }
 
   async write<State>(writes: Write<State>[], opts: WriteOpts = {}): Promise<void> {
-    const { session } = opts
+    const {session} = opts
 
     const mongoWrites = writes.map(write => {
-      switch(write.type) {
+      switch (write.type) {
         case "insert": {
           return {
             updateOne: {
@@ -124,7 +127,8 @@ class MongoStorage implements Storage<WriteOpts> {
           } satisfies AnyBulkWriteOperation<MongoWorkflowState<State>>
         }
 
-        default: throw new Error(`Write is not supported`)
+        default:
+          throw new Error(`Write is not supported`)
       }
     })
 
@@ -134,17 +138,78 @@ class MongoStorage implements Storage<WriteOpts> {
   }
 
   async findById<State>(id: string): Promise<WorkflowState<State> | undefined> {
-    const mRecord = await this.#collection.findOne({ id })
+    const mRecord = await this.#collection.findOne({id})
 
     if (mRecord === null)
       return undefined
 
-    const { _id, ...rest } = mRecord
+    const {_id, ...rest} = mRecord
     return rest as WorkflowState<State>
   }
 
   async disconnect(): Promise<void> {
     await this.#client.close(true)
+  }
+}
+
+type Checkpoint = {
+
+}
+
+export class MongoConsumption implements Consumption {
+  #client: MongoClient
+  #taskCollection: Collection<WorkflowTask<unknown>>
+  #checkpointCollection: Collection<Checkpoint>
+
+  #changeStream?: ChangeStream<WorkflowTask<unknown>, ChangeStreamDocument<WorkflowTask<unknown>>>
+
+  constructor(
+    client: MongoClient,
+    dbName: string,
+    taskCollectionName: string,
+    checkpointCollectionName: string
+  ) {
+    this.#client = client;
+    this.#taskCollection = this.#client.db(dbName).collection(taskCollectionName)
+    this.#checkpointCollection = this.#client.db(dbName).collection(checkpointCollectionName)
+  }
+
+  async *consume<State, FirstState, StateByStepName extends Record<string, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): AsyncGenerator<WorkflowTask<unknown>> {
+    const changeSteam = this.#taskCollection.watch([], {
+      startAtOperationTime: Timestamp.fromNumber(
+        new Date().getTime() - 1_000 * 60 * 60 * 24 * 7
+      )
+    })
+
+    this.#changeStream = changeSteam
+
+    console.log("waiting for changestream")
+
+    for await (const change of changeSteam) {
+      console.log("change received", change)
+
+      if (change.operationType !== "insert")
+        continue
+
+      const { fullDocument } = change
+
+      yield fullDocument
+    }
+  }
+
+  async write<State>(writes: WorkflowTask<State>[]): Promise<void> {
+    const nackWrites = writes
+      .map(task => ({
+       insertOne: {
+         document: task
+       }
+      }) satisfies AnyBulkWriteOperation<WorkflowTask<State>>)
+
+    await this.#taskCollection.bulkWrite(nackWrites)
+  }
+
+  async disconnect(): Promise<void> {
+    await this.#changeStream?.close()
   }
 }
 
@@ -165,8 +230,23 @@ export class MongoEngine implements Engine<WriteOpts> {
     const {
       dbName,
       delayBetweenPulls = 1_000,
-      countPerPull = 20
+      countPerPull = 20,
+      useChangeStream = false
     } = this.#opts
+
+    if (useChangeStream) {
+      const worker = new Consumer(
+        new MongoConsumption(
+          this.client,
+          dbName,
+          "tasks-stream",
+          "checkpoint"
+        )
+      )
+
+      this.#workers.push(worker)
+      return worker
+    }
 
     const storage = new MongoStorage(
       this.client,
@@ -185,6 +265,22 @@ export class MongoEngine implements Engine<WriteOpts> {
   }
 
   createTrigger(): Trigger<WriteOpts> {
+    const {
+      dbName,
+      useChangeStream = false
+    } = this.#opts
+
+    if (useChangeStream) {
+      return new Producer(
+        new MongoConsumption(
+          this.client,
+          dbName,
+          "tasks-stream",
+          "checkpoint"
+        )
+      )
+    }
+
     const storage = new MongoStorage(
       this.client,
       this.#opts.dbName,
@@ -253,6 +349,14 @@ export type CreateEngineOpts = {
    * @default {20}
    */
   countPerPull?: number
+
+  /**
+   * Use change stream-based worker instead of
+   * the normal poller-based worker.
+   *
+   * @default {false}
+   */
+  useChangeStream?: boolean
 }
 
 export function createEngine(opts: CreateEngineOpts) {

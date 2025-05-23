@@ -30,7 +30,7 @@ export interface Storage<WriteOpts> {
   disconnect(): Promise<void>
 }
 
-class InfiniteLoop {
+export class InfiniteLoop {
   #stopped = false;
 
   *[Symbol.iterator]() {
