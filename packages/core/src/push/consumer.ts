@@ -216,7 +216,7 @@ export class Producer<TriggerOpts extends DefaultTriggerOpts> implements Trigger
     workflow: Workflow<State, FirstState, StateByStepName, Decorators>,
     name: Name,
     state: StateByStepName[Name],
-    opts?: (TriggerOpts & DefaultTriggerOpts) | undefined
+    opts?: TriggerOpts
   ): Promise<WorkflowState<State>> {
     const mStep = workflow.getStepByName(name as string)?.item
 

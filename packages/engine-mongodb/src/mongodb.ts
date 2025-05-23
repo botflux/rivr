@@ -151,29 +151,22 @@ class MongoStorage implements Storage<WriteOpts> {
   }
 }
 
-type Checkpoint = {
-
-}
-
 export class MongoQueue implements Queue {
   #client: MongoClient
-  #taskCollection: Collection<WorkflowTask<unknown>>
-  #checkpointCollection: Collection<Checkpoint>
+  #taskCollection: Collection<WorkflowState<unknown>>
 
-  #changeStream?: ChangeStream<WorkflowTask<unknown>, ChangeStreamDocument<WorkflowTask<unknown>>>
+  #changeStream?: ChangeStream<WorkflowState<unknown>, ChangeStreamDocument<WorkflowState<unknown>>>
 
   constructor(
     client: MongoClient,
     dbName: string,
     taskCollectionName: string,
-    checkpointCollectionName: string
   ) {
     this.#client = client;
     this.#taskCollection = this.#client.db(dbName).collection(taskCollectionName)
-    this.#checkpointCollection = this.#client.db(dbName).collection(checkpointCollectionName)
   }
 
-  async *consume<State, FirstState, StateByStepName extends Record<string, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): AsyncGenerator<WorkflowTask<unknown>> {
+  async *consume<State, FirstState, StateByStepName extends Record<string, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): AsyncGenerator<WorkflowState<unknown>> {
     const changeSteam = this.#taskCollection.watch([], {
       startAtOperationTime: Timestamp.fromNumber(
         new Date().getTime() - 1_000 * 60 * 60 * 24 * 7
@@ -182,10 +175,7 @@ export class MongoQueue implements Queue {
 
     this.#changeStream = changeSteam
 
-    console.log("waiting for changestream")
-
     for await (const change of changeSteam) {
-      console.log("change received", change)
 
       if (change.operationType !== "insert")
         continue
@@ -239,7 +229,6 @@ export class MongoEngine implements Engine<WriteOpts> {
           this.client,
           dbName,
           "tasks-stream",
-          "checkpoint"
         )
       )
 
@@ -275,7 +264,6 @@ export class MongoEngine implements Engine<WriteOpts> {
           this.client,
           dbName,
           "tasks-stream",
-          "checkpoint"
         )
       )
     }
