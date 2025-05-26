@@ -20,11 +20,15 @@ export type PullOpts = {
   limit: number
 }
 
+export interface Consumption {
+  [Symbol.asyncIterator](): AsyncIterator<WorkflowState<unknown>>
+  stop(): Promise<void>
+}
+
 export interface Storage<WriteOpts> {
-  pull<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<never, never>>(
-    workflows: Workflow<State, FirstState, StateByStepName, Decorators>[],
-    opts: PullOpts
-  ): Promise<WorkflowState<State>[]>
+  consume<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<never, never>>(
+    workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]
+  ): Promise<Consumption>
   write<State>(writes: Write<State>[], opts?: WriteOpts): Promise<void>
   findById<State>(id: string): Promise<WorkflowState<State> | undefined>
   disconnect(): Promise<void>
@@ -44,7 +48,7 @@ export class InfiniteLoop {
   }
 }
 
-export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trigger<TriggerOpts> {
+export class ConcreteTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trigger<TriggerOpts> {
   #storage: Storage<TriggerOpts>
 
   constructor(storage: Storage<TriggerOpts>) {
@@ -109,149 +113,134 @@ export class PullTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trig
   }
 }
 
-export class Poller<TriggerOpts> implements Worker {
+export class Executor<TriggerOpts> implements Worker {
   #loop = new InfiniteLoop()
   #storage: Storage<TriggerOpts>
 
   #hasFinished = false
-  #delayBetweenPulls: number
-  #countPerPull: number
 
+  #consumption: Consumption | undefined
   #onError: OnErrorHook[] = []
 
   constructor(
     storage: Storage<TriggerOpts>,
-    delayBetweenPulls: number,
-    countPerPull: number
   ) {
     this.#storage = storage
-    this.#delayBetweenPulls = delayBetweenPulls
-    this.#countPerPull = countPerPull
   }
 
   async start<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<void> {
     const readyWorkflows = await Promise.all(workflows.map(async workflow => workflow.ready()))
 
     ;(async () => {
-      for (const _ of this.#loop) {
-        const [tasks, tasksErr] = await tryCatch(this.#storage.pull(workflows, { limit: this.#countPerPull }))
+      const consumption = await this.#storage.consume(readyWorkflows)
+      this.#consumption = consumption
 
-        if (tasksErr !== undefined) {
-          this.#executeErrorHooks(tasksErr)
+      for await (const task of consumption) {
+        const mWorkflow = readyWorkflows.find(w => w.name === task.name)
+
+        if (!mWorkflow)
           continue
-        }
 
-        for (const task of tasks) {
-          const mWorkflow = readyWorkflows.find(w => w.name === task.name)
+        const mStepAndContext = mWorkflow.getStepByName(task.toExecute.step)
 
-          if (!mWorkflow)
-            continue
+        if (!mStepAndContext)
+          continue
 
-          const mStepAndContext = mWorkflow.getStepByName(task.toExecute.step)
+        const {item: step, context: executionContext} = mStepAndContext
 
-          if (!mStepAndContext)
-            continue
+        const result = await this.#handleStep(step, task, executionContext)
+        const newState = updateWorkflowState(task, step, result)
 
-          const {item: step, context: executionContext} = mStepAndContext
+        await this.#write([
+          {
+            type: "update",
+            state: newState
+          }
+        ])
 
-          const result = await this.#handleStep(step, task, executionContext)
-          const newState = updateWorkflowState(task, step, result)
+        switch(result.type) {
+          case "stopped": {
+            for (const { item: handler, context } of mWorkflow.getHook("onWorkflowStopped")) {
+              const [, error] = tryCatchSync(() => handler(context, step, task.toExecute.state))
 
-          await this.#write([
-            {
-              type: "update",
-              state: newState
+              if (error !== undefined) {
+                this.#executeErrorHooks(error)
+              }
             }
-          ])
 
-          switch(result.type) {
-            case "stopped": {
-              for (const { item: handler, context } of mWorkflow.getHook("onWorkflowStopped")) {
+            break
+          }
+
+          case "success":
+          case "skipped": {
+            const newState = result.type === "skipped"
+              ? task.toExecute.state
+              : result.state
+            const mNextStep = mWorkflow.getNextStep(task.toExecute.step)
+
+            if (result.type === "skipped") {
+              for (const { item: handler, context } of mWorkflow.getHook("onStepSkipped")) {
                 const [, error] = tryCatchSync(() => handler(context, step, task.toExecute.state))
 
                 if (error !== undefined) {
                   this.#executeErrorHooks(error)
                 }
               }
-
-              break
             }
 
-            case "success":
-            case "skipped": {
-              const newState = result.type === "skipped"
-                ? task.toExecute.state
-                : result.state
-              const mNextStep = mWorkflow.getNextStep(task.toExecute.step)
+            for (const { item: handler, context } of mWorkflow.getHook("onStepCompleted")) {
+              const [, error] = tryCatchSync(() => handler(context, step, newState as State))
 
-              if (result.type === "skipped") {
-                for (const { item: handler, context } of mWorkflow.getHook("onStepSkipped")) {
-                  const [, error] = tryCatchSync(() => handler(context, step, task.toExecute.state))
+              if (error !== undefined) {
+                this.#executeErrorHooks(error)
+              }
+            }
 
-                  if (error !== undefined) {
-                    this.#executeErrorHooks(error)
-                  }
+            if (mNextStep === undefined) {
+              for (const { item: handler, context } of mWorkflow.getHook("onWorkflowCompleted")) {
+                const [ , err ] = tryCatchSync(() => handler.call(context, context, newState as State))
+
+                if (err !== undefined) {
+                  this.#executeErrorHooks(err)
                 }
               }
+            }
 
-              for (const { item: handler, context } of mWorkflow.getHook("onStepCompleted")) {
-                const [, error] = tryCatchSync(() => handler(context, step, newState as State))
+            break
+          }
+
+          case "failure": {
+            const hasExhaustedRetry = task.toExecute.attempt + 1 > step.maxAttempts
+            const mNextStep = mWorkflow.getNextStep(task.toExecute.step)
+
+            for (const { item: handler, context } of mWorkflow.getHook("onStepError")) {
+              const [, error] = tryCatchSync(() => handler(result.error, context, task.toExecute.state))
+
+              if (error !== undefined) {
+                this.#executeErrorHooks(error)
+              }
+            }
+
+            if (hasExhaustedRetry && !step.optional) {
+              for (const { item: handler, context } of mWorkflow.getHook("onWorkflowFailed")) {
+                const [, error] = tryCatchSync(() => handler(result.error, context, step, task.toExecute.state))
 
                 if (error !== undefined) {
                   this.#executeErrorHooks(error)
                 }
               }
-
-              if (mNextStep === undefined) {
-                for (const { item: handler, context } of mWorkflow.getHook("onWorkflowCompleted")) {
-                  const [ , err ] = tryCatchSync(() => handler.call(context, context, newState as State))
-
-                  if (err !== undefined) {
-                    this.#executeErrorHooks(err)
-                  }
-                }
-              }
-
-              break
             }
 
-            case "failure": {
-              const hasExhaustedRetry = task.toExecute.attempt + 1 > step.maxAttempts
-              const mNextStep = mWorkflow.getNextStep(task.toExecute.step)
-
-              for (const { item: handler, context } of mWorkflow.getHook("onStepError")) {
-                const [, error] = tryCatchSync(() => handler(result.error, context, task.toExecute.state))
+            if (hasExhaustedRetry && step.optional && mNextStep === undefined) {
+              for (const { item: handler, context } of mWorkflow.getHook("onWorkflowCompleted")) {
+                const [, error] = tryCatchSync(() => handler(context, task.toExecute.state))
 
                 if (error !== undefined) {
                   this.#executeErrorHooks(error)
-                }
-              }
-
-              if (hasExhaustedRetry && !step.optional) {
-                for (const { item: handler, context } of mWorkflow.getHook("onWorkflowFailed")) {
-                  const [, error] = tryCatchSync(() => handler(result.error, context, step, task.toExecute.state))
-
-                  if (error !== undefined) {
-                    this.#executeErrorHooks(error)
-                  }
-                }
-              }
-
-              if (hasExhaustedRetry && step.optional && mNextStep === undefined) {
-                for (const { item: handler, context } of mWorkflow.getHook("onWorkflowCompleted")) {
-                  const [, error] = tryCatchSync(() => handler(context, task.toExecute.state))
-
-                  if (error !== undefined) {
-                    this.#executeErrorHooks(error)
-                  }
                 }
               }
             }
           }
-        }
-
-        if (tasks.length === 0) {
-          await setTimeout(this.#delayBetweenPulls)
         }
       }
 
@@ -266,6 +255,7 @@ export class Poller<TriggerOpts> implements Worker {
 
   async stop(): Promise<void> {
     this.#loop.stop()
+    this.#consumption?.stop()
 
     while (!this.#hasFinished) {
       await setTimeout(10)

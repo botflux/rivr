@@ -7,7 +7,6 @@ async function run(): Promise<void> {
   const engine = createEngine({
     url: "mongodb://localhost:27017",
     dbName: randomUUID(),
-    useChangeStream: true,
   })
 
   const worker = engine.createWorker()

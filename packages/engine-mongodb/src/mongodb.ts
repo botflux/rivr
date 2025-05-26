@@ -1,8 +1,8 @@
 import {
   DefaultTriggerOpts, Engine, type Trigger, type Worker,
-  Poller, PullOpts, PullTrigger, type Storage, type Write,
+  Executor, PullOpts, ConcreteTrigger, type Storage, type Write,
   Step, Workflow, WorkflowState, Queue,
-  WorkflowTask, Consumer, Producer
+  WorkflowTask, Consumer, Producer, Consumption
 } from "rivr";
 import {
   type AnyBulkWriteOperation, ChangeStream, ChangeStreamDocument, ClientSession,
@@ -16,6 +16,48 @@ type MongoWorkflowState<State> = WorkflowState<State>
 export type WriteOpts = {
   session?: ClientSession
 } & DefaultTriggerOpts
+
+class MongoConsumption implements Consumption {
+  #collection: Collection<WorkflowState<unknown>>
+
+  #changeStream: ChangeStream<WorkflowState<unknown>, ChangeStreamDocument<WorkflowState<unknown>>> | undefined
+
+  constructor(
+    collection: Collection<WorkflowState<unknown>>,
+  ) {
+    this.#collection = collection
+  }
+
+  async stop(): Promise<void> {
+    await this.#changeStream?.close()
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<WorkflowState<unknown>> {
+    if (this.#changeStream !== undefined) {
+      throw new Error("Consumption was already started, please created another consumption.")
+    }
+
+    const changeStream = this.#collection.watch([
+      {
+        $match: {
+          'fullDocument.toExecute.status': "todo",
+        }
+      }
+    ])
+
+    this.#changeStream = changeStream
+
+    for await (const change of changeStream) {
+      if (change.operationType === "insert") {
+        yield change.fullDocument
+      }
+
+      if (change.operationType === "update" && change.fullDocument !== undefined) {
+        yield change.fullDocument
+      }
+    }
+  }
+}
 
 class MongoStorage implements Storage<WriteOpts> {
   #client: MongoClient
@@ -84,16 +126,10 @@ class MongoStorage implements Storage<WriteOpts> {
     }
   }
 
-  async pull<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[], opts: PullOpts): Promise<WorkflowState<State>[]> {
-    const filter = this.#getPullFilter(workflows)
-
-    const tasks = await this.#collection.find(filter)
-      .limit(opts.limit)
-      .toArray()
-
-    return tasks.map(({_id, ...rest}) => ({
-      ...rest,
-    } as WorkflowState<State>))
+  async consume<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<Consumption> {
+    return new MongoConsumption(
+      this.#collection
+    )
   }
 
   async write<State>(writes: Write<State>[], opts: WriteOpts = {}): Promise<void> {
@@ -158,7 +194,6 @@ type Checkpoint = {
 export class MongoQueue implements Queue {
   #client: MongoClient
   #taskCollection: Collection<WorkflowTask<unknown>>
-  #checkpointCollection: Collection<Checkpoint>
 
   #changeStream?: ChangeStream<WorkflowTask<unknown>, ChangeStreamDocument<WorkflowTask<unknown>>>
 
@@ -166,11 +201,9 @@ export class MongoQueue implements Queue {
     client: MongoClient,
     dbName: string,
     taskCollectionName: string,
-    checkpointCollectionName: string
   ) {
     this.#client = client;
     this.#taskCollection = this.#client.db(dbName).collection(taskCollectionName)
-    this.#checkpointCollection = this.#client.db(dbName).collection(checkpointCollectionName)
   }
 
   async *consume<State, FirstState, StateByStepName extends Record<string, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): AsyncGenerator<WorkflowTask<unknown>> {
@@ -239,7 +272,6 @@ export class MongoEngine implements Engine<WriteOpts> {
           this.client,
           dbName,
           "tasks-stream",
-          "checkpoint"
         )
       )
 
@@ -253,10 +285,8 @@ export class MongoEngine implements Engine<WriteOpts> {
       this.#collectionName,
     )
 
-    const poller = new Poller(
+    const poller = new Executor(
       storage,
-      delayBetweenPulls,
-      countPerPull
     )
     this.#workers.push(poller)
 
@@ -275,7 +305,6 @@ export class MongoEngine implements Engine<WriteOpts> {
           this.client,
           dbName,
           "tasks-stream",
-          "checkpoint"
         )
       )
     }
@@ -288,7 +317,7 @@ export class MongoEngine implements Engine<WriteOpts> {
 
     this.#triggerStorage.push(storage)
 
-    return new PullTrigger(storage)
+    return new ConcreteTrigger(storage)
   }
 
   createStorage(): Storage<WriteOpts> {
