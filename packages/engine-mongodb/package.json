@@ -13,6 +13,7 @@
   },
   "scripts": {
     "test": "borp *.spec.ts",
+    "test:only": "borp --only *.spec.ts",
     "sandbox": "ts-node src/sandbox.ts"
   },
   "repository": {

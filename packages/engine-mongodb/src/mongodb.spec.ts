@@ -21,7 +21,7 @@ after(async () => {
 })
 
 describe('basic flow control', function () {
-  test("execute a workflow step",  async (t) => {
+  test("execute a workflow step", async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -29,10 +29,9 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenPulls: 10,
+      signal: t.signal
     })
-
-    t.after(() => engine.close())
 
     let hookExecuted = false
     let state
@@ -47,13 +46,14 @@ describe('basic flow control', function () {
         state = s
       })
 
+    const trigger = engine.createTrigger()
     const worker = engine.createWorker()
-    worker.addHook("onError", err => console.log(err))
+    worker.addHook("onError", err => console.log("onErrorHook", err))
 
     await worker.start([ workflow ])
 
     // When
-    await engine.createTrigger().trigger(workflow, 4)
+    await trigger.trigger(workflow, 4)
 
     // Then
     let now = new Date().getTime()
@@ -63,7 +63,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 7)
   })
 
-  test("execute a workflow made of multiple steps",  async (t) => {
+  test("execute a workflow made of multiple steps", async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -106,7 +106,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 9)
   })
 
-  test("skip a step",  async (t) => {
+  test("skip a step", async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -160,7 +160,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(state, 5)
   })
 
-  test("stop a workflow",  async (t) => {
+  test("stop a workflow", async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
@@ -207,7 +207,7 @@ describe('basic flow control', function () {
     t.assert.deepEqual(stoppedState, 6)
   })
 
-  test("handle step errors",  async (t) => {
+  test("handle step errors", async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),

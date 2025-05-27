@@ -245,7 +245,7 @@ export class Executor<TriggerOpts> implements Worker {
       }
 
       this.#hasFinished = true
-    })().catch(console.error)
+    })().catch(err => this.#executeErrorHooks(err))
   }
 
   addHook(hook: "onError", handler: OnErrorHook): this {

@@ -19,16 +19,23 @@ export type WriteOpts = {
 
 class MongoConsumption implements Consumption {
   #collection: Collection<WorkflowState<unknown>>
+  #workflows: Workflow<unknown, unknown, Record<string, never>, Record<never, never>>[]
 
   #changeStream: ChangeStream<WorkflowState<unknown>, ChangeStreamDocument<WorkflowState<unknown>>> | undefined
 
   constructor(
     collection: Collection<WorkflowState<unknown>>,
+    workflows: Workflow<unknown, unknown, Record<string, never>, Record<never, never>>[]
   ) {
     this.#collection = collection
+    this.#workflows = workflows
   }
 
   async stop(): Promise<void> {
+    if (this.#changeStream !== undefined && this.#changeStream.closed) {
+      return
+    }
+
     await this.#changeStream?.close()
   }
 
@@ -40,22 +47,110 @@ class MongoConsumption implements Consumption {
     const changeStream = this.#collection.watch([
       {
         $match: {
-          'fullDocument.toExecute.status': "todo",
+          'fullDocument.toExecute.status': 'todo',
+          $or: [
+            {
+              'fullDocument.toExecute.pickAfter': { $exists: false }
+            },
+          ]
         }
       }
-    ])
+    ], {
+      fullDocument: "updateLookup"
+    })
 
     this.#changeStream = changeStream
 
-    for await (const change of changeStream) {
-      if (change.operationType === "insert") {
-        yield change.fullDocument
-      }
+    try {
+      for await (const change of changeStream) {
+        if (change.operationType === "insert") {
+          yield change.fullDocument
+        }
 
-      if (change.operationType === "update" && change.fullDocument !== undefined) {
-        yield change.fullDocument
+        if (change.operationType === "replace" && change.fullDocument !== undefined) {
+          yield change.fullDocument
+        }
+      }
+    } catch (error: unknown) {
+      if (!this.#isWatchStreamClosed(error)) {
+        throw error
       }
     }
+  }
+
+  #buildAggregationPipeline(workflows: Workflow<unknown, unknown, Record<string, never>, Record<never, never>>[]) {
+    const steps = workflows
+      .map(workflow => Array.from(workflow.steps()))
+      .flat()
+      .map(({item, context}) => [
+        `${context.name}-${item.maxAttempts}`,
+        {
+          step: item,
+          workflow: context
+        }
+      ] as const)
+      .reduce(
+        (acc, [id, {step, workflow}]) => {
+          const existing = acc.get(id)
+
+          if (!existing) {
+            acc.set(id, {steps: [step], workflow: workflow.name, maxAttempts: step.maxAttempts})
+            return acc
+          }
+
+          return acc.set(id, {...existing, steps: [...existing.steps, step]})
+        },
+        new Map<string, { workflow: string, maxAttempts: number, steps: Step[] }>()
+      )
+
+    const filter = Array.from(steps.entries())
+      .map(([, {maxAttempts, workflow, steps}]) => ({
+        $and: [
+          {
+            "fullDocument.name": workflow,
+            "fullDocument.toExecute.step": {$in: steps.map(step => step.name)},
+            "fullDocument.toExecute.status": "todo"
+          },
+          // {
+          //   $or: [
+          //     {
+          //       "fullDocument.toExecute.status": "todo",
+          //       "fullDocument.toExecute.attempt": {$lte: maxAttempts},
+          //       "fullDocument.toExecute.pickAfter": {$exists: false}
+          //     },
+          //     // {
+          //     //   "fullDocument.toExecute.status": "todo",
+          //     //   "fullDocument.toExecute.attempt": {$lte: maxAttempts},
+          //     //   // "fullDocument.toExecute.pickAfter": {$lte: "$$NOW"}
+          //     //   $expr: {
+          //     //     $lt: ["fullDocument.toExecute.pickAfter", "$$NOW"]
+          //     //   }
+          //     // }
+          //   ]
+          // }
+        ]
+      })) satisfies Filter<MongoWorkflowState<unknown>>[]
+
+    console.log(JSON.stringify([
+      {
+        $match: {
+          $or: filter
+        }
+      }
+    ]))
+
+    return [
+      {
+        $match: {
+          $or: filter
+        }
+      }
+    ]
+  }
+
+  #isWatchStreamClosed(error: unknown): boolean {
+    return typeof error === "object" && error !== null && "message" in error &&
+      typeof error.message === "string" && error.message.includes("is closed")
   }
 }
 
@@ -126,9 +221,10 @@ class MongoStorage implements Storage<WriteOpts> {
     }
   }
 
-  async consume<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<Consumption> {
+  async consume<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<string, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<Consumption> {
     return new MongoConsumption(
-      this.#collection
+      this.#collection,
+      workflows as Workflow<unknown, unknown, Record<string, never>, Record<never, never>>[]
     )
   }
 
@@ -261,23 +357,7 @@ export class MongoEngine implements Engine<WriteOpts> {
   createWorker(): Worker {
     const {
       dbName,
-      delayBetweenPulls = 1_000,
-      countPerPull = 20,
-      useChangeStream = false
     } = this.#opts
-
-    if (useChangeStream) {
-      const worker = new Consumer(
-        new MongoQueue(
-          this.client,
-          dbName,
-          "tasks-stream",
-        )
-      )
-
-      this.#workers.push(worker)
-      return worker
-    }
 
     const storage = new MongoStorage(
       this.client,
@@ -296,22 +376,11 @@ export class MongoEngine implements Engine<WriteOpts> {
   createTrigger(): Trigger<WriteOpts> {
     const {
       dbName,
-      useChangeStream = false
     } = this.#opts
-
-    if (useChangeStream) {
-      return new Producer(
-        new MongoQueue(
-          this.client,
-          dbName,
-          "tasks-stream",
-        )
-      )
-    }
 
     const storage = new MongoStorage(
       this.client,
-      this.#opts.dbName,
+      dbName,
       this.#collectionName
     )
 

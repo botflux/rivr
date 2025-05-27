@@ -15,23 +15,33 @@ async function run(): Promise<void> {
     console.log("onerror hook", err)
   })
 
-  const trigger = engine.createTrigger()
 
   const workflow = rivr.workflow<number>("workflow")
     .step({
       name: "add-1",
       handler: ({ state }) => {
         console.log("step called", state)
-        return state + 1
+        throw new Error("Not implemented at line 24 in sandbox.ts")
+        // return state + 1
+      },
+      maxAttempts: 3,
+      optional: true
+    })
+    .step({
+      name: "add-5",
+      handler: ({ state }) => {
+        console.log("add-5", state)
+        return state + 5
       }
     })
 
-  console.log("triggering first message")
-  await trigger.trigger(workflow, 1)
+  // console.log("triggering first message")
+  // await trigger.trigger(workflow, 1)
 
   console.log("starting the worker")
   await worker.start([ workflow ])
 
+  const trigger = engine.createTrigger()
   console.log("waiting for timeout")
   await setTimeout(5_000)
 
