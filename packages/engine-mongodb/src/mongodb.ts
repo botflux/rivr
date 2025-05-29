@@ -16,6 +16,11 @@ export type WriteOpts = {
   session?: ClientSession
 } & DefaultTriggerOpts
 
+function isAbortError(error: unknown): boolean {
+  return typeof error === "object" && error !== null &&
+    error instanceof DOMException && error.name === "AbortError"
+}
+
 class MongoContinuousPollConsumption implements Consumption {
   #collection: Collection<WorkflowState<unknown>>
   #createFilter: () => Filter<WorkflowState<unknown>>
@@ -33,11 +38,19 @@ class MongoContinuousPollConsumption implements Consumption {
   }
 
   async *[Symbol.asyncIterator](): AsyncIterator<WorkflowState<unknown>> {
-    for (const _ of this.#infiniteLoop) {
-      const cursor = this.#collection.find(this.#createFilter())
+    try {
+      for (const _ of this.#infiniteLoop) {
+        const cursor = this.#collection.find(this.#createFilter(), {
+          signal: this.#abort.signal
+        })
 
-      for await (const { _id, ...state } of cursor) {
-        yield state
+        for await (const { _id, ...state } of cursor) {
+          yield state
+        }
+      }
+    } catch (error: unknown) {
+      if (!isAbortError(error)) {
+        throw error
       }
     }
   }
