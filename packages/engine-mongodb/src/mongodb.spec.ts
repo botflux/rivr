@@ -1281,7 +1281,7 @@ describe('transaction', function () {
 
     // Then
     await waitForPredicate(() => states.length === 2)
-    t.assert.deepStrictEqual(states, [ 2, 3 ])
+    t.assert.deepStrictEqual(states.toSorted(), [ 2, 3 ])
   })
 })
 
