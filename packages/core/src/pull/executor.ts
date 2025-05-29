@@ -3,7 +3,6 @@ import {DefaultTriggerOpts, OnErrorHook, type Trigger, type Worker} from "../eng
 import {ReadyWorkflow, Step, StepResult, Workflow} from "../types";
 import {tryCatch, tryCatchSync} from "../utils/inline-catch";
 import {createWorkflowState, updateWorkflowState, WorkflowState} from "./state";
-import {Queue} from "../push/queue";
 
 export type Insert<State> = {
   type: "insert"

@@ -1,14 +1,13 @@
 import {
   DefaultTriggerOpts, Engine, type Trigger, type Worker,
-  Executor, PullOpts, ConcreteTrigger, type Storage, type Write,
-  Step, Workflow, WorkflowState, Queue,
-  WorkflowTask, Consumption, InfiniteLoop
+  Executor, ConcreteTrigger, type Storage, type Write,
+  Step, Workflow, WorkflowState, Consumption, InfiniteLoop
 } from "rivr";
 import {
   type AnyBulkWriteOperation, ChangeStream, ChangeStreamDocument, ClientSession,
   type Collection, Filter,
   MongoClient,
-  MongoClientOptions, ObjectId, Timestamp
+  MongoClientOptions
 } from "mongodb"
 
 type MongoWorkflowState<State> = WorkflowState<State>
@@ -351,60 +350,6 @@ class MongoStorage implements Storage<WriteOpts> {
 
   async disconnect(): Promise<void> {
     await this.#client.close(true)
-  }
-}
-
-type Checkpoint = {
-
-}
-
-export class MongoQueue implements Queue {
-  #client: MongoClient
-  #taskCollection: Collection<WorkflowTask<unknown>>
-
-  #changeStream?: ChangeStream<WorkflowTask<unknown>, ChangeStreamDocument<WorkflowTask<unknown>>>
-
-  constructor(
-    client: MongoClient,
-    dbName: string,
-    taskCollectionName: string,
-  ) {
-    this.#client = client;
-    this.#taskCollection = this.#client.db(dbName).collection(taskCollectionName)
-  }
-
-  async *consume<State, FirstState, StateByStepName extends Record<string, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): AsyncGenerator<WorkflowTask<unknown>> {
-    const changeSteam = this.#taskCollection.watch([], {
-      startAtOperationTime: Timestamp.fromNumber(
-        new Date().getTime() - 1_000 * 60 * 60 * 24 * 7
-      )
-    })
-
-    this.#changeStream = changeSteam
-
-    for await (const change of changeSteam) {
-      if (change.operationType !== "insert")
-        continue
-
-      const { fullDocument } = change
-
-      yield fullDocument
-    }
-  }
-
-  async enqueue<State>(writes: WorkflowTask<State>[]): Promise<void> {
-    const nackWrites = writes
-      .map(task => ({
-       insertOne: {
-         document: task
-       }
-      }) satisfies AnyBulkWriteOperation<WorkflowTask<State>>)
-
-    await this.#taskCollection.bulkWrite(nackWrites)
-  }
-
-  async disconnect(): Promise<void> {
-    await this.#changeStream?.close()
   }
 }
 
