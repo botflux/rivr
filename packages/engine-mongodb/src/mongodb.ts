@@ -291,9 +291,6 @@ class MongoStorage implements Storage<WriteOpts> {
           "toExecute.status": "todo",
           $or: [
             {
-              "toExecute.attempt": { $gt: 1 }
-            },
-            {
               "toExecute.pickAfter": { $lte: new Date() }
             }
           ]

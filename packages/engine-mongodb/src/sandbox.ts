@@ -24,7 +24,8 @@ async function run(): Promise<void> {
         // return state + 1
       },
       maxAttempts: 3,
-      optional: true
+      optional: true,
+      delayBetweenAttempts: attempt => attempt * 500
     })
     .step({
       name: "add-5",
@@ -34,17 +35,18 @@ async function run(): Promise<void> {
       }
     })
 
+  console.log("starting the worker")
+  await worker.start([ workflow ])
+
   const trigger = engine.createTrigger()
   await trigger.trigger(workflow, 1)
 
   console.log("waiting for 5s to be sure that the state is picked up by the single pass poller")
   await setTimeout(5_000)
 
-  console.log("starting the worker")
-  await worker.start([ workflow ])
 
   console.log("triggering a workflow")
-  await trigger.trigger(workflow, 10)
+  // await trigger.trigger(workflow, 10)
 }
 
 run().catch(console.error)

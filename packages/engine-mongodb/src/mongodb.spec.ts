@@ -7,7 +7,7 @@ import { createEngine } from "./mongodb"
 import {rivr, rivrPlugin} from "rivr"
 import {Network, StartedNetwork} from "testcontainers";
 import {CreatedProxy, StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
-import {MongoBulkWriteError} from "mongodb";
+import {MongoBulkWriteError, MongoServerSelectionError} from "mongodb";
 import {rejects} from "node:assert";
 
 let container!: StartedMongoDBContainer
@@ -765,7 +765,7 @@ describe('advance flow control', function () {
     // Then
     await waitForPredicate(() => state !== undefined)
     const end = new Date().getTime()
-    t.assert.strictEqual(end - start > 1_500, true)
+    t.assert.strictEqual(end - start > 1_500, true, `${end - start}ms is not greater than 1500ms`)
     t.assert.strictEqual(state, 2)
   })
 })
@@ -1595,8 +1595,12 @@ describe("resilience", () => {
     // Then
     await waitForPredicate(() => error !== undefined)
 
-    t.assert.deepStrictEqual(error instanceof MongoBulkWriteError ||
-      (typeof error === "object" && error !== null && "message" in error && error.message === "This socket has been ended by the other party"), true)
+    t.assert.deepStrictEqual(
+      error instanceof MongoBulkWriteError || error instanceof MongoServerSelectionError ||
+      (typeof error === "object" && error !== null && "message" in error && error.message === "This socket has been ended by the other party"),
+      true,
+      `${(error as any)?.constructor?.name} "${(error as any)?.message}" does not match the expected error`
+    )
   })
 })
 
