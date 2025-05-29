@@ -342,6 +342,7 @@ describe('basic flow control', function () {
         directConnection: true
       }
     })
+    const now = new Date()
 
     t.after(() => engine.close())
 
@@ -355,7 +356,10 @@ describe('basic flow control', function () {
 
     // When
     // Then
-    t.assert.deepStrictEqual(await engine.createTrigger().trigger(workflow, 4, { id: "1" }), {
+    t.assert.deepStrictEqual(await engine.createTrigger().trigger(workflow, 4, {
+      id: "1",
+      now
+    }), {
       id: "1",
       name: "complex-calculation",
       status: "in_progress",
@@ -371,7 +375,8 @@ describe('basic flow control', function () {
         state: 4,
         status: "todo",
         step: "add-1"
-      }
+      },
+      lastModified: now
     })
   })
 
@@ -714,7 +719,7 @@ describe('advance flow control', function () {
     // Then
     await waitForPredicate(() => state !== undefined)
     const end = new Date().getTime()
-    t.assert.strictEqual(end - start > 1_500, true)
+    t.assert.strictEqual(end - start > 1_500, true, `${end - start}ms is not greater than 1500ms`)
     t.assert.strictEqual(state, 2)
   })
 
@@ -1606,6 +1611,7 @@ describe('storage', function () {
         directConnection: true
       },
     })
+    const now = new Date()
 
     t.after(() => engine.close())
 
@@ -1623,11 +1629,13 @@ describe('storage', function () {
     await engine.createWorker().start([ workflow ])
 
     // When
-    await engine.createTrigger().trigger(workflow, 1, { id: "1" })
+    await engine.createTrigger().trigger(workflow, 1, { id: "1", now })
 
     // Then
     await waitForPredicate(() => result !== undefined)
-    t.assert.deepStrictEqual(await engine.createStorage().findById("1"), {
+    const mState = await engine.createStorage().findById("1")
+
+    t.assert.deepStrictEqual(mState ? omit(mState, [ "lastModified" ]) : mState, {
       id: "1",
       name: "complex-calculation",
       result: 1,
@@ -1649,7 +1657,7 @@ describe('storage', function () {
         state: 1,
         status: "done",
         step: "add-1"
-      }
+      },
     })
   })
 })
@@ -1659,4 +1667,17 @@ async function waitForPredicate(fn: () => boolean, ms = 5_000) {
   while (!fn() && new Date().getTime() - now < ms) {
     await setTimeout(20)
   }
+}
+
+function omit<Object extends Record<never, never>, Key extends keyof Object>(
+  o: Object,
+  keys: Key[]
+): Omit<Object, Key> {
+  const shallowCopy = { ...o }
+
+  for (const key of keys) {
+    delete shallowCopy[key]
+  }
+
+  return shallowCopy
 }

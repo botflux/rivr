@@ -7,6 +7,7 @@ describe('state', function () {
   test("should be able to create a workflow state", async (t: TestContext) => {
     // Given
     const id = randomUUID()
+    const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
       .step({
@@ -17,7 +18,7 @@ describe('state', function () {
     await workflow.ready()
 
     // When
-    const state = createWorkflowState(workflow, "add-1", 1, id)
+    const state = createWorkflowState(workflow, "add-1", 1, id, now)
 
     // Then
     t.assert.deepStrictEqual(state, {
@@ -36,13 +37,15 @@ describe('state', function () {
           name: "add-1",
           attempts: []
         }
-      ]
+      ],
+      lastModified: now
     })
   })
 
   test("should be able to update based on a successful result", async (t: TestContext) => {
     // Given
     const id = randomUUID()
+    const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
       .step({
@@ -58,7 +61,7 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id)
+    const state = createWorkflowState(workflow, "add-1", 1, id, now)
     const newState = updateWorkflowState(state, step, {
       type: "success",
       state: 2
@@ -90,12 +93,14 @@ describe('state', function () {
           name: "add-6",
           attempts: []
         }
-      ]
+      ],
+      lastModified: now
     })
   })
 
   test("should be able to end the workflow state", async (t: TestContext) => {
     const id = randomUUID()
+    const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
       .step({
@@ -107,7 +112,7 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id)
+    const state = createWorkflowState(workflow, "add-1", 1, id, now)
     const newState = updateWorkflowState(state, step, {
       type: "success",
       state: 2
@@ -136,13 +141,15 @@ describe('state', function () {
             }
           ]
         },
-      ]
+      ],
+      lastModified: now
     })
   })
 
   test("should be able to skip a step", async (t: TestContext) => {
     // Given
     const id = randomUUID()
+    const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
       .step({
@@ -158,7 +165,7 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id)
+    const state = createWorkflowState(workflow, "add-1", 1, id, now)
     const newState = updateWorkflowState(state, step, {
       type: "skipped",
     })
@@ -189,13 +196,15 @@ describe('state', function () {
           name: "add-6",
           attempts: []
         }
-      ]
+      ],
+      lastModified: now
     })
   })
 
   test("should be able to stop a workflow", async (t: TestContext) => {
     // Given
     const id = randomUUID()
+    const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
       .step({
@@ -211,7 +220,7 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id)
+    const state = createWorkflowState(workflow, "add-1", 1, id, now)
     const newState = updateWorkflowState(state, step, {
       type: "stopped",
     })
@@ -242,7 +251,8 @@ describe('state', function () {
           name: "add-6",
           attempts: []
         }
-      ]
+      ],
+      lastModified: now
     })
   })
 
@@ -262,7 +272,7 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id)
+    const state = createWorkflowState(workflow, "add-1", 1, id, now)
     const newState = updateWorkflowState(state, step, {
       type: "failure",
       error: new Error("oops")
@@ -291,7 +301,8 @@ describe('state', function () {
             }
           ]
         },
-      ]
+      ],
+      lastModified: now
     })
   })
 
@@ -311,7 +322,7 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id)
+    const state = createWorkflowState(workflow, "add-1", 1, id, now)
     const newState = updateWorkflowState(state, step, {
       type: "failure",
       error: new Error("oops")
@@ -339,7 +350,8 @@ describe('state', function () {
             }
           ]
         },
-      ]
+      ],
+      lastModified: now
     })
   })
 
@@ -363,7 +375,7 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id)
+    const state = createWorkflowState(workflow, "add-1", 1, id, now)
     const newState = updateWorkflowState(state, step, {
       type: "failure",
       error: new Error("oops")
@@ -395,7 +407,8 @@ describe('state', function () {
           name: "add-6",
           attempts: []
         }
-      ]
+      ],
+      lastModified: now
     })
   })
 })

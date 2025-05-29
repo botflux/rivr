@@ -15,6 +15,11 @@ export type DefaultTriggerOpts = {
    * The ID of the workflow
    */
   id?: string
+
+  /**
+   * Only used while testing to have a predictable value for `lastModified`.
+   */
+  now?: Date
 }
 
 export interface Trigger<TriggerOpts extends Record<never, never>> {

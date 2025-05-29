@@ -2,7 +2,7 @@ import {
   DefaultTriggerOpts, Engine, type Trigger, type Worker,
   Executor, PullOpts, ConcreteTrigger, type Storage, type Write,
   Step, Workflow, WorkflowState, Queue,
-  WorkflowTask, Consumer, Producer, Consumption
+  WorkflowTask, Consumption, InfiniteLoop
 } from "rivr";
 import {
   type AnyBulkWriteOperation, ChangeStream, ChangeStreamDocument, ClientSession,
@@ -17,7 +17,59 @@ export type WriteOpts = {
   session?: ClientSession
 } & DefaultTriggerOpts
 
-class MongoConsumption implements Consumption {
+class MongoContinuousPollConsumption implements Consumption {
+  #collection: Collection<WorkflowState<unknown>>
+  #createFilter: () => Filter<WorkflowState<unknown>>
+  #abort = new AbortController()
+  #infiniteLoop = new InfiniteLoop()
+
+  constructor(collection: Collection<WorkflowState<unknown>>, filter: () => Filter<WorkflowState<unknown>>) {
+    this.#collection = collection;
+    this.#createFilter = filter;
+  }
+
+  async stop(): Promise<void> {
+    this.#infiniteLoop.stop()
+    this.#abort.abort()
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<WorkflowState<unknown>> {
+    for (const _ of this.#infiniteLoop) {
+      const cursor = this.#collection.find(this.#createFilter())
+
+      for await (const { _id, ...state } of cursor) {
+        yield state
+      }
+    }
+  }
+}
+
+class MongoSinglePollConsumption implements Consumption {
+  #collection: Collection<WorkflowState<unknown>>
+  #filter: Filter<WorkflowState<unknown>>
+  #abort = new AbortController()
+
+  constructor(collection: Collection<WorkflowState<unknown>>, filter: Filter<WorkflowState<unknown>>) {
+    this.#collection = collection;
+    this.#filter = filter;
+  }
+
+  async stop(): Promise<void> {
+    this.#abort.abort()
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<WorkflowState<unknown>> {
+    const cursor = this.#collection.find(this.#filter, {
+      signal: this.#abort.signal
+    })
+
+    for await (const { _id, ...state } of cursor) {
+      yield state
+    }
+  }
+}
+
+class MongoChangeStreamConsumption implements Consumption {
   #collection: Collection<WorkflowState<unknown>>
   #workflows: Workflow<unknown, unknown, Record<string, never>, Record<never, never>>[]
 
@@ -221,11 +273,33 @@ class MongoStorage implements Storage<WriteOpts> {
     }
   }
 
-  async consume<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<string, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<Consumption> {
-    return new MongoConsumption(
-      this.#collection,
-      workflows as Workflow<unknown, unknown, Record<string, never>, Record<never, never>>[]
-    )
+  async consume<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<string, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<Consumption[]> {
+    return [
+      new MongoChangeStreamConsumption(
+        this.#collection,
+        workflows as Workflow<unknown, unknown, Record<string, never>, Record<never, never>>[]
+      ),
+      new MongoSinglePollConsumption(
+        this.#collection,
+        {
+          lastModified: { $lte: new Date() }
+        }
+      ),
+      new MongoContinuousPollConsumption(
+        this.#collection,
+        () => ({
+          "toExecute.status": "todo",
+          $or: [
+            {
+              "toExecute.attempt": { $gt: 1 }
+            },
+            {
+              "toExecute.pickAfter": { $lte: new Date() }
+            }
+          ]
+        })
+      )
+    ]
   }
 
   async write<State>(writes: Write<State>[], opts: WriteOpts = {}): Promise<void> {
@@ -311,11 +385,7 @@ export class MongoQueue implements Queue {
 
     this.#changeStream = changeSteam
 
-    console.log("waiting for changestream")
-
     for await (const change of changeSteam) {
-      console.log("change received", change)
-
       if (change.operationType !== "insert")
         continue
 
@@ -368,6 +438,7 @@ export class MongoEngine implements Engine<WriteOpts> {
     const poller = new Executor(
       storage,
     )
+
     this.#workers.push(poller)
 
     return poller

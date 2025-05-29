@@ -15,7 +15,6 @@ async function run(): Promise<void> {
     console.log("onerror hook", err)
   })
 
-
   const workflow = rivr.workflow<number>("workflow")
     .step({
       name: "add-1",
@@ -35,19 +34,17 @@ async function run(): Promise<void> {
       }
     })
 
-  // console.log("triggering first message")
-  // await trigger.trigger(workflow, 1)
+  const trigger = engine.createTrigger()
+  await trigger.trigger(workflow, 1)
+
+  console.log("waiting for 5s to be sure that the state is picked up by the single pass poller")
+  await setTimeout(5_000)
 
   console.log("starting the worker")
   await worker.start([ workflow ])
 
-  const trigger = engine.createTrigger()
-  console.log("waiting for timeout")
-  await setTimeout(5_000)
-
   console.log("triggering a workflow")
   await trigger.trigger(workflow, 10)
-
 }
 
 run().catch(console.error)

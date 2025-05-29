@@ -31,13 +31,15 @@ export type WorkflowState<State> = {
   result?: State
   status: WorkflowStatus
   steps: StepState[]
+  lastModified: Date
 }
 
 export function createWorkflowState<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName>(
   workflow: Workflow<State, FirstState, StateByStepName, Record<never, never>>,
   name: Name,
   state: StateByStepName[Name],
-  id: string = randomUUID()
+  id: string = randomUUID(),
+  now: Date
 ): WorkflowState<State> {
   const steps = Array.from(workflow.steps())
     .map(({ item }) => item)
@@ -84,11 +86,17 @@ export function createWorkflowState<State, FirstState, StateByStepName extends R
         name: step.name,
         attempts: []
       }))
-    ]
+    ],
+    lastModified: now
   }
 }
 
-export function updateWorkflowState<State>(state: WorkflowState<State>, step: Step, result: StepResult<State>, now = new Date()): WorkflowState<State> {
+export function updateWorkflowState<State>(
+  state: WorkflowState<State>,
+  step: Step,
+  result: StepResult<State>,
+  now = new Date()
+): WorkflowState<State> {
   const stepStateIndex = state.steps.findIndex(s => s.name === step.name)
   const stepState = state.steps[stepStateIndex]
 
@@ -111,7 +119,8 @@ export function updateWorkflowState<State>(state: WorkflowState<State>, step: St
     toExecute: nextTask,
     ...newStatus === "successful" && {
       result: nextTask.state
-    }
+    },
+    lastModified: now
   }
 }
 
