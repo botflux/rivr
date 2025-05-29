@@ -233,14 +233,15 @@ function getNextTask<State>(state: WorkflowState<State>, step: Step, result: Ste
         ? () => delayFnOrNumber
         : delayFnOrNumber
 
-      const retryAfter = new Date(now.getTime() + delayBetweenAttempts(state.toExecute.attempt + 1))
+      const newDelay = delayBetweenAttempts(state.toExecute.attempt + 1)
+      const pickAfter = newDelay === 0 ? undefined : new Date(now.getTime() + newDelay)
 
       return [
         {
           ...state.toExecute,
           attempt: state.toExecute.attempt + 1,
           areRetryExhausted,
-          pickAfter: retryAfter,
+          ...pickAfter !== undefined && { pickAfter },
         },
         "in_progress"
       ]

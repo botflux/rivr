@@ -25,7 +25,7 @@ async function run(): Promise<void> {
       },
       maxAttempts: 3,
       optional: true,
-      delayBetweenAttempts: attempt => attempt * 500
+      // delayBetweenAttempts: attempt => attempt * 500
     })
     .step({
       name: "add-5",
