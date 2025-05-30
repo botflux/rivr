@@ -16,10 +16,6 @@ export type Update<State> = {
 
 export type Write<State> = Update<State> | Insert<State>
 
-export type PullOpts = {
-  limit: number
-}
-
 export interface Consumption {
   [Symbol.asyncIterator](): AsyncIterator<WorkflowState<unknown>>
   stop(): Promise<void>
