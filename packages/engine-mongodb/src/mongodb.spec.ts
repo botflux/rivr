@@ -29,7 +29,7 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10,
+      delayBetweenEmptyPolls: 10,
       signal: t.signal
     })
 
@@ -71,7 +71,7 @@ describe('basic flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -114,7 +114,7 @@ describe('basic flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -168,7 +168,7 @@ describe('basic flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -215,7 +215,7 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -259,7 +259,7 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -298,7 +298,7 @@ describe('basic flow control', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -337,7 +337,7 @@ describe('basic flow control', function () {
     const engine = createEngine({
       url: container.getConnectionString(),
       dbName: randomUUID(),
-      delayBetweenPulls: 10,
+      delayBetweenEmptyPolls: 10,
       clientOpts: {
         directConnection: true
       }
@@ -385,7 +385,7 @@ describe('basic flow control', function () {
     const engine = createEngine({
       url: container.getConnectionString(),
       dbName: randomUUID(),
-      delayBetweenPulls: 10,
+      delayBetweenEmptyPolls: 10,
       clientOpts: {
         directConnection: true,
       },
@@ -426,7 +426,7 @@ describe('basic flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -470,7 +470,7 @@ describe('advance flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -520,7 +520,7 @@ describe('advance flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -571,7 +571,7 @@ describe('advance flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -617,7 +617,7 @@ describe('advance flow control', function () {
         directConnection: true,
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -652,7 +652,7 @@ describe('advance flow control', function () {
         directConnection: true,
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -686,7 +686,7 @@ describe('advance flow control', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -731,7 +731,7 @@ describe('advance flow control', function () {
       clientOpts: {
         directConnection: true,
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -779,7 +779,7 @@ describe('extension', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -819,7 +819,7 @@ describe('extension', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -858,7 +858,7 @@ describe('extension', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      delayBetweenPulls: 10,
+      delayBetweenEmptyPolls: 10,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true
@@ -905,7 +905,7 @@ describe('extension', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -950,7 +950,7 @@ describe('extension', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -990,7 +990,7 @@ describe('extension', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -1042,7 +1042,7 @@ describe('extension', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -1137,7 +1137,7 @@ describe('extension', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -1199,7 +1199,7 @@ describe('transaction', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -1243,7 +1243,7 @@ describe('transaction', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -1294,7 +1294,7 @@ describe('hooks', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -1332,7 +1332,7 @@ describe('hooks', function () {
       clientOpts: {
         directConnection: true
       },
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -1380,7 +1380,7 @@ describe('hooks', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -1433,7 +1433,7 @@ describe('hooks', function () {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -1513,7 +1513,7 @@ describe("resilience", () => {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -1562,7 +1562,7 @@ describe("resilience", () => {
         directConnection: true
       },
       dbName: randomUUID(),
-      delayBetweenPulls: 10
+      delayBetweenEmptyPolls: 10
     })
 
     t.after(() => engine.close())
@@ -1609,7 +1609,7 @@ describe('storage', function () {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
-      delayBetweenPulls: 10,
+      delayBetweenEmptyPolls: 10,
       dbName: randomUUID(),
       clientOpts: {
         directConnection: true

@@ -24,12 +24,18 @@ function isAbortError(error: unknown): boolean {
 class MongoContinuousPollConsumption implements Consumption {
   #collection: Collection<WorkflowState<unknown>>
   #createFilter: () => Filter<WorkflowState<unknown>>
+  #timeBetweenEmptyPolls: number = 0
   #abort = new AbortController()
   #infiniteLoop = new InfiniteLoop()
 
-  constructor(collection: Collection<WorkflowState<unknown>>, filter: () => Filter<WorkflowState<unknown>>) {
+  constructor(
+    collection: Collection<WorkflowState<unknown>>,
+    filter: () => Filter<WorkflowState<unknown>>,
+    timeBetweenEmptyPolls: number
+  ) {
     this.#collection = collection;
     this.#createFilter = filter;
+    this.#timeBetweenEmptyPolls = timeBetweenEmptyPolls;
   }
 
   async stop(): Promise<void> {
@@ -221,14 +227,17 @@ class MongoChangeStreamConsumption implements Consumption {
 class MongoStorage implements Storage<WriteOpts> {
   #client: MongoClient
   #collection: Collection<MongoWorkflowState<unknown>>
+  #timeBetweenEmptyPolls: number
 
   constructor(
     client: MongoClient,
     dbName: string,
-    collectionName: string
+    collectionName: string,
+    timeBetweenEmptyPolls: number
   ) {
     this.#client = client
     this.#collection = this.#client.db(dbName).collection(collectionName)
+    this.#timeBetweenEmptyPolls = timeBetweenEmptyPolls
   }
 
   #getPullFilter<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Filter<MongoWorkflowState<unknown>> {
@@ -306,7 +315,8 @@ class MongoStorage implements Storage<WriteOpts> {
               "toExecute.pickAfter": { $lte: new Date() }
             }
           ]
-        })
+        }),
+        this.#timeBetweenEmptyPolls
       )
     ]
   }
@@ -380,15 +390,7 @@ export class MongoEngine implements Engine<WriteOpts> {
   }
 
   createWorker(): Worker {
-    const {
-      dbName,
-    } = this.#opts
-
-    const storage = new MongoStorage(
-      this.client,
-      dbName,
-      this.#collectionName,
-    )
+    const storage = this.#createStorage()
 
     const poller = new Executor(
       storage,
@@ -404,11 +406,7 @@ export class MongoEngine implements Engine<WriteOpts> {
       dbName,
     } = this.#opts
 
-    const storage = new MongoStorage(
-      this.client,
-      dbName,
-      this.#collectionName
-    )
+    const storage = this.#createStorage()
 
     this.#triggerStorage.push(storage)
 
@@ -416,12 +414,7 @@ export class MongoEngine implements Engine<WriteOpts> {
   }
 
   createStorage(): Storage<WriteOpts> {
-    const storage = new MongoStorage(
-      this.client,
-      this.#opts.dbName,
-      this.#collectionName
-    )
-
+    const storage = this.#createStorage()
     this.#triggerStorage.push(storage)
     return storage
   }
@@ -444,8 +437,19 @@ export class MongoEngine implements Engine<WriteOpts> {
     return this.#client
   }
 
-  get #collectionName(): string {
-    return this.#opts.collectionName ?? "workflow-states"
+  #createStorage() {
+    const {
+      dbName,
+      delayBetweenEmptyPolls = 5_000,
+      collectionName = "workflow-states"
+    } = this.#opts
+
+    return new MongoStorage(
+      this.client,
+      dbName,
+      collectionName,
+      delayBetweenEmptyPolls
+    )
   }
 }
 
@@ -462,9 +466,9 @@ export type CreateEngineOpts = {
    * Note that this delay is waited only if an incomplete or empty
    * page is pulled.
    *
-   * @default {1_000} 1000ms by default
+   * @default {5_000} 5000ms by default
    */
-  delayBetweenPulls?: number
+  delayBetweenEmptyPolls?: number
 
   /**
    * The number of states retrieved for each pull.

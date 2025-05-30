@@ -34,7 +34,7 @@ describe('fastify integration', function () {
       .register(fastifyRivr, {
         engine: createEngine({
           url: container.getConnectionString(),
-          delayBetweenPulls: 100,
+          delayBetweenEmptyPolls: 100,
           clientOpts: {
             directConnection: true
           },
