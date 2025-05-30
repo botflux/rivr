@@ -1,6 +1,6 @@
 import {
-  ConcreteTrigger,
-  Consumption,
+  ConcreteTrigger, ConsumeOpts,
+  Consumption, Consumption2,
   DefaultTriggerOpts,
   Engine,
   Executor,
@@ -20,11 +20,12 @@ import {
   ChangeStream,
   ChangeStreamDocument,
   ClientSession,
-  type Collection,
+  type Collection, Document,
   Filter,
   MongoClient,
   MongoClientOptions
 } from "mongodb"
+import {setTimeout} from "node:timers/promises"
 
 type MongoWorkflowState<State> = WorkflowState<State>
 
@@ -35,6 +36,176 @@ export type WriteOpts = {
 function isAbortError(error: unknown): boolean {
   return typeof error === "object" && error !== null &&
     error instanceof DOMException && error.name === "AbortError"
+}
+
+class MongoSinglePollConsumption2 implements Consumption2 {
+  #collection: Collection<WorkflowState<unknown>>
+  #filter: Filter<WorkflowState<unknown>>
+  #opts: ConsumeOpts
+  #abort = new AbortController()
+
+  constructor(
+    collection: Collection<WorkflowState<unknown>>,
+    filter: Filter<WorkflowState<unknown>>,
+    opts: ConsumeOpts
+  ) {
+    this.#collection = collection
+    this.#filter = filter
+    this.#opts = opts;
+
+    this.#startConsuming()
+  }
+
+  async stop(): Promise<void> {
+    this.#abort.abort()
+  }
+
+  async #startConsuming(): Promise<void> {
+    try {
+      const cursor = this.#collection.find(this.#filter, {
+        signal: this.#abort.signal
+      })
+
+      for await (const { _id, ...state } of cursor) {
+        try {
+          await this.#opts.onMessage(state)
+        } catch (error: unknown) {
+          console.error(error)
+        }
+      }
+    } catch (error: unknown) {
+      if (!isAbortError(error)) {
+        throw error
+      }
+    }
+  }
+}
+
+class MongoContinuousPollConsumption2 implements Consumption2 {
+  #collection: Collection<WorkflowState<unknown>>
+  #getFilter: () => Filter<WorkflowState<unknown>>
+  #opts: ConsumeOpts
+  #timeBetweenEmptyPolls: number
+  #abort = new AbortController
+  #infiniteLoop = new InfiniteLoop()
+
+  constructor(
+    collection: Collection<WorkflowState<unknown>>,
+    getFilter: () => Filter<WorkflowState<unknown>>,
+    opts: ConsumeOpts,
+    timeBetweenEmptyPolls: number
+  ) {
+    this.#collection = collection;
+    this.#getFilter = getFilter;
+    this.#opts = opts;
+    this.#timeBetweenEmptyPolls = timeBetweenEmptyPolls;
+
+    this.#startConsuming()
+  }
+
+  async stop(): Promise<void> {
+    this.#infiniteLoop.stop()
+    this.#abort.abort()
+  }
+
+  async #startConsuming() {
+    try {
+      for (const _ of this.#infiniteLoop) {
+        const cursor = this.#collection.find(this.#getFilter(), {
+          signal: this.#abort.signal
+        })
+
+        let count = 0
+
+        for await (const { _id, ...state } of cursor) {
+          count ++
+
+          try {
+            await this.#opts.onMessage(state)
+          } catch (error: unknown) {
+            console.error(error)
+          }
+        }
+
+        if (count === 0) {
+          await setTimeout(this.#timeBetweenEmptyPolls, 0, { signal: this.#abort.signal })
+        }
+      }
+    } catch (error: unknown) {
+      if (isAbortError(error)) {
+        throw error
+      }
+    }
+  }
+}
+
+class MongoChangeStreamConsumption2 implements Consumption2 {
+  #collection: Collection<WorkflowState<unknown>>
+  #opts: ConsumeOpts
+  #pipeline: Document[]
+
+  #changeStream: ChangeStream<WorkflowState<unknown>, ChangeStreamDocument<WorkflowState<unknown>>> | undefined
+
+  constructor(
+    collection: Collection<WorkflowState<unknown>>,
+    pipeline: Document[],
+    opts: ConsumeOpts
+  ) {
+    this.#collection = collection;
+    this.#pipeline = pipeline;
+    this.#opts = opts;
+
+    this.#startConsuming()
+  }
+
+  async stop(): Promise<void> {
+    if (!this.#changeStream?.closed) {
+      return
+    }
+
+    this.#changeStream?.close()
+  }
+
+  async #startConsuming() {
+    try {
+      const stream = this.#collection.watch(this.#pipeline, {
+        fullDocument: "updateLookup"
+      })
+
+      this.#changeStream = stream
+
+      for await (const change of stream) {
+        if (change.operationType === "insert" || (change.operationType === "replace" && change.fullDocument !== undefined)) {
+          try {
+            await this.#opts.onMessage(change.fullDocument)
+          } catch (error: unknown) {
+            console.error(error)
+          }
+        }
+      }
+
+    } catch (error: unknown) {
+     if (!this.#isWatchStreamClosed(error))
+       throw error
+    }
+  }
+
+  #isWatchStreamClosed(error: unknown): boolean {
+    return typeof error === "object" && error !== null && "message" in error &&
+      typeof error.message === "string" && (error.message.includes("is closed") || error.message === "Executor error during getMore :: caused by :: operation was interrupted")
+  }
+}
+
+class CompoundConsumption2 implements Consumption2 {
+  #consumptions: Consumption2[]
+
+  constructor(consumptions: Consumption2[]) {
+    this.#consumptions = consumptions;
+  }
+
+  async stop(): Promise<void> {
+    await Promise.allSettled(this.#consumptions.map(c => c.stop()))
+  }
 }
 
 class MongoContinuousPollConsumption implements Consumption {
@@ -281,6 +452,47 @@ class MongoStorage implements Storage<WriteOpts>, Queue<WriteOpts> {
         this.#timeBetweenEmptyPolls
       )
     ]
+  }
+
+  async consume(opts: ConsumeOpts): Promise<Consumption2> {
+    return new CompoundConsumption2([
+      new MongoSinglePollConsumption2(
+        this.#collection,
+        {
+          lastModified: { $lte: new Date() }
+        },
+        opts
+      ),
+      new MongoContinuousPollConsumption2(
+        this.#collection,
+        () => ({
+          "toExecute.status": "todo",
+          $or: [
+            {
+              "toExecute.pickAfter": { $lte: new Date() }
+            }
+          ]
+        }),
+        opts,
+        this.#timeBetweenEmptyPolls
+      ),
+      new MongoChangeStreamConsumption2(
+        this.#collection,
+        [
+          {
+            $match: {
+              'fullDocument.toExecute.status': 'todo',
+              $or: [
+                {
+                  'fullDocument.toExecute.pickAfter': { $exists: false }
+                },
+              ]
+            }
+          }
+        ],
+        opts
+      )
+    ])
   }
 
   async write<State>(writes: Write<State>[], opts: WriteOpts = {}): Promise<void> {
