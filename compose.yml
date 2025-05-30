@@ -9,6 +9,11 @@ services:
       interval: 10s
       start_period: 30s
 
+  rabbitmq:
+    image: rabbitmq:4.1
+    ports:
+      - "5672:5672"
+
   postgres:
     image: postgres:latest
     environment:

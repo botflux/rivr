@@ -85,6 +85,7 @@ export interface Queue<WriteOpts> {
    * @param opts
    */
   write<State>(writes: Write<State>[], opts?: WriteOpts): Promise<void>
+  disconnect(): Promise<void>
 }
 
 export class InfiniteLoop {
@@ -102,10 +103,10 @@ export class InfiniteLoop {
 }
 
 export class ConcreteTrigger<TriggerOpts extends DefaultTriggerOpts> implements Trigger<TriggerOpts> {
-  #storage: Storage<TriggerOpts>
+  #queue: Queue<TriggerOpts>
 
-  constructor(storage: Storage<TriggerOpts>) {
-    this.#storage = storage
+  constructor(queue: Queue<TriggerOpts>) {
+    this.#queue = queue
   }
 
   async trigger<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(
@@ -127,7 +128,7 @@ export class ConcreteTrigger<TriggerOpts extends DefaultTriggerOpts> implements 
       opts?.now ?? new Date()
     )
 
-    await this.#storage.write([
+    await this.#queue.write([
       {
         type: "insert",
         state: s
@@ -157,7 +158,7 @@ export class ConcreteTrigger<TriggerOpts extends DefaultTriggerOpts> implements 
       new Date()
     )
 
-    await this.#storage.write([
+    await this.#queue.write([
       {
         type: "insert",
         state: s
@@ -169,20 +170,20 @@ export class ConcreteTrigger<TriggerOpts extends DefaultTriggerOpts> implements 
 }
 
 export class ConcreteWorker<TriggerOpts> implements Worker {
-  #storage: Queue<TriggerOpts> & Storage<TriggerOpts>
+  #queue: Queue<TriggerOpts>
 
   #consumption: Consumption | undefined
   #onError: OnErrorHook[] = []
 
   constructor(
-    storage: Queue<TriggerOpts> & Storage<TriggerOpts>,
+    queue: Queue<TriggerOpts>,
   ) {
-    this.#storage = storage
+    this.#queue = queue
   }
 
   async start<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<void> {
     const readyWorkflows = await Promise.all(workflows.map(async workflow => workflow.ready()))
-    this.#consumption = await this.#storage.consume({
+    this.#consumption = await this.#queue.consume({
       workflows: readyWorkflows,
       onMessage: async task => {
         try {
@@ -306,7 +307,7 @@ export class ConcreteWorker<TriggerOpts> implements Worker {
 
   async stop(): Promise<void> {
     this.#consumption?.stop()
-    await this.#storage.disconnect()
+    await this.#queue.disconnect()
   }
 
   async #handleStep<State>(
@@ -360,7 +361,7 @@ export class ConcreteWorker<TriggerOpts> implements Worker {
   }
 
   async #write<State>(writes: Write<State>[]) {
-    const [, err] = await tryCatch(this.#storage.write(writes))
+    const [, err] = await tryCatch(this.#queue.write(writes))
 
     if (err !== undefined) {
       this.#executeErrorHooks(err)
