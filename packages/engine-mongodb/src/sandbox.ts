@@ -19,20 +19,9 @@ async function run(): Promise<void> {
     .step({
       name: "add-1",
       handler: ({ state }) => {
-        console.log("step called", state)
-        throw new Error("Not implemented at line 24 in sandbox.ts")
-        // return state + 1
+        return state + 1
       },
-      maxAttempts: 3,
-      optional: true,
-      // delayBetweenAttempts: attempt => attempt * 500
-    })
-    .step({
-      name: "add-5",
-      handler: ({ state }) => {
-        console.log("add-5", state)
-        return state + 5
-      }
+      maxAttempts: 1,
     })
 
   console.log("starting the worker")

@@ -28,6 +28,15 @@ export interface Consumption {
   stop(): Promise<void>
 }
 
+export type FindAll<
+  State,
+  FirstState,
+  StateByStepName extends Record<string, never>,
+  Decorators extends Record<never, never>
+> = {
+  workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]
+}
+
 /**
  * The storage is an abstraction representing the underlying
  * database/queuing system.
@@ -47,6 +56,13 @@ export interface Storage<WriteOpts> {
    * @param id
    */
   findById<State>(id: string): Promise<WorkflowState<State> | undefined>
+
+  findAll<
+    State,
+    FirstState,
+    StateByStepName extends Record<string, never>,
+    Decorators extends Record<never, never>
+  >(opts: FindAll<State, FirstState, StateByStepName, Decorators>): Promise<WorkflowState<unknown>[]>
 
   disconnect(): Promise<void>
 }

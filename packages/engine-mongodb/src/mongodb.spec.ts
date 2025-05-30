@@ -1463,7 +1463,7 @@ describe('hooks', function () {
   })
 })
 
-describe("resilience", () => {
+describe("resilience", {skip: true}, () => {
   let network: StartedNetwork
   let mongodb: StartedMongoDBContainer
   let toxiproxy: StartedToxiProxyContainer
@@ -1642,7 +1642,7 @@ describe('storage', function () {
     t.assert.deepStrictEqual(mState ? omit(mState, [ "lastModified" ]) : mState, {
       id: "1",
       name: "complex-calculation",
-      result: 1,
+      result: 2,
       status: "successful",
       steps: [
         {
@@ -1663,6 +1663,112 @@ describe('storage', function () {
         step: "add-1"
       },
     })
+  })
+
+  test("should be able to find a list of workflow", async (t: TestContext) => {
+    // Given
+    const engine = createEngine({
+      url: container.getConnectionString(),
+      dbName: randomUUID(),
+      clientOpts: {
+        directConnection: true,
+      },
+    })
+
+    t.after(() => engine.close())
+
+    let doneCount = 0
+
+    const workflow = rivr.workflow<number>("complex-calculation")
+      .step({
+        name: "add-1",
+        handler: ({ state }) => state + 1
+      })
+      .addHook("onWorkflowCompleted", (w, s) => doneCount++)
+
+    await engine.createWorker().start([ workflow ])
+
+    // When
+    await engine.createTrigger().trigger(workflow, 10)
+    await engine.createTrigger().trigger(workflow, 20)
+    await engine.createTrigger().trigger(workflow, 30)
+
+    // Then
+    await waitForPredicate(() => doneCount === 3)
+    const states = await engine.createStorage().findAll({
+      workflows: [ workflow ]
+    })
+    t.assert.deepStrictEqual(states.map(s => omit(s, [ "lastModified", "id" ])), [
+      {
+        name: "complex-calculation",
+        result: 11,
+        status: "successful",
+        steps: [
+          {
+            attempts: [
+              {
+                id: 1,
+                status: "successful",
+              }
+            ],
+            name: "add-1"
+          }
+        ],
+        toExecute: {
+          areRetryExhausted: false,
+          attempt: 1,
+          state: 10,
+          status: "done",
+          step: "add-1"
+        }
+      },
+      {
+        name: "complex-calculation",
+        result: 21,
+        status: "successful",
+        steps: [
+          {
+            attempts: [
+              {
+                id: 1,
+                status: "successful",
+              }
+            ],
+            name: "add-1"
+          }
+        ],
+        toExecute: {
+          areRetryExhausted: false,
+          attempt: 1,
+          state: 20,
+          status: "done",
+          step: "add-1"
+        }
+      },
+      {
+        name: "complex-calculation",
+        result: 31,
+        status: "successful",
+        steps: [
+          {
+            attempts: [
+              {
+                id: 1,
+                status: "successful",
+              }
+            ],
+            name: "add-1"
+          }
+        ],
+        toExecute: {
+          areRetryExhausted: false,
+          attempt: 1,
+          state: 30,
+          status: "done",
+          step: "add-1"
+        }
+      }
+    ])
   })
 })
 

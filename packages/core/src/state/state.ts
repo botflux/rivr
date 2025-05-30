@@ -110,15 +110,15 @@ export function updateWorkflowState<State>(
 
   const updatedSteps = state.steps.with(stepStateIndex, { ...stepState, attempts: [ ...stepState.attempts, newAttempt ] })
 
-  const [nextTask, newStatus] = getNextTask(state, step, result, now)
+  const [nextTask, newStatus, resultState] = getNextTask(state, step, result, now)
 
   return {
     ...state,
     steps: updatedSteps,
     status: newStatus,
     toExecute: nextTask,
-    ...newStatus === "successful" && {
-      result: nextTask.state
+    ...resultState !== undefined && {
+      result: resultState
     },
     lastModified: now
   }
@@ -141,7 +141,11 @@ function resultToAttemptStatus (result: StepResult<unknown>): AttemptStatus {
  * @param result
  * @param now
  */
-function getNextTask<State>(state: WorkflowState<State>, step: Step, result: StepResult<State>, now: Date): [Task<State>, WorkflowStatus] {
+function getNextTask<State>(state: WorkflowState<State>, step: Step, result: StepResult<State>, now: Date): [
+  newTask: Task<State>,
+  newStatus: WorkflowStatus,
+  resultState: State | undefined
+] {
   const { delayBetweenAttempts: delayFnOrNumber, maxAttempts, optional } = step
   const currentStepIndex = state.steps.findIndex(s => s.name === step.name)
 
@@ -156,19 +160,20 @@ function getNextTask<State>(state: WorkflowState<State>, step: Step, result: Ste
   switch (result.type) {
     case "skipped":
     case "success": {
+      const nextState = result.type === "skipped"
+        ? state.toExecute.state
+        : result.state
+
       if (mNextStep === undefined) {
         return [
           {
             ...state.toExecute,
             status: "done",
           },
-          "successful"
+          "successful",
+          nextState
         ]
       }
-
-      const nextState = result.type === "skipped"
-        ? state.toExecute.state
-        : result.state
 
       return [
         {
@@ -178,7 +183,8 @@ function getNextTask<State>(state: WorkflowState<State>, step: Step, result: Ste
           attempt: 1,
           areRetryExhausted: false
         },
-        "in_progress"
+        "in_progress",
+        undefined
       ]
     }
 
@@ -188,7 +194,8 @@ function getNextTask<State>(state: WorkflowState<State>, step: Step, result: Ste
           ...state.toExecute,
           status: "done",
         },
-        "stopped"
+        "stopped",
+        undefined
       ]
     }
 
@@ -202,7 +209,8 @@ function getNextTask<State>(state: WorkflowState<State>, step: Step, result: Ste
               ...state.toExecute,
               status: "done"
             },
-            "successful"
+            "successful",
+            state.toExecute.state
           ]
         }
 
@@ -214,7 +222,8 @@ function getNextTask<State>(state: WorkflowState<State>, step: Step, result: Ste
             state: state.toExecute.state,
             step: mNextStep.name,
           },
-          "in_progress"
+          "in_progress",
+          undefined
         ]
       }
 
@@ -225,7 +234,8 @@ function getNextTask<State>(state: WorkflowState<State>, step: Step, result: Ste
             status: "done",
             areRetryExhausted,
           },
-          "failed"
+          "failed",
+          undefined
         ]
       }
 
@@ -243,7 +253,8 @@ function getNextTask<State>(state: WorkflowState<State>, step: Step, result: Ste
           areRetryExhausted,
           ...pickAfter !== undefined && { pickAfter },
         },
-        "in_progress"
+        "in_progress",
+        undefined
       ]
     }
   }

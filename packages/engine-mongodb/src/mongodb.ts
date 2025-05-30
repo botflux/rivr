@@ -1,11 +1,27 @@
 import {
-  DefaultTriggerOpts, Engine, type Trigger, type Worker,
-  Executor, ConcreteTrigger, type Storage, type Write,
-  Step, Workflow, WorkflowState, Consumption, InfiniteLoop, Queue
+  ConcreteTrigger,
+  Consumption,
+  DefaultTriggerOpts,
+  Engine,
+  Executor,
+  FindAll,
+  InfiniteLoop,
+  Queue,
+  Step,
+  type Storage,
+  type Trigger,
+  type Worker,
+  Workflow,
+  WorkflowState,
+  type Write
 } from "rivr";
 import {
-  type AnyBulkWriteOperation, ChangeStream, ChangeStreamDocument, ClientSession,
-  type Collection, Filter,
+  type AnyBulkWriteOperation,
+  ChangeStream,
+  ChangeStreamDocument,
+  ClientSession,
+  type Collection,
+  Filter,
   MongoClient,
   MongoClientOptions
 } from "mongodb"
@@ -240,60 +256,6 @@ class MongoStorage implements Storage<WriteOpts>, Queue<WriteOpts> {
     this.#timeBetweenEmptyPolls = timeBetweenEmptyPolls
   }
 
-  #getPullFilter<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Filter<MongoWorkflowState<unknown>> {
-    const steps = workflows
-      .map(workflow => Array.from(workflow.steps()))
-      .flat()
-      .map(({item, context}) => [
-        `${context.name}-${item.maxAttempts}`,
-        {
-          step: item,
-          workflow: context
-        }
-      ] as const)
-      .reduce(
-        (acc, [id, {step, workflow}]) => {
-          const existing = acc.get(id)
-
-          if (!existing) {
-            acc.set(id, {steps: [step], workflow: workflow.name, maxAttempts: step.maxAttempts})
-            return acc
-          }
-
-          return acc.set(id, {...existing, steps: [...existing.steps, step]})
-        },
-        new Map<string, { workflow: string, maxAttempts: number, steps: Step[] }>()
-      )
-
-    const filter = Array.from(steps.entries())
-      .map(([, {maxAttempts, workflow, steps}]) => ({
-        $and: [
-          {
-            name: workflow,
-            "toExecute.step": {$in: steps.map(step => step.name)},
-          },
-          {
-            $or: [
-              {
-                "toExecute.status": "todo",
-                "toExecute.attempt": {$lte: maxAttempts},
-                "toExecute.pickAfter": {$exists: false}
-              },
-              {
-                "toExecute.status": "todo",
-                "toExecute.attempt": {$lte: maxAttempts},
-                "toExecute.pickAfter": {$lte: new Date()}
-              }
-            ]
-          }
-        ]
-      })) satisfies Filter<MongoWorkflowState<State>>[]
-
-    return {
-      $or: filter
-    }
-  }
-
   async createConsumptions<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<string, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<Consumption[]> {
     return [
       new MongoChangeStreamConsumption(
@@ -369,6 +331,13 @@ class MongoStorage implements Storage<WriteOpts>, Queue<WriteOpts> {
 
     const {_id, ...rest} = mRecord
     return rest as WorkflowState<State>
+  }
+
+  async findAll<State, FirstState, StateByStepName extends Record<string, never>, Decorators extends Record<never, never>>(opts: FindAll<State, FirstState, StateByStepName, Decorators>): Promise<WorkflowState<unknown>[]> {
+    const cursor = this.#collection.find({ name: { $in: opts.workflows.map(w => w.name) } })
+    const documents = await cursor.toArray()
+
+    return documents.map(({_id, ...state}) => state)
   }
 
   async disconnect(): Promise<void> {
