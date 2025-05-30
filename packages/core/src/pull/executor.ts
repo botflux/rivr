@@ -111,24 +111,6 @@ export class ConcreteTrigger<TriggerOpts extends DefaultTriggerOpts> implements 
   }
 }
 
-export abstract class BaseExecutor implements Worker {
-  #onErrorHooks: OnErrorHook[] = []
-
-  abstract start<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<void>
-  abstract stop(): Promise<void>
-
-  addHook(hook: "onError", handler: OnErrorHook): this {
-    this.#onErrorHooks.push(handler)
-    return this
-  }
-
-  protected executeErrorHooks(error: unknown): void {
-    for (const handler of this.#onErrorHooks) {
-      handler(error)
-    }
-  }
-}
-
 export class Executor<TriggerOpts> implements Worker {
   #loop = new InfiniteLoop()
   #storage: Storage<TriggerOpts>
