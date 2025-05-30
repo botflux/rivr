@@ -55,6 +55,18 @@ export interface Consumption {
   stop(): Promise<void>
 }
 
+export class CompoundConsumption implements Consumption {
+  #consumptions: Consumption[]
+
+  constructor(consumptions: Consumption[]) {
+    this.#consumptions = consumptions;
+  }
+
+  async stop(): Promise<void> {
+    await Promise.allSettled(this.#consumptions.map(c => c.stop()))
+  }
+}
+
 export type OnMessage = (state: WorkflowState<unknown>) => Promise<void>
 
 export interface ConsumeOpts {

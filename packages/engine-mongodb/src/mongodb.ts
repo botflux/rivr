@@ -13,7 +13,8 @@ import {
   type Worker,
   Workflow,
   WorkflowState,
-  type Write
+  type Write,
+  CompoundConsumption
 } from "rivr";
 import {
   type AnyBulkWriteOperation,
@@ -193,18 +194,6 @@ class MongoChangeStreamConsumption implements Consumption {
   #isWatchStreamClosed(error: unknown): boolean {
     return typeof error === "object" && error !== null && "message" in error &&
       typeof error.message === "string" && (error.message.includes("is closed") || error.message === "Executor error during getMore :: caused by :: operation was interrupted")
-  }
-}
-
-class CompoundConsumption implements Consumption {
-  #consumptions: Consumption[]
-
-  constructor(consumptions: Consumption[]) {
-    this.#consumptions = consumptions;
-  }
-
-  async stop(): Promise<void> {
-    await Promise.allSettled(this.#consumptions.map(c => c.stop()))
   }
 }
 
