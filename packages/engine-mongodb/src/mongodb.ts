@@ -3,7 +3,7 @@ import {
   Consumption,
   DefaultTriggerOpts,
   Engine,
-  Executor,
+  ConcreteWorker,
   FindAll,
   InfiniteLoop,
   Queue,
@@ -343,7 +343,7 @@ export class MongoEngine implements Engine<WriteOpts> {
   createWorker(): Worker {
     const storage = this.#createStorage()
 
-    const poller = new Executor(
+    const poller = new ConcreteWorker(
       storage,
     )
 

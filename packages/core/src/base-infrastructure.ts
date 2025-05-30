@@ -1,20 +1,17 @@
-import {DefaultTriggerOpts, OnErrorHook, type Trigger, type Worker} from "../engine"
-import {ReadyWorkflow, Step, StepResult, Workflow} from "../types";
-import {tryCatch, tryCatchSync} from "../utils/inline-catch";
-import {createWorkflowState, updateWorkflowState, WorkflowState} from "../state/state";
+import {ReadyWorkflow, Step, StepResult, Workflow} from "./types";
+import {DefaultTriggerOpts, OnErrorHook, type Trigger, type Worker} from "./engine";
+import {createWorkflowState, updateWorkflowState, WorkflowState} from "./state/state";
+import {tryCatch, tryCatchSync} from "./utils/inline-catch";
 
 export type Insert<State> = {
   type: "insert"
   state: WorkflowState<State>
 }
-
 export type Update<State> = {
   type: "update"
   state: WorkflowState<State>
 }
-
 export type Write<State> = Update<State> | Insert<State>
-
 export type FindAll<
   State,
   FirstState,
@@ -81,7 +78,7 @@ export interface Queue<WriteOpts> {
 export class InfiniteLoop {
   #stopped = false;
 
-  *[Symbol.iterator]() {
+  * [Symbol.iterator]() {
     while (!this.#stopped) {
       yield
     }
@@ -159,7 +156,7 @@ export class ConcreteTrigger<TriggerOpts extends DefaultTriggerOpts> implements 
   }
 }
 
-export class Executor<TriggerOpts> implements Worker {
+export class ConcreteWorker<TriggerOpts> implements Worker {
   #storage: Queue<TriggerOpts> & Storage<TriggerOpts>
 
   #consumption: Consumption | undefined
@@ -334,12 +331,12 @@ export class Executor<TriggerOpts> implements Worker {
         type: "success",
         state: nextStateOrResult
       })
-    } catch(error: unknown) {
-      return ({ type: "failure", error })
+    } catch (error: unknown) {
+      return ({type: "failure", error})
     }
   }
 
-  #isStepResult (value: unknown): value is StepResult<unknown> {
+  #isStepResult(value: unknown): value is StepResult<unknown> {
     return typeof value === "object" && value !== null &&
       "type" in value && typeof value["type"] === "string"
   }
@@ -351,7 +348,7 @@ export class Executor<TriggerOpts> implements Worker {
   }
 
   async #write<State>(writes: Write<State>[]) {
-    const [, err ] = await tryCatch(this.#storage.write(writes))
+    const [, err] = await tryCatch(this.#storage.write(writes))
 
     if (err !== undefined) {
       this.#executeErrorHooks(err)
