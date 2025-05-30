@@ -1,5 +1,5 @@
 import {Workflow} from "./types";
-import {WorkflowState} from "./pull/state";
+import {WorkflowState} from "./state/state";
 import { Storage } from "./pull/executor"
 
 export type OnErrorHook = (error: unknown) => void;
