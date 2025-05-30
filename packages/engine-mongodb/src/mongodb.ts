@@ -285,7 +285,7 @@ class MongoStorage implements Storage<WriteOpts> {
     }
   }
 
-  async consume<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<string, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<Consumption[]> {
+  async createConsumptions<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<string, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<Consumption[]> {
     return [
       new MongoChangeStreamConsumption(
         this.#collection,

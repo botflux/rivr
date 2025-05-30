@@ -26,7 +26,7 @@ export interface Consumption {
 }
 
 export interface Storage<WriteOpts> {
-  consume<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<never, never>>(
+  createConsumptions<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<never, never>>(
     workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]
   ): Promise<Consumption[]>
   write<State>(writes: Write<State>[], opts?: WriteOpts): Promise<void>
@@ -150,7 +150,7 @@ export class Executor<TriggerOpts> implements Worker {
 
   async start<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<void> {
     const readyWorkflows = await Promise.all(workflows.map(async workflow => workflow.ready()))
-    const consumptions = await this.#storage.consume(readyWorkflows)
+    const consumptions = await this.#storage.createConsumptions(readyWorkflows)
     this.#consumptions = consumptions
 
     for (const consumption of consumptions) {
