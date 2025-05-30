@@ -1,4 +1,3 @@
-import {setTimeout} from "node:timers/promises"
 import {DefaultTriggerOpts, OnErrorHook, type Trigger, type Worker} from "../engine"
 import {ReadyWorkflow, Step, StepResult, Workflow} from "../types";
 import {tryCatch, tryCatchSync} from "../utils/inline-catch";
@@ -15,18 +14,6 @@ export type Update<State> = {
 }
 
 export type Write<State> = Update<State> | Insert<State>
-
-export interface Consumption {
-  /**
-   * Iterate over the workflow states.
-   */
-  [Symbol.asyncIterator](): AsyncIterator<WorkflowState<unknown>>
-
-  /**
-   * Stop the consumption.
-   */
-  stop(): Promise<void>
-}
 
 export type FindAll<
   State,
@@ -80,19 +67,6 @@ export interface ConsumeOpts {
 }
 
 export interface Queue<WriteOpts> {
-  /**
-   * Create a list of consumptions.
-   *
-   * This method can seem a bit weird because we'd expect
-   * to have only one consumption, but some storages cannot be implemented
-   * using only one consumption.
-   *
-   * @param workflows
-   */
-  createConsumptions<State, Decorators extends Record<never, never>, FirstState, StateByStepName extends Record<never, never>>(
-    workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]
-  ): Promise<Consumption[]>
-
   consume(opts: ConsumeOpts): Promise<Consumption2>
 
   /**
