@@ -1,7 +1,7 @@
 import {
   DefaultTriggerOpts, Engine, type Trigger, type Worker,
   Executor, ConcreteTrigger, type Storage, type Write,
-  Step, Workflow, WorkflowState, Consumption, InfiniteLoop
+  Step, Workflow, WorkflowState, Consumption, InfiniteLoop, Queue
 } from "rivr";
 import {
   type AnyBulkWriteOperation, ChangeStream, ChangeStreamDocument, ClientSession,
@@ -224,7 +224,7 @@ class MongoChangeStreamConsumption implements Consumption {
   }
 }
 
-class MongoStorage implements Storage<WriteOpts> {
+class MongoStorage implements Storage<WriteOpts>, Queue<WriteOpts> {
   #client: MongoClient
   #collection: Collection<MongoWorkflowState<unknown>>
   #timeBetweenEmptyPolls: number

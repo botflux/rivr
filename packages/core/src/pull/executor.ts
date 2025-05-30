@@ -34,6 +34,25 @@ export interface Consumption {
  */
 export interface Storage<WriteOpts> {
   /**
+   * Batch insert/update workflow states.
+   *
+   * @param writes
+   * @param opts
+   */
+  write<State>(writes: Write<State>[], opts?: WriteOpts): Promise<void>
+
+  /**
+   * Find a workflow state using its id.
+   *
+   * @param id
+   */
+  findById<State>(id: string): Promise<WorkflowState<State> | undefined>
+
+  disconnect(): Promise<void>
+}
+
+export interface Queue<WriteOpts> {
+  /**
    * Create a list of consumptions.
    *
    * This method can seem a bit weird because we'd expect
@@ -53,15 +72,6 @@ export interface Storage<WriteOpts> {
    * @param opts
    */
   write<State>(writes: Write<State>[], opts?: WriteOpts): Promise<void>
-
-  /**
-   * Find a workflow state using its id.
-   *
-   * @param id
-   */
-  findById<State>(id: string): Promise<WorkflowState<State> | undefined>
-
-  disconnect(): Promise<void>
 }
 
 export class InfiniteLoop {
@@ -147,7 +157,7 @@ export class ConcreteTrigger<TriggerOpts extends DefaultTriggerOpts> implements 
 
 export class Executor<TriggerOpts> implements Worker {
   #loop = new InfiniteLoop()
-  #storage: Storage<TriggerOpts>
+  #storage: Queue<TriggerOpts> & Storage<TriggerOpts>
 
   #hasFinished = false
 
@@ -155,7 +165,7 @@ export class Executor<TriggerOpts> implements Worker {
   #onError: OnErrorHook[] = []
 
   constructor(
-    storage: Storage<TriggerOpts>,
+    storage: Queue<TriggerOpts> & Storage<TriggerOpts>,
   ) {
     this.#storage = storage
   }
