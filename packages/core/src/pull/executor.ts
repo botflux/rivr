@@ -54,7 +54,7 @@ export interface Storage<WriteOpts> {
   disconnect(): Promise<void>
 }
 
-export interface Consumption2 {
+export interface Consumption {
   stop(): Promise<void>
 }
 
@@ -67,7 +67,7 @@ export interface ConsumeOpts {
 }
 
 export interface Queue<WriteOpts> {
-  consume(opts: ConsumeOpts): Promise<Consumption2>
+  consume(opts: ConsumeOpts): Promise<Consumption>
 
   /**
    * Batch insert/update workflow states.
@@ -162,7 +162,7 @@ export class ConcreteTrigger<TriggerOpts extends DefaultTriggerOpts> implements 
 export class Executor<TriggerOpts> implements Worker {
   #storage: Queue<TriggerOpts> & Storage<TriggerOpts>
 
-  #consumption: Consumption2 | undefined
+  #consumption: Consumption | undefined
   #onError: OnErrorHook[] = []
 
   constructor(

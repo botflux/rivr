@@ -1,6 +1,6 @@
 import {
   ConcreteTrigger, ConsumeOpts,
-  Consumption2,
+  Consumption,
   DefaultTriggerOpts,
   Engine,
   Executor,
@@ -38,7 +38,7 @@ function isAbortError(error: unknown): boolean {
     error instanceof DOMException && error.name === "AbortError"
 }
 
-class MongoSinglePollConsumption2 implements Consumption2 {
+class MongoSinglePollConsumption implements Consumption {
   #collection: Collection<WorkflowState<unknown>>
   #filter: Filter<WorkflowState<unknown>>
   #opts: ConsumeOpts
@@ -81,7 +81,7 @@ class MongoSinglePollConsumption2 implements Consumption2 {
   }
 }
 
-class MongoContinuousPollConsumption2 implements Consumption2 {
+class MongoContinuousPollConsumption implements Consumption {
   #collection: Collection<WorkflowState<unknown>>
   #getFilter: () => Filter<WorkflowState<unknown>>
   #opts: ConsumeOpts
@@ -139,7 +139,7 @@ class MongoContinuousPollConsumption2 implements Consumption2 {
   }
 }
 
-class MongoChangeStreamConsumption2 implements Consumption2 {
+class MongoChangeStreamConsumption implements Consumption {
   #collection: Collection<WorkflowState<unknown>>
   #opts: ConsumeOpts
   #pipeline: Document[]
@@ -196,10 +196,10 @@ class MongoChangeStreamConsumption2 implements Consumption2 {
   }
 }
 
-class CompoundConsumption2 implements Consumption2 {
-  #consumptions: Consumption2[]
+class CompoundConsumption implements Consumption {
+  #consumptions: Consumption[]
 
-  constructor(consumptions: Consumption2[]) {
+  constructor(consumptions: Consumption[]) {
     this.#consumptions = consumptions;
   }
 
@@ -224,16 +224,16 @@ class MongoStorage implements Storage<WriteOpts>, Queue<WriteOpts> {
     this.#timeBetweenEmptyPolls = timeBetweenEmptyPolls
   }
 
-  async consume(opts: ConsumeOpts): Promise<Consumption2> {
-    return new CompoundConsumption2([
-      new MongoSinglePollConsumption2(
+  async consume(opts: ConsumeOpts): Promise<Consumption> {
+    return new CompoundConsumption([
+      new MongoSinglePollConsumption(
         this.#collection,
         {
           lastModified: { $lte: new Date() }
         },
         opts
       ),
-      new MongoContinuousPollConsumption2(
+      new MongoContinuousPollConsumption(
         this.#collection,
         () => ({
           "toExecute.status": "todo",
@@ -246,7 +246,7 @@ class MongoStorage implements Storage<WriteOpts>, Queue<WriteOpts> {
         opts,
         this.#timeBetweenEmptyPolls
       ),
-      new MongoChangeStreamConsumption2(
+      new MongoChangeStreamConsumption(
         this.#collection,
         [
           {
