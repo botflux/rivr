@@ -24,6 +24,8 @@ describe("rabbitmq engine", () => {
       queueName: randomUUID()
     })
 
+    t.after(() => engine.close())
+
     let state: unknown
 
     const workflow = rivr.workflow<number>("calc")

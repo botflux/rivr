@@ -1,6 +1,5 @@
 import {createEngine} from "./rabbitmq";
 import {rivr} from "rivr";
-import {addAbortSignal} from "node:stream";
 import {randomUUID} from "node:crypto";
 
 async function start() {

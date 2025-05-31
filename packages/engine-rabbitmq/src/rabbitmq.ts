@@ -13,8 +13,6 @@ import {
   Write
 } from "rivr"
 import Consume = Replies.Consume;
-import {channel} from "node:diagnostics_channel";
-import {write} from "node:fs";
 
 export interface CreateEngineOpts {
   url: string
@@ -77,6 +75,8 @@ class RabbitMQConsumption implements Consumption {
 }
 
 class RabbitMQQueue implements Queue<Record<never, never>> {
+  #consumptions: Consumption[] = []
+
   #channel: ConfirmChannel | undefined
   #createChannel: () => Promise<ConfirmChannel>
   #queue: string
@@ -98,11 +98,14 @@ class RabbitMQQueue implements Queue<Record<never, never>> {
   async consume(opts: ConsumeOpts): Promise<Consumption> {
     await this.#assertCreated()
 
-    return new RabbitMQConsumption(
+    const c = new RabbitMQConsumption(
       await this.#getChannel(),
       this.#queue,
       opts
     )
+
+    this.#consumptions.push(c)
+    return c
   }
 
   async write<State>(writes: Write<State>[], opts?: Record<never, never> | undefined): Promise<void> {
@@ -128,8 +131,10 @@ class RabbitMQQueue implements Queue<Record<never, never>> {
     await channel.waitForConfirms()
   }
 
-  disconnect(): Promise<void> {
-    return Promise.resolve(undefined);
+  async disconnect(): Promise<void> {
+    for (const consumption of this.#consumptions) {
+      await consumption.stop()
+    }
   }
 
   async #getChannel(): Promise<ConfirmChannel> {
@@ -163,6 +168,7 @@ class RabbitMQEngine implements Engine<DefaultTriggerOpts> {
   #connection: ChannelModel | undefined
   #channels: ConfirmChannel[] = []
   #workers: Worker[] = []
+  #queues: RabbitMQQueue[] = [];
 
   constructor(opts: CreateEngineOpts) {
     this.#opts = opts;
@@ -205,12 +211,16 @@ class RabbitMQEngine implements Engine<DefaultTriggerOpts> {
       routingKey = "rivr-routing",
     } = this.#opts
 
-    return new RabbitMQQueue(
+    const queue = new RabbitMQQueue(
       this.#createChannel.bind(this),
       queueName,
       exchangeName,
       routingKey,
     )
+    
+    this.#queues.push(queue)
+    
+    return queue
   }
 
   async #createConnection() {
