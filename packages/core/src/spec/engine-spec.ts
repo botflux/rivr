@@ -2,6 +2,7 @@ import {describe, test, TestContext} from "node:test"
 import {Engine} from "../engine";
 import {rivr} from "../workflow";
 import {setTimeout} from "timers/promises";
+import {rivrPlugin} from "../types";
 
 export type TestOpts = {
   createEngine: () => Engine<any>
@@ -206,6 +207,252 @@ export function basicFlowControl (
       // Then
       await waitForPredicate(() => result !== undefined, 5_000)
       t.assert.strictEqual(result, "The result is '40'")
+    })
+  })
+}
+
+export function extension (opts: TestOpts) {
+  describe('extension', function () {
+    test("should be able to add a property on the workflow", async (t: TestContext) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      let state: unknown
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .decorate("add", (x: number, y: number) => x + y)
+        .step({
+          name: "add-3",
+          handler: ({ state, workflow }) => workflow.add(state, 3)
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          state = s
+        })
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 3)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      t.assert.strictEqual(state, 6)
+    })
+
+    test("should be able to register a plugin", async (t: TestContext) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      let state: unknown
+      let errors: unknown[] = []
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .register(workflow => workflow.decorate("add", (x: number, y: number) => x + y))
+        .step({
+          name: "add-3",
+          handler: ({ state, workflow }) => workflow.add(state, 3)
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          state = s
+        })
+        .addHook("onStepError", error => errors.push(error))
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 3)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      t.assert.deepEqual(state, 6)
+    })
+
+    test("should be able to register a step within a plugin", async (t: TestContext) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      const plugin = rivrPlugin({
+        name: "my-plugin",
+        plugin: p => p.input<number>().step({
+          name: "add-1",
+          handler: ({ state }) => ({ result: state + 1 })
+        })
+      })
+
+      let result: unknown
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .register(plugin)
+        .step({
+          name: "format",
+          handler: ({ state }) => `Result is ${state.result}`,
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          result = s
+        })
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 1)
+
+      // Then
+      await waitForPredicate(() => result !== undefined, 5_000)
+      t.assert.deepStrictEqual(result, "Result is 2")
+    })
+    
+    test("should be able to not break the state tracking if a plugin without step is registered", async (t) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      const pluginA = rivrPlugin({
+        name: "plugin-a",
+        plugin: p => p.input().decorate("foo", 1)
+      })
+      let state: unknown
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .register(pluginA)
+        .step({
+          name: "add-bar",
+          handler: ({ state, workflow }) => state + workflow.foo
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          state = s
+        })
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 1)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      t.assert.deepEqual(state, 2)
+    })
+
+    test("should be able to register a plugin with dependencies", async (t) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      const pluginA = rivrPlugin({
+        name: "plugin-a",
+        plugin: p => p.input().decorate("foo", 1)
+      })
+      const pluginB = rivrPlugin({
+        name: "plugin-b",
+        deps: [ pluginA ],
+        plugin: p => {
+          const w = p.input()
+
+          return w.decorate("bar", w.foo + 1)
+        }
+      })
+
+      let state: unknown
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .register(pluginA)
+        .register(pluginB)
+
+      workflow
+        .step({
+          name: "add-bar",
+          handler: ({ state, workflow }) => state + workflow.bar
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          state = s
+        })
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 1)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      t.assert.deepEqual(state, 3)
+    })
+
+    test("should be able to register a plugin with options", async (t: TestContext) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      const greetPlugin = rivrPlugin({
+        name: "greet-plugin",
+        plugin: (p, opts: { name: string }) => p.input().decorate("greet", function () {
+          return `Hello, ${opts.name}!`
+        })
+      })
+
+      let state: unknown
+
+      const workflow = rivr.workflow<string>("complex-calculation")
+        .register(greetPlugin, {
+          name: "Daneel"
+        })
+        .step({
+          name: "step-1",
+          handler: ({ workflow }) => workflow.greet()
+        })
+        .addHook("onWorkflowCompleted", (w, s) => state = s)
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, "")
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      t.assert.strictEqual(state, "Hello, Daneel!")
+    })
+
+    test("should be able to declare the plugin options as a function", async (t: TestContext) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      const plugin0 = rivrPlugin({
+        name: "plugin-0",
+        plugin: p => p.input()
+          .decorate("fooFromPlugin0", 1)
+      })
+
+      const plugin1 = rivrPlugin({
+        name: "plugin-1",
+        deps: [ plugin0],
+        plugin: (p, opts: { foo: number }) => p.input().decorate("foo", opts.foo)
+      })
+
+      let state: unknown
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .register(plugin0)
+        .register(plugin1, w => ({
+          foo: w.fooFromPlugin0
+        }))
+        .step({
+          name: "my-step",
+          handler: ctx => ctx.workflow.foo + 1
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          state = s
+        })
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 1)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      t.assert.deepEqual(state, 2)
     })
   })
 }
