@@ -287,6 +287,91 @@ export function advancedFlowControl (opts: TestOpts) {
       t.assert.strictEqual(stoppedState, 6)
     })
 
+    test("should be able to mark a step as optional", async (t: TestContext) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      let state: unknown
+      let errors: unknown[] = []
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "add-1",
+          handler: ({ state }) => state + 1
+        })
+        .step({
+          name: "always-fails",
+          handler: ({ state }) => {
+            throw "oops"
+          },
+          optional: true
+        })
+        .step({
+          name: "add-2",
+          handler: ({ state }) => state + 2
+        })
+        .addHook("onStepError", (e) => {
+          errors.push(e)
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          state = s
+        })
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 3)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      t.assert.deepEqual(state, 6)
+      t.assert.deepStrictEqual(errors, [ "oops" ])
+    })
+
+    test("should be able to retry an optional step until it passes", async (t: TestContext) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      let state: unknown
+      let errors: unknown[] = []
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "add-1",
+          handler: ({ state }) => state + 1
+        })
+        .step({
+          name: "always-fails",
+          handler: ({ state }) => {
+            throw "oops"
+          },
+          maxAttempts: 5,
+          optional: true
+        })
+        .step({
+          name: "add-2",
+          handler: ({ state }) => state + 2
+        })
+        .addHook("onStepError", (e) => {
+          errors.push(e)
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          state = s
+        })
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 3)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      t.assert.deepEqual(state, 6)
+      t.assert.deepStrictEqual(errors, [ "oops", "oops", "oops", "oops", "oops" ])
+    })
+
     test("should be able to return a ok result", async (t) => {
       // Given
       const engine = opts.createEngine()
@@ -340,6 +425,134 @@ export function advancedFlowControl (opts: TestOpts) {
       await waitForPredicate(() => state !== undefined)
       t.assert.deepEqual(error, "oops")
       t.assert.deepEqual(state, 4)
+    })
+
+    test("should be able to retry a failed step", async (t) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      let errorCount = 0
+      let failed = false
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "always-failing",
+          handler: ctx => ctx.err("oops"),
+          maxAttempts: 5
+        })
+        .addHook("onStepError", (w, s) => errorCount ++)
+        .addHook("onWorkflowFailed", () => failed = true)
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 1)
+
+      // Then
+      await waitForPredicate(() => failed)
+      t.assert.deepEqual(errorCount, 5)
+    })
+
+    test("should be able to not retry failed steps by default", async (t) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      let errorCount = 0
+      let failed = false
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "always-failing",
+          handler: ctx => ctx.err("oops"),
+        })
+        .addHook("onStepError", (w, s) => errorCount ++)
+        .addHook("onWorkflowFailed", () => failed = true)
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 1)
+
+      // Then
+      await waitForPredicate(() => failed)
+      t.assert.deepEqual(errorCount, 1)
+    })
+
+    test("should be able to wait between tries", async (t: TestContext) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      let state: unknown
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "add-1",
+          handler: ({ state, attempt }) => {
+            if (attempt === 1) {
+              throw "oops"
+            }
+            return state + 1
+          },
+          maxAttempts: 2,
+          delayBetweenAttempts: 1_500
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          state = s
+        })
+
+      const start = new Date().getTime()
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 1)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      const end = new Date().getTime()
+      t.assert.strictEqual(end - start > 1_500, true, `${end - start}ms is not greater than 1500ms`)
+      t.assert.strictEqual(state, 2)
+    })
+
+    test("should be able to increase the delay between tries", async (t: TestContext) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      let state: unknown
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "fails-once",
+          handler: ctx => {
+            if (ctx.attempt <= 2) {
+              return ctx.err("oops")
+            }
+
+            return ctx.state + 1
+          },
+          maxAttempts: 3,
+          delayBetweenAttempts: attempt => attempt * 500
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          state = s
+        })
+
+      const start = new Date().getTime()
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 1)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      const end = new Date().getTime()
+      t.assert.strictEqual(end - start > 1_500, true, `${end - start}ms is not greater than 1500ms`)
+      t.assert.strictEqual(state, 2)
     })
   })
 }
