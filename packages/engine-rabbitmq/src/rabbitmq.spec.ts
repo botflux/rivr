@@ -1,7 +1,7 @@
 import { before, after, test, describe, TestContext } from "node:test"
 import {RabbitMQContainer, StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
 import {randomUUID} from "node:crypto";
-import {rivr} from "rivr";
+import {rivr, basicFlowControl} from "rivr";
 import {setTimeout} from "timers/promises";
 import {createEngine} from "./rabbitmq";
 
@@ -14,6 +14,15 @@ describe("rabbitmq engine", () => {
 
   after(async () => {
     await container?.stop()
+  })
+
+  basicFlowControl({
+    createEngine: () => createEngine({
+      url: container.getAmqpUrl(),
+      exchangeName: randomUUID(),
+      queueName: randomUUID(),
+      routingKey: randomUUID(),
+    })
   })
 
   test("should be able to execute a workflow made of one step", async (t: TestContext) => {
