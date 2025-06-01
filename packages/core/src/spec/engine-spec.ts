@@ -74,81 +74,6 @@ export function basicFlowControl (
       t.assert.deepEqual(state, 9)
     })
 
-    test("should be able to skip a step", async (t) => {
-      // Given
-      const engine = opts.createEngine()
-
-      t.after(() => engine.close())
-
-      let skippedState: unknown
-      let state: unknown
-
-      const workflow = rivr.workflow<number>("complex-calculation")
-        .step({
-          name: "add-3",
-          handler: ({ state }) => state + 3
-        })
-        .step({
-          name: "skipped",
-          handler: ctx => ctx.skip()
-        })
-        .step({
-          name: "minus-1",
-          handler: ({ state }) => state - 1
-        })
-        .addHook("onStepSkipped", (w, step, state) => {
-          skippedState = state
-        })
-        .addHook("onWorkflowCompleted", (w, s) => {
-          state = s
-        })
-
-      await engine.createWorker().start([ workflow ])
-
-      // When
-      await engine.createTrigger().trigger(workflow, 3)
-
-      // Then
-      await waitForPredicate(() => state !== undefined)
-      t.assert.deepEqual(skippedState, 6)
-      t.assert.deepEqual(state, 5)
-    })
-
-    test("should be able to stop a workflow", async (t: TestContext) => {
-      // Given
-      const engine = opts.createEngine()
-
-      t.after(() => engine.close())
-
-      let stoppedState: unknown
-
-      const workflow = rivr.workflow<number>("complex-calculation")
-        .step({
-          name: "add-3",
-          handler: ({ state }) => state + 3
-        })
-        .step({
-          name: "stopped",
-          handler: ctx => ctx.stop()
-        })
-        .step({
-          name: "minus-1",
-          handler: ({ state }) => state - 1
-        })
-        .addHook("onWorkflowStopped", (w, step, state) => {
-          stoppedState = state
-        })
-
-      await engine.createWorker().start([ workflow ])
-
-      // When
-      await engine.createTrigger().trigger(workflow, 3)
-
-      // Then
-      await waitForPredicate(() => stoppedState !== undefined)
-      t.assert.strictEqual(stoppedState, 6)
-    })
-
     test("should be able to handle step errors", async (t) => {
       // Given
       const engine = opts.createEngine()
@@ -168,61 +93,6 @@ export function basicFlowControl (
         .addHook("onStepError", (e, w, s) => {
           state = s
           error = e
-        })
-
-      await engine.createWorker().start([ workflow ])
-
-      // When
-      await engine.createTrigger().trigger(workflow, 4)
-
-      // Then
-      await waitForPredicate(() => state !== undefined)
-      t.assert.deepEqual(error, "oops")
-      t.assert.deepEqual(state, 4)
-    })
-
-    test("should be able to return a ok result", async (t) => {
-      // Given
-      const engine = opts.createEngine()
-      t.after(() => engine.close())
-
-      let state: unknown
-
-      const workflow = rivr.workflow<number>("complex-calculation")
-        .step({
-          name: "add-3",
-          handler: ctx => ctx.ok(ctx.state + 3)
-        })
-        .addHook("onWorkflowCompleted", (w, s) => {
-          state = s
-        })
-
-      await engine.createWorker().start([ workflow ])
-
-      // When
-      await engine.createTrigger().trigger(workflow, 4)
-
-      // Then
-      await waitForPredicate(() => state !== undefined)
-      t.assert.deepEqual(state, 7)
-    })
-
-    test("should be able to return a error step result", async (t) => {
-      // Given
-      const engine = opts.createEngine()
-      t.after(() => engine.close())
-
-      let state: unknown
-      let error: unknown
-
-      const workflow = rivr.workflow<number>("complex-calculation")
-        .step({
-          name: "add-3",
-          handler: ctx => ctx.err("oops")
-        })
-        .addHook("onStepError", (e, w, s) => {
-          error = e
-          state = s
         })
 
       await engine.createWorker().start([ workflow ])
@@ -336,6 +206,140 @@ export function basicFlowControl (
       // Then
       await waitForPredicate(() => result !== undefined, 5_000)
       t.assert.strictEqual(result, "The result is '40'")
+    })
+  })
+}
+
+export function advancedFlowControl (opts: TestOpts) {
+  describe('advanced flow control', function () {
+    test("should be able to skip a step", async (t) => {
+      // Given
+      const engine = opts.createEngine()
+
+      t.after(() => engine.close())
+
+      let skippedState: unknown
+      let state: unknown
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "add-3",
+          handler: ({ state }) => state + 3
+        })
+        .step({
+          name: "skipped",
+          handler: ctx => ctx.skip()
+        })
+        .step({
+          name: "minus-1",
+          handler: ({ state }) => state - 1
+        })
+        .addHook("onStepSkipped", (w, step, state) => {
+          skippedState = state
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          state = s
+        })
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 3)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      t.assert.deepEqual(skippedState, 6)
+      t.assert.deepEqual(state, 5)
+    })
+
+    test("should be able to stop a workflow", async (t: TestContext) => {
+      // Given
+      const engine = opts.createEngine()
+
+      t.after(() => engine.close())
+
+      let stoppedState: unknown
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "add-3",
+          handler: ({ state }) => state + 3
+        })
+        .step({
+          name: "stopped",
+          handler: ctx => ctx.stop()
+        })
+        .step({
+          name: "minus-1",
+          handler: ({ state }) => state - 1
+        })
+        .addHook("onWorkflowStopped", (w, step, state) => {
+          stoppedState = state
+        })
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 3)
+
+      // Then
+      await waitForPredicate(() => stoppedState !== undefined)
+      t.assert.strictEqual(stoppedState, 6)
+    })
+
+    test("should be able to return a ok result", async (t) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      let state: unknown
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "add-3",
+          handler: ctx => ctx.ok(ctx.state + 3)
+        })
+        .addHook("onWorkflowCompleted", (w, s) => {
+          state = s
+        })
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 4)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      t.assert.deepEqual(state, 7)
+    })
+
+    test("should be able to return a error step result", async (t) => {
+      // Given
+      const engine = opts.createEngine()
+      t.after(() => engine.close())
+
+      let state: unknown
+      let error: unknown
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "add-3",
+          handler: ctx => ctx.err("oops")
+        })
+        .addHook("onStepError", (e, w, s) => {
+          error = e
+          state = s
+        })
+
+      await engine.createWorker().start([ workflow ])
+
+      // When
+      await engine.createTrigger().trigger(workflow, 4)
+
+      // Then
+      await waitForPredicate(() => state !== undefined)
+      t.assert.deepEqual(error, "oops")
+      t.assert.deepEqual(state, 4)
     })
   })
 }

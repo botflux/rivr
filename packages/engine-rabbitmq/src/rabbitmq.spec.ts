@@ -1,7 +1,7 @@
 import { before, after, test, describe, TestContext } from "node:test"
 import {RabbitMQContainer, StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
 import {randomUUID} from "node:crypto";
-import {rivr, basicFlowControl} from "rivr";
+import {rivr, basicFlowControl, advancedFlowControl} from "rivr";
 import {setTimeout} from "timers/promises";
 import {createEngine} from "./rabbitmq";
 
@@ -16,43 +16,15 @@ describe("rabbitmq engine", () => {
     await container?.stop()
   })
 
-  basicFlowControl({
-    createEngine: () => createEngine({
-      url: container.getAmqpUrl(),
-      exchangeName: randomUUID(),
-      queueName: randomUUID(),
-      routingKey: randomUUID(),
-    })
+  const makeEngine = () => createEngine({
+    url: container.getAmqpUrl(),
+    exchangeName: randomUUID(),
+    queueName: randomUUID(),
+    routingKey: randomUUID(),
   })
 
-  test("should be able to execute a workflow made of one step", async (t: TestContext) => {
-    // Given
-    const engine = createEngine({
-      url: container.getAmqpUrl(),
-      exchangeName: randomUUID(),
-      queueName: randomUUID()
-    })
-
-    t.after(() => engine.close())
-
-    let state: unknown
-
-    const workflow = rivr.workflow<number>("calc")
-      .step({
-        name: "add-1",
-        handler: ({ state }) => state + 1
-      })
-      .addHook("onWorkflowCompleted", (_, s) => state = s)
-
-    await engine.createWorker().start([ workflow ])
-
-    // When
-    await engine.createTrigger().trigger(workflow, 9)
-
-    // Then
-    await waitForPredicate(() => state !== undefined)
-    t.assert.strictEqual(state, 10)
-  })
+  basicFlowControl({ createEngine: makeEngine })
+  advancedFlowControl({ createEngine: makeEngine })
 })
 
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {
