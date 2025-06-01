@@ -1,7 +1,7 @@
 import { before, after, test, describe, TestContext } from "node:test"
 import {RabbitMQContainer, StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
 import {randomUUID} from "node:crypto";
-import {rivr, basicFlowControl, advancedFlowControl} from "rivr";
+import {rivr, basicFlowControl, advancedFlowControl, extension} from "rivr";
 import {setTimeout} from "timers/promises";
 import {createEngine} from "./rabbitmq";
 
@@ -25,6 +25,7 @@ describe("rabbitmq engine", () => {
 
   basicFlowControl({ createEngine: makeEngine })
   advancedFlowControl({ createEngine: makeEngine })
+  extension({ createEngine: makeEngine })
 })
 
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {
