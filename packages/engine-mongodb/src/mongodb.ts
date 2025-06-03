@@ -35,8 +35,8 @@ export type WriteOpts = {
 } & DefaultTriggerOpts
 
 function isAbortError(error: unknown): boolean {
-  return typeof error === "object" && error !== null &&
-    error instanceof DOMException && error.name === "AbortError"
+  return typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
+    && error.message.includes("was aborted")
 }
 
 class MongoSinglePollConsumption implements Consumption {
@@ -133,7 +133,7 @@ class MongoContinuousPollConsumption implements Consumption {
         }
       }
     } catch (error: unknown) {
-      if (isAbortError(error)) {
+      if (!isAbortError(error)) {
         throw error
       }
     }
