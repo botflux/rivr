@@ -17,6 +17,7 @@ import Consume = Replies.Consume;
 export interface CreateEngineOpts {
   url: string
   exchangeName?: string
+  delayedExchangeName?: string
   queueName?: string
   routingKey?: string
 }
@@ -81,17 +82,20 @@ class RabbitMQQueue implements Queue<Record<never, never>> {
   #createChannel: () => Promise<ConfirmChannel>
   #queue: string
   #exchange: string
+  #delayedExchange: string
   #routingKey: string
 
   constructor(
     createChannel: () => Promise<ConfirmChannel>,
     queueName: string,
     exchange: string,
+    delayedExchange: string,
     routingQueue: string
   ) {
     this.#createChannel = createChannel;
     this.#queue = queueName;
     this.#exchange = exchange
+    this.#delayedExchange = delayedExchange;
     this.#routingKey = routingQueue
   }
 
@@ -117,13 +121,24 @@ class RabbitMQQueue implements Queue<Record<never, never>> {
     const channel = await this.#getChannel()
 
     for (const write of notEndingWrites) {
+      const exchange = write.toExecute.pickAfter !== undefined
+        ? this.#delayedExchange
+        : this.#exchange
+
+      const headers = write.toExecute.pickAfter !== undefined
+        ? {
+          "x-delay": write.toExecute.pickAfter.getTime() - new Date().getTime(),
+        }
+        : {}
+
       channel.publish(
-        this.#exchange,
+        exchange,
         this.#routingKey,
         Buffer.from(JSON.stringify(write), "utf-8"),
         {
           persistent: true,
           contentType: "application/json",
+          headers
         }
       )
     }
@@ -151,6 +166,12 @@ class RabbitMQQueue implements Queue<Record<never, never>> {
     await channel.assertExchange(this.#exchange, "direct", {
       durable: true,
     })
+    await channel.assertExchange(this.#delayedExchange, "x-delayed-message", {
+      durable: true,
+      arguments: {
+        "x-delayed-type": "direct"
+      }
+    })
 
     await channel.assertQueue(this.#queue, {
       durable: true,
@@ -160,6 +181,7 @@ class RabbitMQQueue implements Queue<Record<never, never>> {
     })
 
     await channel.bindQueue(this.#queue, this.#exchange, this.#routingKey)
+    await channel.bindQueue(this.#queue, this.#delayedExchange, this.#routingKey)
   }
 }
 
@@ -208,6 +230,7 @@ class RabbitMQEngine implements Engine<DefaultTriggerOpts> {
     const {
       queueName = "rivr-states",
       exchangeName = "rivr-exchange",
+      delayedExchangeName = "rivr-delayed-exchange",
       routingKey = "rivr-routing",
     } = this.#opts
 
@@ -215,6 +238,7 @@ class RabbitMQEngine implements Engine<DefaultTriggerOpts> {
       this.#createChannel.bind(this),
       queueName,
       exchangeName,
+      delayedExchangeName,
       routingKey,
     )
     

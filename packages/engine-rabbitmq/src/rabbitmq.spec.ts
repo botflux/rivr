@@ -1,15 +1,37 @@
 import { before, after, test, describe, TestContext } from "node:test"
-import {RabbitMQContainer, StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
+import {StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
 import {randomUUID} from "node:crypto";
-import {rivr, basicFlowControl, advancedFlowControl, extension} from "rivr";
-import {setTimeout} from "timers/promises";
+import {basicFlowControl, advancedFlowControl, extension} from "rivr";
 import {createEngine} from "./rabbitmq";
+import {GenericContainerBuilder, Wait} from "testcontainers"
+import { join } from "node:path";
 
 describe("rabbitmq engine", () => {
   let container!: StartedRabbitMQContainer
 
   before(async () => {
-    container = await new RabbitMQContainer("rabbitmq:4.1").start()
+    const customImage = await new GenericContainerBuilder(join(__dirname, ".."), join("config", "Dockerfile"))
+      .withCache(true)
+      .build("custom-rabbitmq-with-delayed-exchange:latest")
+
+    const AMQP_PORT = 5672;
+    const AMQPS_PORT = 5671;
+    const RABBITMQ_DEFAULT_USER = "guest";
+    const RABBITMQ_DEFAULT_PASS = "guest";
+
+    container = new StartedRabbitMQContainer(
+      await customImage
+        .withExposedPorts(AMQP_PORT, AMQPS_PORT)
+        .withEnvironment({
+          RABBITMQ_DEFAULT_USER,
+          RABBITMQ_DEFAULT_PASS
+        })
+        .withWaitStrategy(Wait.forLogMessage("Server startup complete"))
+        .withStartupTimeout(30_000)
+        .start()
+    )
+
+    // container = await new RabbitMQContainer("rabbitmq:4.1").start()
   })
 
   after(async () => {
@@ -21,6 +43,7 @@ describe("rabbitmq engine", () => {
     exchangeName: randomUUID(),
     queueName: randomUUID(),
     routingKey: randomUUID(),
+    delayedExchangeName: randomUUID(),
   })
 
   basicFlowControl({ createEngine: makeEngine })
