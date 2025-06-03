@@ -28,9 +28,3 @@ describe("rabbitmq engine", () => {
   extension({ createEngine: makeEngine })
 })
 
-async function waitForPredicate(fn: () => boolean, ms = 5_000) {
-  let now = new Date().getTime()
-  while (!fn() && new Date().getTime() - now < ms) {
-    await setTimeout(20)
-  }
-}
