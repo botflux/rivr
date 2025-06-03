@@ -810,3 +810,9 @@ async function waitForPredicate(fn: () => boolean, ms = 5_000) {
     await setTimeout(20)
   }
 }
+
+export function installUnhandledRejectionHook () {
+  process.on('unhandledRejection', err => {
+    console.log("Unhandled rejection caught", err)
+  })
+}

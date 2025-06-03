@@ -1,10 +1,12 @@
 import { before, after, test, describe, TestContext } from "node:test"
 import {StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
 import {randomUUID} from "node:crypto";
-import {basicFlowControl, advancedFlowControl, extension} from "rivr";
+import {basicFlowControl, advancedFlowControl, extension, installUnhandledRejectionHook} from "rivr";
 import {createEngine} from "./rabbitmq";
 import {GenericContainerBuilder, Wait} from "testcontainers"
 import { join } from "node:path";
+
+installUnhandledRejectionHook()
 
 describe("rabbitmq engine", () => {
   let container!: StartedRabbitMQContainer

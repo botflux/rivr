@@ -1,6 +1,9 @@
 import {describe, test} from "node:test";
 import {rivrPlugin} from "./types";
 import {rivr} from "./workflow";
+import {installUnhandledRejectionHook} from "./spec/engine-spec";
+
+installUnhandledRejectionHook()
 
 describe('extension', function () {
   test("register a plugin with a missing dependency throw an error",  async (t) => {

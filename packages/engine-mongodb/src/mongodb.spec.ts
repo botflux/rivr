@@ -4,13 +4,14 @@ import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongo
 import { randomUUID } from "crypto"
 import { setTimeout } from "timers/promises"
 import { createEngine } from "./mongodb"
-import {advancedFlowControl, basicFlowControl, extension, rivr, rivrPlugin} from "rivr"
+import {advancedFlowControl, basicFlowControl, extension, installUnhandledRejectionHook, rivr, rivrPlugin} from "rivr"
 import {Network, StartedNetwork} from "testcontainers";
 import {CreatedProxy, StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
 import {MongoBulkWriteError, MongoServerSelectionError} from "mongodb";
 
 let container!: StartedMongoDBContainer
 
+installUnhandledRejectionHook()
 before(async () => {
   container = await new MongoDBContainer("mongo:8").start()
 })
