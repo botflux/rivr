@@ -13,7 +13,7 @@
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "test": "borp *.spec.ts",
+    "test": "borp --timeout 60000 *.spec.ts",
     "sandbox": "ts-node ./src/sandbox.ts"
   },
   "repository": {
