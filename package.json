@@ -28,6 +28,7 @@
     "packages/core",
     "packages/engine-mongodb",
     "packages/fastify",
-    "packages/engine-rabbitmq"
+    "packages/engine-rabbitmq",
+    "packages/engine-redis"
   ]
 }
