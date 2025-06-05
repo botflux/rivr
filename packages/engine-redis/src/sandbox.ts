@@ -7,63 +7,63 @@ const stream = "my-stream"
 const group = "my-group"
 
 async function start () {
-  // const engine = createEngine({
-  //   redis: { url: "redis://localhost:6379" },
-  // })
-  //
-  // const worker = engine.createWorker()
-  // const trigger = engine.createTrigger()
-  //
-  // const w = rivr.workflow<number>("calc")
-  //   .step({
-  //     name: "add-1",
-  //     handler: ({ state }) => state + 1
-  //   })
-  //   .addHook("onWorkflowCompleted", (w, s) => {
-  //     console.log("state", s)
-  //   })
-  //
-  // console.log("starting")
-  // await worker.start([ w ])
-  //
-  // console.log("triggering")
-  // await trigger.trigger(w, 9)
-  // await trigger.trigger(w, 10)
-  // await trigger.trigger(w, 11)
-  // await trigger.trigger(w, 12)
-  // await trigger.trigger(w, 13)
-  // await trigger.trigger(w, 14)
-
-  const client = createClient({
-    url: "redis://localhost:6379",
+  const engine = createEngine({
+    redis: { url: "redis://localhost:6379" },
   })
 
-  await client.connect()
+  const worker = engine.createWorker()
+  const trigger = engine.createTrigger()
 
-  await client.xGroupCreate(
-    stream,
-    group,
-    "0",
-    {
-      MKSTREAM: true
-    }
-  )
-    .catch(error => error.message.includes("BUSYGROUP") ? Promise.resolve() : Promise.reject(error))
+  const w = rivr.workflow<number>("calc")
+    .step({
+      name: "add-1",
+      handler: ({ state }) => state + 1
+    })
+    .addHook("onWorkflowCompleted", (w, s) => {
+      console.log("state", s)
+    })
 
-  console.log("waiting")
-  consumer(client)
-  consumer(client)
-  await producer(client, "hello 1")
-  await producer(client, "hello 2")
-  await producer(client, "hello 3")
-  await producer(client, "hello 4")
-  // console.log("waiting 5s...")
-  // await setTimeout(5_000)
-  // console.log("finish waiting")
+  console.log("starting")
+  await worker.start([ w ])
 
+  console.log("triggering")
+  await trigger.trigger(w, 9)
+  await trigger.trigger(w, 10)
+  await trigger.trigger(w, 11)
+  await trigger.trigger(w, 12)
+  await trigger.trigger(w, 13)
+  await trigger.trigger(w, 14)
 
-  await producer(client, "hello 5")
-  await producer(client, "hello 6")
+  // const client = createClient({
+  //   url: "redis://localhost:6379",
+  // })
+  //
+  // await client.connect()
+  //
+  // await client.xGroupCreate(
+  //   stream,
+  //   group,
+  //   "0",
+  //   {
+  //     MKSTREAM: true
+  //   }
+  // )
+  //   .catch(error => error.message.includes("BUSYGROUP") ? Promise.resolve() : Promise.reject(error))
+  //
+  // console.log("waiting")
+  // consumer(client)
+  // consumer(client)
+  // await producer(client, "hello 1")
+  // await producer(client, "hello 2")
+  // await producer(client, "hello 3")
+  // await producer(client, "hello 4")
+  // // console.log("waiting 5s...")
+  // // await setTimeout(5_000)
+  // // console.log("finish waiting")
+  //
+  //
+  // await producer(client, "hello 5")
+  // await producer(client, "hello 6")
 
 }
 

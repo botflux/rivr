@@ -1,88 +1,152 @@
-import {createClient, RedisClientOptions, RedisClientType} from "redis"
+import {createClient, RedisClientOptions} from "redis"
 import {
   ConcreteTrigger,
   ConcreteWorker, ConsumeOpts, Consumption,
   DefaultTriggerOpts,
-  Engine, OnMessage,
-  Queue,
+  Engine, Queue,
   Storage,
   Trigger,
   Worker,
   Write
 } from "rivr";
-import {write} from "node:fs";
+import {randomUUID} from "node:crypto";
 
-class RedisQueueConsumption implements Consumption {
+class RedisStreamConsumption implements Consumption {
   #redis: ReturnType<typeof createClient>
-  #queueName: string
-  #brPopTimeoutSeconds: number
-  #opts: ConsumeOpts
+  #group: string
+  #stream: string
+  #itemCount: number
+  #waitTime: number
+  #consumerOpts: ConsumeOpts
 
   #stopped = false
+  #consumptionId = randomUUID()
 
-  constructor(
-    redis: ReturnType<typeof createClient>,
-    queueName: string,
-    brPopTimeoutSeconds: number,
-    opts: ConsumeOpts
-  ) {
+  constructor(redis: ReturnType<typeof createClient>, group: string, stream: string, itemCount: number, waitTime: number, consumerOpts: ConsumeOpts) {
     this.#redis = redis;
-    this.#queueName = queueName
-    this.#brPopTimeoutSeconds = brPopTimeoutSeconds
-    this.#opts = opts;
+    this.#group = group;
+    this.#stream = stream;
+    this.#itemCount = itemCount;
+    this.#waitTime = waitTime;
+    this.#consumerOpts = consumerOpts;
+
     this.#startConsuming()
   }
 
   async stop(): Promise<void> {
-      this.#stopped = true
+    this.#stopped = true
   }
 
   async #startConsuming() {
     try {
+      await this.#redis.xGroupCreate(
+        this.#stream,
+        this.#group,
+        "0",
+        {
+          MKSTREAM: true,
+        }
+      )
+        .catch(error => error.message.includes("BUSYGROUP") ? Promise.resolve() : Promise.reject(error))
 
-      console.log(this.#queueName, this.#brPopTimeoutSeconds)
       while (!this.#stopped) {
-        const mMessage = await this.#redis.brPop(
-          this.#queueName,
-          this.#brPopTimeoutSeconds
+        const result = await this.#redis.xReadGroup(
+          this.#group,
+          this.#consumptionId,
+          { key: this.#stream, id: ">" },
+          {
+            COUNT: this.#itemCount,
+            BLOCK: this.#waitTime
+          }
         )
 
-        if (!mMessage) {
+        if (result === null || result === undefined) {
           continue
         }
 
-        const { key, element } = mMessage
-        console.log("message found", key)
-        const payload = JSON.parse(element)
+        if (!this.#isArray(result)) {
+          console.log("unrecognized value returned by redis")
+          continue
+        }
 
-        await this.#opts.onMessage(payload)
+        if (result.length === 0)
+          continue
+
+        const [ first ] = result
+
+        if (!this.#looksLikeRedisStreamResult(first)) {
+          console.log("unrecognized stream result item")
+          continue
+        }
+
+        const { messages } = first
+
+        for (const message of messages) {
+          if (!this.#looksLikeRedisStreamMessage(message)) {
+            console.log("message does not look like a redis stream message", message)
+            continue
+          }
+
+          try {
+            const state = JSON.parse(message.message.msg)
+            await this.#consumerOpts.onMessage(state)
+            await this.#redis.xAck(this.#stream, this.#group, message.id)
+          } catch (error: unknown) {
+            console.error("error while handling the message", error, message)
+          }
+        }
       }
     } catch (error: unknown) {
-      console.error("error while consuming the redis queue", error)
+      console.error("error while listening to redis stream", error)
     }
+  }
+
+  #isArray(result: unknown): result is unknown[] {
+    return Array.isArray(result)
+  }
+
+  #looksLikeRedisStreamResult(data: unknown): data is { name: string, messages: unknown[] } {
+    return typeof data === "object" && data !== null
+      && "name" in data && "messages" in data
+      && typeof data.name === "string"
+      && Array.isArray(data.messages)
+  }
+
+  #looksLikeRedisStreamMessage(message: unknown): message is { id: string, message: { msg: string } } {
+    return typeof message === "object" && message !== null
+      && "message" in message && "id" in message
+      && typeof message.id === "string"
+      && typeof message.message === "object" && message.message !== null
+      && "msg" in message.message && typeof message.message.msg === "string"
   }
 }
 
 class RedisQueue implements Queue<DefaultTriggerOpts> {
   #redis: RedisClientOptions
-  #queueName: string
-  #brPopTimeoutSeconds: number
+  #group: string
+  #stream: string
+  #itemCount: number
+  #waitTime: number
 
   #client?: ReturnType<typeof createClient>
   #consumptions: Consumption[] = []
 
-  constructor(redis: RedisClientOptions, queueName: string, brPopTimeoutSeconds: number) {
+  constructor(redis: RedisClientOptions, group: string, stream: string, itemCount: number, waitTime: number) {
     this.#redis = redis;
-    this.#queueName = queueName;
-    this.#brPopTimeoutSeconds = brPopTimeoutSeconds;
+    this.#group = group;
+    this.#stream = stream;
+    this.#itemCount = itemCount;
+    this.#waitTime = waitTime;
   }
 
   async consume(opts: ConsumeOpts): Promise<Consumption> {
     const client = await this.#getClient()
-    const c = new RedisQueueConsumption(
+    const c = new RedisStreamConsumption(
       client,
-      this.#queueName,
-      this.#brPopTimeoutSeconds,
+      this.#group,
+      this.#stream,
+      this.#itemCount,
+      this.#waitTime,
       opts
     )
 
@@ -98,7 +162,8 @@ class RedisQueue implements Queue<DefaultTriggerOpts> {
       .filter(s => s.status === "in_progress")
 
     for (const state of notEndingWrites) {
-      await client.lPush(this.#queueName, JSON.stringify(state))
+      // await client.xAdd(this.#queueName, JSON.stringify(state))
+      await client.xAdd(this.#stream, "*", { msg: JSON.stringify(state) })
     }
   }
 
@@ -149,14 +214,18 @@ class RedisEngine implements Engine<DefaultTriggerOpts> {
   #createQueue() {
     const {
       redis,
-      queueName = "rivr-queue",
-      popTimeoutSeconds = 1
+      stream = "rivr:workflows",
+      group = "rivr:workflows-group",
+      itemCount = 10,
+      waitTime = 3,
     } = this.#opts
 
     const queue = new RedisQueue(
       redis,
-      queueName,
-      popTimeoutSeconds
+      group,
+      stream,
+      itemCount,
+      waitTime
     )
 
     this.#queues.push(queue)
@@ -167,8 +236,10 @@ class RedisEngine implements Engine<DefaultTriggerOpts> {
 
 export type CreateEngineOpts = {
   redis: RedisClientOptions
-  queueName?: string
-  popTimeoutSeconds?: number
+  group?: string
+  stream?: string
+  itemCount?: number
+  waitTime?: number
 }
 
 export function createEngine(opts: CreateEngineOpts) {
