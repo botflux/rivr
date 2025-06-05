@@ -3,6 +3,8 @@ import {setTimeout} from "node:timers/promises"
 import {createEngine} from "./redis";
 import {rivr} from "rivr";
 
+const stream = "my-stream"
+const group = "my-group"
 
 async function start () {
   // const engine = createEngine({
@@ -38,6 +40,16 @@ async function start () {
 
   await client.connect()
 
+  await client.xGroupCreate(
+    stream,
+    group,
+    "0",
+    {
+      MKSTREAM: true
+    }
+  )
+    .catch(error => error.message.includes("BUSYGROUP") ? Promise.resolve() : Promise.reject(error))
+
   console.log("waiting")
   consumer(client)
   consumer(client)
@@ -56,7 +68,9 @@ async function start () {
 }
 
 async function producer (client: ReturnType<typeof createClient>, message: string) {
-  await client.lPush("foo", message)
+  await client.xAdd(stream, "*", {
+    foo: "bar"
+  })
 }
 
 let consumerId = 1
@@ -67,12 +81,27 @@ async function consumer (client: ReturnType<typeof createClient>) {
 
   try {
     while (true) {
-      const value = await client.brPop("foo", 1)
+      const value = await client.xReadGroup(
+        group,
+        localId.toString(),
+        { key: stream, id: ">" },
+        {
+          COUNT: 1,
+          BLOCK: 1000
+        }
+      )
 
-      if (value) {
-        console.log(localId, "new message", value)
-      } else {
-        console.log(localId, "no new message")
+      if (!value) {
+        continue
+      }
+
+      for (const m of value as {name: string, messages: {id: string, message: unknown}[]}[]) {
+        const { messages, name } = m
+
+        for (const message of messages) {
+          console.log(localId, "done with ", message.message)
+          await client.xAck(stream, group, message.id)
+        }
       }
     }
   } catch (error) {
@@ -80,4 +109,4 @@ async function consumer (client: ReturnType<typeof createClient>) {
   }
 }
 
-start().catch(console.error)
+start().catch(err => console.error("error with script", err, err.stack))
