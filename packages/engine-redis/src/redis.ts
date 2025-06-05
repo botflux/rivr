@@ -14,13 +14,7 @@ import { setTimeout } from "node:timers/promises"
 
 class RedisStreamConsumption implements Consumption {
   #redis: ReturnType<typeof createClient>
-  #group: string
-  #stream: string
-  #itemCount: number
-  #waitTime: number
-  #xAutoClaimInterval: number
-  #xAutoClaimPendingMinTime: number
-  #xAutoClaimLimit: number
+  #queueOpts: RedisQueueOpts
   #consumerOpts: ConsumeOpts
 
   #stopped = false
@@ -29,23 +23,11 @@ class RedisStreamConsumption implements Consumption {
 
   constructor(
     redis: ReturnType<typeof createClient>,
-    group: string,
-    stream: string,
-    itemCount: number,
-    waitTime: number,
-    xAutoClaimInterval: number,
-    xAutoClaimPendingMinTime: number,
-    xAutoClaimLimit: number,
+    queueOpts: RedisQueueOpts,
     consumerOpts: ConsumeOpts
   ) {
     this.#redis = redis;
-    this.#group = group;
-    this.#stream = stream;
-    this.#itemCount = itemCount;
-    this.#waitTime = waitTime;
-    this.#xAutoClaimInterval = xAutoClaimInterval;
-    this.#xAutoClaimLimit = xAutoClaimLimit;
-    this.#xAutoClaimPendingMinTime = xAutoClaimPendingMinTime;
+    this.#queueOpts = queueOpts;
     this.#consumerOpts = consumerOpts;
 
     this.#startConsuming()
@@ -60,8 +42,8 @@ class RedisStreamConsumption implements Consumption {
   async #startConsuming() {
     try {
       await this.#redis.xGroupCreate(
-        this.#stream,
-        this.#group,
+        this.#queueOpts.stream,
+        this.#queueOpts.group,
         "0",
         {
           MKSTREAM: true,
@@ -71,12 +53,12 @@ class RedisStreamConsumption implements Consumption {
 
       while (!this.#stopped) {
         const result = await this.#redis.xReadGroup(
-          this.#group,
+          this.#queueOpts.group,
           this.#consumptionId,
-          { key: this.#stream, id: ">" },
+          { key: this.#queueOpts.stream, id: ">" },
           {
-            COUNT: this.#itemCount,
-            BLOCK: this.#waitTime
+            COUNT: this.#queueOpts.itemCount,
+            BLOCK: this.#queueOpts.waitTime
           }
         )
 
@@ -110,7 +92,7 @@ class RedisStreamConsumption implements Consumption {
           try {
             const state = JSON.parse(message.message.msg)
             await this.#consumerOpts.onMessage(state)
-            await this.#redis.xAck(this.#stream, this.#group, message.id)
+            await this.#redis.xAck(this.#queueOpts.stream, this.#queueOpts.group, message.id)
           } catch (error: unknown) {
             console.error("error while handling the message", error, message)
           }
@@ -125,17 +107,17 @@ class RedisStreamConsumption implements Consumption {
     try {
       while (!this.#stopped) {
         await this.#redis.xAutoClaim(
-          this.#stream,
-          this.#group,
+          this.#queueOpts.stream,
+          this.#queueOpts.group,
           this.#consumptionId,
-          this.#xAutoClaimPendingMinTime,
+          this.#queueOpts.xAutoClaimPendingMinTime,
           "0",
           {
-            COUNT: this.#xAutoClaimLimit
+            COUNT: this.#queueOpts.xAutoClaimLimit
           }
         )
 
-        await setTimeout(this.#xAutoClaimInterval, 0, { signal: this.#xAutoClaimIntervalAbort.signal })
+        await setTimeout(this.#queueOpts.xAutoClaimInterval, 0, { signal: this.#xAutoClaimIntervalAbort.signal })
       }
     } catch (error: unknown) {
       if (!this.#isAbortError(error)) {
@@ -169,50 +151,32 @@ class RedisStreamConsumption implements Consumption {
   }
 }
 
+type RedisQueueOpts = {
+  redis: RedisClientOptions
+  group: string
+  stream: string
+  itemCount: number
+  waitTime: number
+  xAutoClaimInterval: number
+  xAutoClaimPendingMinTime: number
+  xAutoClaimLimit: number
+}
+
 class RedisQueue implements Queue<DefaultTriggerOpts> {
-  #redis: RedisClientOptions
-  #group: string
-  #stream: string
-  #itemCount: number
-  #waitTime: number
-  #xAutoClaimInterval: number
-  #xAutoClaimPendingMinTime: number
-  #xAutoClaimLimit: number
+  #opts: RedisQueueOpts
 
   #client?: ReturnType<typeof createClient>
   #consumptions: Consumption[] = []
 
-  constructor(
-    redis: RedisClientOptions,
-    group: string,
-    stream: string,
-    itemCount: number,
-    waitTime: number,
-    xAutoClaimInterval: number,
-    xAutoClaimPendingMinTime: number,
-    xAutoClaimLimit: number,
-  ) {
-    this.#redis = redis;
-    this.#group = group;
-    this.#stream = stream;
-    this.#itemCount = itemCount;
-    this.#waitTime = waitTime;
-    this.#xAutoClaimInterval = xAutoClaimInterval
-    this.#xAutoClaimPendingMinTime = xAutoClaimPendingMinTime
-    this.#xAutoClaimLimit = xAutoClaimLimit
+  constructor(opts: RedisQueueOpts) {
+    this.#opts = opts
   }
 
   async consume(opts: ConsumeOpts): Promise<Consumption> {
     const client = await this.#getClient()
     const c = new RedisStreamConsumption(
       client,
-      this.#group,
-      this.#stream,
-      this.#itemCount,
-      this.#waitTime,
-      this.#xAutoClaimInterval,
-      this.#xAutoClaimPendingMinTime,
-      this.#xAutoClaimLimit,
+      this.#opts,
       opts
     )
 
@@ -226,7 +190,7 @@ class RedisQueue implements Queue<DefaultTriggerOpts> {
     const writesToPublish = this.#filterWritesToPublish(writes)
 
     await Promise.all([
-      writesToPublish.map(write => client.xAdd(this.#stream, "*", { msg: JSON.stringify(write.state) }))
+      writesToPublish.map(write => client.xAdd(this.#opts.stream, "*", { msg: JSON.stringify(write.state) }))
     ])
   }
 
@@ -239,7 +203,7 @@ class RedisQueue implements Queue<DefaultTriggerOpts> {
 
   async #getClient() {
     if (this.#client === undefined) {
-      this.#client = createClient(this.#redis)
+      this.#client = createClient(this.#opts.redis)
 
       if (!this.#client.isOpen) {
         await this.#client.connect()
@@ -298,16 +262,16 @@ class RedisEngine implements Engine<DefaultTriggerOpts> {
       xAutoClaimLoopInterval = 10000,
     } = this.#opts
 
-    const queue = new RedisQueue(
+    const queue = new RedisQueue({
       redis,
       group,
       stream,
       itemCount,
       waitTime,
-      xAutoClaimLoopInterval,
-      xAutoClaimMinTime,
+      xAutoClaimInterval: xAutoClaimLoopInterval,
+      xAutoClaimPendingMinTime: xAutoClaimMinTime,
       xAutoClaimLimit,
-    )
+    })
 
     this.#queues.push(queue)
 
