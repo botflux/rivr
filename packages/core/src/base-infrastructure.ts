@@ -88,6 +88,22 @@ export interface Queue<WriteOpts> {
   disconnect(): Promise<void>
 }
 
+export interface SearchableQueue<WriteOpts> extends Queue<WriteOpts> {
+  /**
+   * Find a workflow state using its id.
+   *
+   * @param id
+   */
+  findById<State>(id: string): Promise<WorkflowState<State> | undefined>
+
+  findAll<
+    State,
+    FirstState,
+    StateByStepName extends Record<string, never>,
+    Decorators extends Record<never, never>
+  >(opts: FindAll<State, FirstState, StateByStepName, Decorators>): Promise<WorkflowState<unknown>[]>
+}
+
 export class InfiniteLoop {
   #stopped = false;
 
