@@ -157,14 +157,11 @@ class RedisQueue implements Queue<DefaultTriggerOpts> {
 
   async write<State>(writes: Write<State>[], opts?: DefaultTriggerOpts | undefined): Promise<void> {
     const client = await this.#getClient()
-    const notEndingWrites = writes
-      .map(write => write.state)
-      .filter(s => s.status === "in_progress")
+    const writesToPublish = this.#filterWritesToPublish(writes)
 
-    for (const state of notEndingWrites) {
-      // await client.xAdd(this.#queueName, JSON.stringify(state))
-      await client.xAdd(this.#stream, "*", { msg: JSON.stringify(state) })
-    }
+    await Promise.all([
+      writesToPublish.map(write => client.xAdd(this.#stream, "*", { msg: JSON.stringify(write.state) }))
+    ])
   }
 
   async disconnect(): Promise<void> {
@@ -184,6 +181,18 @@ class RedisQueue implements Queue<DefaultTriggerOpts> {
     }
 
     return this.#client
+  }
+
+  /**
+   * We only publish the writes that will trigger a workflow's step.
+   *
+   * We won't trigger another step if a new state has `status === "successful"`.
+   *
+   * @param writes
+   * @private
+   */
+  #filterWritesToPublish(writes: Write<unknown>[]): Write<unknown>[] {
+    return writes.filter(w => w.state.status === "in_progress")
   }
 }
 
