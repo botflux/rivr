@@ -10,6 +10,7 @@ import {
   Write
 } from "rivr";
 import {randomUUID} from "node:crypto";
+import { setTimeout } from "node:timers/promises"
 
 class RedisStreamConsumption implements Consumption {
   #redis: ReturnType<typeof createClient>
@@ -17,24 +18,43 @@ class RedisStreamConsumption implements Consumption {
   #stream: string
   #itemCount: number
   #waitTime: number
+  #xAutoClaimInterval: number
+  #xAutoClaimPendingMinTime: number
+  #xAutoClaimLimit: number
   #consumerOpts: ConsumeOpts
 
   #stopped = false
   #consumptionId = randomUUID()
+  #xAutoClaimIntervalAbort = new AbortController()
 
-  constructor(redis: ReturnType<typeof createClient>, group: string, stream: string, itemCount: number, waitTime: number, consumerOpts: ConsumeOpts) {
+  constructor(
+    redis: ReturnType<typeof createClient>,
+    group: string,
+    stream: string,
+    itemCount: number,
+    waitTime: number,
+    xAutoClaimInterval: number,
+    xAutoClaimPendingMinTime: number,
+    xAutoClaimLimit: number,
+    consumerOpts: ConsumeOpts
+  ) {
     this.#redis = redis;
     this.#group = group;
     this.#stream = stream;
     this.#itemCount = itemCount;
     this.#waitTime = waitTime;
+    this.#xAutoClaimInterval = xAutoClaimInterval;
+    this.#xAutoClaimLimit = xAutoClaimLimit;
+    this.#xAutoClaimPendingMinTime = xAutoClaimPendingMinTime;
     this.#consumerOpts = consumerOpts;
 
     this.#startConsuming()
+    this.#startAutoClaimLoop()
   }
 
   async stop(): Promise<void> {
     this.#stopped = true
+    this.#xAutoClaimIntervalAbort.abort()
   }
 
   async #startConsuming() {
@@ -101,6 +121,34 @@ class RedisStreamConsumption implements Consumption {
     }
   }
 
+  async #startAutoClaimLoop() {
+    try {
+      while (!this.#stopped) {
+        await this.#redis.xAutoClaim(
+          this.#stream,
+          this.#group,
+          this.#consumptionId,
+          this.#xAutoClaimPendingMinTime,
+          "0",
+          {
+            COUNT: this.#xAutoClaimLimit
+          }
+        )
+
+        await setTimeout(this.#xAutoClaimInterval, 0, { signal: this.#xAutoClaimIntervalAbort.signal })
+      }
+    } catch (error: unknown) {
+      if (!this.#isAbortError(error)) {
+        console.log("something went wrong in the auto claim loop")
+      }
+    }
+  }
+
+  #isAbortError(error: unknown): boolean {
+    return typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
+      && error.message.includes("was aborted")
+  }
+
   #isArray(result: unknown): result is unknown[] {
     return Array.isArray(result)
   }
@@ -127,16 +175,31 @@ class RedisQueue implements Queue<DefaultTriggerOpts> {
   #stream: string
   #itemCount: number
   #waitTime: number
+  #xAutoClaimInterval: number
+  #xAutoClaimPendingMinTime: number
+  #xAutoClaimLimit: number
 
   #client?: ReturnType<typeof createClient>
   #consumptions: Consumption[] = []
 
-  constructor(redis: RedisClientOptions, group: string, stream: string, itemCount: number, waitTime: number) {
+  constructor(
+    redis: RedisClientOptions,
+    group: string,
+    stream: string,
+    itemCount: number,
+    waitTime: number,
+    xAutoClaimInterval: number,
+    xAutoClaimPendingMinTime: number,
+    xAutoClaimLimit: number,
+  ) {
     this.#redis = redis;
     this.#group = group;
     this.#stream = stream;
     this.#itemCount = itemCount;
     this.#waitTime = waitTime;
+    this.#xAutoClaimInterval = xAutoClaimInterval
+    this.#xAutoClaimPendingMinTime = xAutoClaimPendingMinTime
+    this.#xAutoClaimLimit = xAutoClaimLimit
   }
 
   async consume(opts: ConsumeOpts): Promise<Consumption> {
@@ -147,6 +210,9 @@ class RedisQueue implements Queue<DefaultTriggerOpts> {
       this.#stream,
       this.#itemCount,
       this.#waitTime,
+      this.#xAutoClaimInterval,
+      this.#xAutoClaimPendingMinTime,
+      this.#xAutoClaimLimit,
       opts
     )
 
@@ -227,6 +293,9 @@ class RedisEngine implements Engine<DefaultTriggerOpts> {
       group = "rivr:workflows-group",
       itemCount = 10,
       waitTime = 3,
+      xAutoClaimLimit = 25,
+      xAutoClaimMinTime = 60000,
+      xAutoClaimLoopInterval = 10000,
     } = this.#opts
 
     const queue = new RedisQueue(
@@ -234,7 +303,10 @@ class RedisEngine implements Engine<DefaultTriggerOpts> {
       group,
       stream,
       itemCount,
-      waitTime
+      waitTime,
+      xAutoClaimLoopInterval,
+      xAutoClaimMinTime,
+      xAutoClaimLimit,
     )
 
     this.#queues.push(queue)
@@ -249,6 +321,10 @@ export type CreateEngineOpts = {
   stream?: string
   itemCount?: number
   waitTime?: number
+
+  xAutoClaimLoopInterval?: number
+  xAutoClaimMinTime?: number
+  xAutoClaimLimit?: number
 }
 
 export function createEngine(opts: CreateEngineOpts) {
