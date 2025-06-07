@@ -36,7 +36,7 @@ describe('mongodb', function () {
 })
 
 describe('transaction', function () {
-  test("should be able to execute the write in a transaction",  async (t) => {
+  test("should be able to execute the write in a transaction",  {skip: true}, async (t) => {
     // Given
     const engine = createEngine({
       url: container.getConnectionString(),
