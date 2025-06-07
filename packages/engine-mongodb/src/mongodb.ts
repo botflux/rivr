@@ -27,6 +27,7 @@ import {
   MongoClientOptions
 } from "mongodb"
 import {setTimeout} from "node:timers/promises"
+import {write} from "node:fs";
 
 type MongoWorkflowState<State> = WorkflowState<State>
 
@@ -197,33 +198,26 @@ class MongoChangeStreamConsumption implements Consumption {
   }
 }
 
-class MongoStorage implements Storage<WriteOpts>, Queue<WriteOpts> {
-  #client: MongoClient
-  #collection: Collection<MongoWorkflowState<unknown>>
-  #timeBetweenEmptyPolls: number
+class MongoQueue implements Storage<WriteOpts>, Queue<WriteOpts> {
+  #opts: MongoQueueOpts
 
-  constructor(
-    client: MongoClient,
-    dbName: string,
-    collectionName: string,
-    timeBetweenEmptyPolls: number
-  ) {
-    this.#client = client
-    this.#collection = this.#client.db(dbName).collection(collectionName)
-    this.#timeBetweenEmptyPolls = timeBetweenEmptyPolls
+  #client: MongoClient | undefined
+
+  constructor(opts: MongoQueueOpts) {
+    this.#opts = opts;
   }
 
   async consume(opts: ConsumeOpts): Promise<Consumption> {
     return new CompoundConsumption([
       new MongoSinglePollConsumption(
-        this.#collection,
+        this.#getCollection(),
         {
           lastModified: { $lte: new Date() }
         },
         opts
       ),
       new MongoContinuousPollConsumption(
-        this.#collection,
+        this.#getCollection(),
         () => ({
           "toExecute.status": "todo",
           $or: [
@@ -233,10 +227,10 @@ class MongoStorage implements Storage<WriteOpts>, Queue<WriteOpts> {
           ]
         }),
         opts,
-        this.#timeBetweenEmptyPolls
+        this.#opts.delayBetweenEmptyPolls
       ),
       new MongoChangeStreamConsumption(
-        this.#collection,
+        this.#getCollection(),
         [
           {
             $match: {
@@ -289,13 +283,13 @@ class MongoStorage implements Storage<WriteOpts>, Queue<WriteOpts> {
       }
     })
 
-    await this.#collection.bulkWrite(mongoWrites, {
+    await this.#getCollection().bulkWrite(mongoWrites, {
       session,
     })
   }
 
   async findById<State>(id: string): Promise<WorkflowState<State> | undefined> {
-    const mRecord = await this.#collection.findOne({id})
+    const mRecord = await this.#getCollection().findOne({id})
 
     if (mRecord === null)
       return undefined
@@ -305,14 +299,26 @@ class MongoStorage implements Storage<WriteOpts>, Queue<WriteOpts> {
   }
 
   async findAll<State, FirstState, StateByStepName extends Record<string, never>, Decorators extends Record<never, never>>(opts: FindAll<State, FirstState, StateByStepName, Decorators>): Promise<WorkflowState<unknown>[]> {
-    const cursor = this.#collection.find({ name: { $in: opts.workflows.map(w => w.name) } })
+    const cursor = this.#getCollection().find({ name: { $in: opts.workflows.map(w => w.name) } })
     const documents = await cursor.toArray()
 
     return documents.map(({_id, ...state}) => state)
   }
 
   async disconnect(): Promise<void> {
-    await this.#client.close(true)
+    await this.#client?.close(true)
+  }
+
+  #getClient(): MongoClient {
+    if (this.#client === undefined) {
+      this.#client = new MongoClient(this.#opts.url, this.#opts.clientOpts)
+    }
+
+    return this.#client
+  }
+
+  #getCollection(): Collection<MongoWorkflowState<unknown>> {
+    return this.#getClient().db(this.#opts.dbName).collection<MongoWorkflowState<unknown>>(this.#opts.collectionName)
   }
 }
 
@@ -381,15 +387,20 @@ export class MongoEngine implements Engine<WriteOpts> {
     const {
       dbName,
       delayBetweenEmptyPolls = 5_000,
-      collectionName = "workflow-states"
+      collectionName = "workflow-states",
+      url,
+      signal,
+      clientOpts,
     } = this.#opts
 
-    return new MongoStorage(
-      this.client,
+    return new MongoQueue({
       dbName,
+      delayBetweenEmptyPolls,
       collectionName,
-      delayBetweenEmptyPolls
-    )
+      url,
+      signal,
+      clientOpts,
+    })
   }
 }
 
@@ -409,23 +420,46 @@ export type CreateEngineOpts = {
    * @default {5_000} 5000ms by default
    */
   delayBetweenEmptyPolls?: number
-
-  /**
-   * The number of states retrieved for each pull.
-   *
-   * @default {20}
-   */
-  countPerPull?: number
-
-  /**
-   * Use change stream-based worker instead of
-   * the normal poller-based worker.
-   *
-   * @default {false}
-   */
-  useChangeStream?: boolean
 }
 
 export function createEngine(opts: CreateEngineOpts) {
   return new MongoEngine(opts)
+}
+
+export type MongoQueueOpts = {
+  url: string
+  clientOpts?: MongoClientOptions
+  dbName: string
+  collectionName: string
+  signal?: AbortSignal
+
+  /**
+   * The delay between state pulls.
+   *
+   * Note that this delay is waited only if an incomplete or empty
+   * page is pulled.
+   *
+   * @default {5_000} 5000ms by default
+   */
+  delayBetweenEmptyPolls: number
+}
+
+export function createQueue(opts: CreateEngineOpts) {
+  const {
+    dbName,
+    delayBetweenEmptyPolls = 5_000,
+    collectionName = "workflow-states",
+    url,
+    signal,
+    clientOpts,
+  } = opts
+
+  return new MongoQueue({
+    dbName,
+    delayBetweenEmptyPolls,
+    collectionName,
+    url,
+    signal,
+    clientOpts,
+  })
 }
