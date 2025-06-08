@@ -112,10 +112,13 @@
   },
   "references": [
     {
-    "path": "../core/tsconfig.json"
-  },
+      "path": "../core/tsconfig.json"
+    },
     {
       "path": "../engine-mongodb/tsconfig.json"
+    },
+    {
+      "path": "../engine-redis/tsconfig.json"
     }
   ],
   "exclude": ["node_modules", "dist"]
