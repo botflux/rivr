@@ -1,5 +1,10 @@
 export type ReadyOutbox<State, Decorators extends Record<never, never>> = Outbox<State, Decorators> & Decorators
 
+export type Success = { type: "success" }
+export type Failure = { type: "error", error: unknown }
+export type OutboxResult = Success | Failure
+
+
 export interface OutboxHandlerOpts<State, Decorators extends Record<never, never>> {
   state: State
   outbox: ReadyOutbox<State, Decorators>
@@ -7,7 +12,7 @@ export interface OutboxHandlerOpts<State, Decorators extends Record<never, never
 }
 
 export interface OutboxHandler<State, Decorators extends Record<never, never>> {
-  (opts: OutboxHandlerOpts<State, Decorators>): void | Promise<void>
+  (opts: OutboxHandlerOpts<State, Decorators>): void | Promise<void> | OutboxResult | Promise<OutboxResult>
 }
 
 export interface Outbox<State, Decorators extends Record<never, never>> {
