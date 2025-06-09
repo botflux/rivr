@@ -1,6 +1,24 @@
+
 export interface Consumption {
   start(): Promise<void>
   stop(): Promise<void>
+}
+
+export class CompoundConsumption implements Consumption{
+  #consumptions: Consumption[]
+
+  constructor(consumptions: Consumption[]) {
+    this.#consumptions = consumptions;
+  }
+
+  async start(): Promise<void> {
+    await Promise.all(this.#consumptions.map(c => c.start()))
+  }
+
+  async stop(): Promise<void> {
+    await Promise.all(this.#consumptions.map(c => c.stop()))
+  }
+
 }
 
 export interface Message {
@@ -34,4 +52,6 @@ export interface Queue<WriteOpts> {
    * @param opts
    */
   produce(messages: Message[], opts?: WriteOpts): Promise<void>
+
+  disconnect(): Promise<void>
 }

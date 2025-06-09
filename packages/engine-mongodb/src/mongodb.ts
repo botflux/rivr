@@ -14,7 +14,8 @@ import {
   Workflow,
   WorkflowState,
   type Write,
-  CompoundConsumption
+  CompoundConsumption,
+  queue
 } from "rivr";
 import {
   type AnyBulkWriteOperation,
@@ -27,7 +28,7 @@ import {
   MongoClientOptions
 } from "mongodb"
 import {setTimeout} from "node:timers/promises"
-import {write} from "node:fs";
+import {Message} from "rivr/dist/queue";
 
 type MongoWorkflowState<State> = WorkflowState<State>
 
@@ -462,4 +463,248 @@ export function createQueue(opts: CreateEngineOpts) {
     signal,
     clientOpts,
   })
+}
+
+class MongoSinglePollConsumption2 implements queue.Consumption {
+  #collection: Collection<Message>
+  #filter: Filter<Message>
+  #opts: queue.ConsumeOpts
+  #abort = new AbortController()
+
+  constructor(
+    collection: Collection<Message>,
+    filter: Filter<Message>,
+    opts: queue.ConsumeOpts
+  ) {
+    this.#collection = collection
+    this.#filter = filter
+    this.#opts = opts;
+  }
+
+  async start(): Promise<void> {
+    this.#startListening()
+  }
+
+  async #startListening() {
+    try {
+      const cursor = this.#collection.find(this.#filter, {
+        signal: this.#abort.signal
+      })
+
+      for await (const { _id, ...state } of cursor) {
+        try {
+          await this.#opts.onMessage(state)
+        } catch (error: unknown) {
+          console.error(error)
+        }
+      }
+    } catch (error: unknown) {
+      if (!isAbortError(error)) {
+        throw error
+      }
+    }
+  }
+
+  async stop(): Promise<void> {
+    this.#abort.abort()
+  }
+}
+
+class MongoContinuousPollConsumption2 implements queue.Consumption {
+  #collection: Collection<Message>
+  #getFilter: () => Filter<Message>
+  #opts: queue.ConsumeOpts
+  #timeBetweenEmptyPolls: number
+  #abort = new AbortController
+  #infiniteLoop = new InfiniteLoop()
+
+  constructor(
+    collection: Collection<Message>,
+    getFilter: () => Filter<Message>,
+    opts: queue.ConsumeOpts,
+    timeBetweenEmptyPolls: number
+  ) {
+    this.#collection = collection;
+    this.#getFilter = getFilter;
+    this.#opts = opts;
+    this.#timeBetweenEmptyPolls = timeBetweenEmptyPolls;
+  }
+
+  async stop(): Promise<void> {
+    this.#infiniteLoop.stop()
+    this.#abort.abort()
+  }
+
+  async start(): Promise<void> {
+    this.#startConsuming()
+  }
+
+  async #startConsuming() {
+    try {
+      for (const _ of this.#infiniteLoop) {
+        const cursor = this.#collection.find(this.#getFilter(), {
+          signal: this.#abort.signal
+        })
+
+        let count = 0
+
+        for await (const { _id, ...state } of cursor) {
+          count ++
+
+          try {
+            await this.#opts.onMessage(state)
+          } catch (error: unknown) {
+            console.error(error)
+          }
+        }
+
+        if (count === 0) {
+          await setTimeout(this.#timeBetweenEmptyPolls, 0, { signal: this.#abort.signal })
+        }
+      }
+    } catch (error: unknown) {
+      if (!isAbortError(error)) {
+        throw error
+      }
+    }
+  }
+}
+
+class MongoChangeStreamConsumption2 implements queue.Consumption {
+  #collection: Collection<Message>
+  #opts: queue.ConsumeOpts
+  #pipeline: Document[]
+
+  #changeStream: ChangeStream<Message, ChangeStreamDocument<Message>> | undefined
+
+  constructor(
+    collection: Collection<Message>,
+    pipeline: Document[],
+    opts: queue.ConsumeOpts
+  ) {
+    this.#collection = collection;
+    this.#pipeline = pipeline;
+    this.#opts = opts;
+
+    this.#startListening()
+  }
+
+  async stop(): Promise<void> {
+    if (!this.#changeStream?.closed) {
+      return
+    }
+
+    this.#changeStream?.close()
+  }
+
+  async start(): Promise<void> {
+    this.#startListening()
+  }
+
+  async #startListening() {
+    try {
+      const stream = this.#collection.watch(this.#pipeline, {
+        fullDocument: "updateLookup"
+      })
+
+      this.#changeStream = stream
+
+      for await (const change of stream) {
+        if (change.operationType === "insert" || (change.operationType === "replace" && change.fullDocument !== undefined)) {
+          try {
+            await this.#opts.onMessage(change.fullDocument)
+          } catch (error: unknown) {
+            console.error(error)
+          }
+        }
+      }
+
+    } catch (error: unknown) {
+      if (!this.#isWatchStreamClosed(error))
+        throw error
+    }
+  }
+
+  #isWatchStreamClosed(error: unknown): boolean {
+    return typeof error === "object" && error !== null && "message" in error &&
+      typeof error.message === "string" && (error.message.includes("is closed") || error.message === "Executor error during getMore :: caused by :: operation was interrupted")
+  }
+}
+
+class MongoQueue2 implements queue.Queue<WriteOpts> {
+  #opts: MongoQueueOpts
+
+  #client: MongoClient | undefined
+
+  constructor(opts: MongoQueueOpts) {
+    this.#opts = opts;
+  }
+
+  consume(opts: queue.ConsumeOpts): queue.Consumption {
+    return new queue.CompoundConsumption([
+      new MongoSinglePollConsumption2(
+        this.#getCollection(),
+        {
+          lastModified: { $lte: new Date() }
+        },
+        opts
+      ),
+      new MongoContinuousPollConsumption2(
+        this.#getCollection(),
+        () => ({ status: "todo" }),
+        opts,
+        this.#opts.delayBetweenEmptyPolls
+      ),
+      new MongoChangeStreamConsumption2(
+        this.#getCollection(),
+        [
+          {
+            $match: {
+              'fullDocument.status': 'todo',
+            }
+          }
+        ],
+        opts
+      )
+    ])
+  }
+
+  async produce(messages: queue.Message[], opts?: WriteOpts | undefined): Promise<void> {
+    await this.#getCollection().bulkWrite(
+      messages.map(message => ({
+        updateOne: {
+          filter: {
+            taskId: message.taskId,
+          },
+          upsert: true,
+          update: {
+            $set: message
+          }
+        }
+      })),
+      {
+        session: opts?.session
+      }
+    )
+  }
+
+  async disconnect(): Promise<void> {
+    await this.#client?.close(true)
+  }
+
+  #getClient(): MongoClient {
+    if (this.#client === undefined) {
+      this.#client = new MongoClient(this.#opts.url, this.#opts.clientOpts)
+    }
+
+    return this.#client
+  }
+
+  #getCollection(): Collection<Message> {
+    return this.#getClient().db(this.#opts.dbName).collection<Message>(this.#opts.collectionName)
+  }
+}
+
+export function createQueue2(opts: MongoQueueOpts) {
+  return new MongoQueue2(opts)
 }

@@ -34,8 +34,8 @@ export type OutboxState = {
   lastModified: Date
 }
 
-export function createState<State>(
-  outbox: Outbox<State, Record<never, never>>,
+export function createState<State, Decorators extends Record<never, never>>(
+  outbox: Outbox<State, Decorators>,
   state: State,
   id: string,
   now: Date

@@ -11,9 +11,9 @@ import {randomUUID} from "crypto";
  * @param state The state to produce in the queue
  * @param writeOpts The options to pass to `queue.produce(messages, writeOpts)`.
  */
-export async function trigger<State, WriteOpts> (
+export async function trigger<State, Decorators extends Record<never, never>, WriteOpts> (
   queue: Queue<WriteOpts>,
-  outbox: Outbox<State, Record<never, never>>,
+  outbox: Outbox<State, Decorators>,
   state: State,
   writeOpts?: WriteOpts
 ): Promise<OutboxState> {

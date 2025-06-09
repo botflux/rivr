@@ -23,9 +23,9 @@ async function execHandler (
   state: OutboxState
 ): Promise<OutboxResult> {
   try {
-    const handler = outbox.getHandler()
+    const opts = outbox.getHandler()
 
-    const result = await handler({
+    const result = await opts.handler({
       state: state.state,
       outbox,
       attempt: state.attempt

@@ -4,15 +4,19 @@ export type Success = { type: "success" }
 export type Failure = { type: "error", error: unknown }
 export type OutboxResult = Success | Failure
 
-
 export interface OutboxHandlerOpts<State, Decorators extends Record<never, never>> {
+  attempt?: number
+  handler: OutboxHandlerFn<State, Decorators>
+}
+
+export interface OutboxHandlerContext<State, Decorators extends Record<never, never>> {
   state: State
   outbox: ReadyOutbox<State, Decorators>
   attempt: number
 }
 
-export interface OutboxHandler<State, Decorators extends Record<never, never>> {
-  (opts: OutboxHandlerOpts<State, Decorators>): void | Promise<void> | OutboxResult | Promise<OutboxResult>
+export interface OutboxHandlerFn<State, Decorators extends Record<never, never>> {
+  (opts: OutboxHandlerContext<State, Decorators>): void | Promise<void> | OutboxResult | Promise<OutboxResult>
 }
 
 const kOutbox = Symbol("outbox")
@@ -54,7 +58,7 @@ export interface Outbox<State, Decorators extends Record<never, never>> {
    *
    * @param handler
    */
-  handler(handler: OutboxHandler<State, Decorators>): Outbox<State, Decorators>
+  handler(handler: OutboxHandlerOpts<State, Decorators>): Outbox<State, Decorators>
 
   /**
    * Execute all the register plugins and their sub-plugins.
@@ -64,7 +68,7 @@ export interface Outbox<State, Decorators extends Record<never, never>> {
   /**
    * Get this outbox's handler.
    */
-  getHandler(): OutboxHandler<State, Decorators>
+  getHandler(): Required<OutboxHandlerOpts<State, Decorators>>
 }
 
 export function isOutbox (value: unknown): value is Outbox<unknown, Record<never, never>> {
@@ -80,7 +84,7 @@ type PluginAndOpts = {
 export function createOutbox<State> (name: string): Outbox<State, Record<never, never>> {
   const plugins: PluginAndOpts[] = []
   let ready = false
-  let handler: OutboxHandler<State, Record<never, never>> | undefined = undefined
+  let handler: Required<OutboxHandlerOpts<State, Record<never, never>>> | undefined = undefined
 
   return {
     name,
@@ -100,15 +104,18 @@ export function createOutbox<State> (name: string): Outbox<State, Record<never, 
 
       return this as unknown as Outbox<State, Record<never, never> & OutDecorators>
     },
-    handler(h: OutboxHandler<State, Record<never, never>>): Outbox<State, Record<never, never>> {
+    handler(h: OutboxHandlerOpts<State, Record<never, never>>): Outbox<State, Record<never, never>> {
       if (handler !== undefined) {
         throw new Error("Not implemented at line 104 in types.ts")
       }
 
-      handler = h
+      handler = {
+        attempt: 1,
+        ...h,
+      }
       return this
     },
-    getHandler(): OutboxHandler<State, Record<never, never>> {
+    getHandler(): Required<OutboxHandlerOpts<State, Record<never, never>>> {
       if (handler === undefined) {
         throw new Error("Not implemented at line 112 in types.ts")
       }

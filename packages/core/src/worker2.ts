@@ -5,7 +5,9 @@ import {isOutbox, Outbox,} from "./outbox/types";
 import { isState as isOutboxState } from "./outbox/state"
 import { handleState as handlerOutboxState } from "./outbox/handler"
 
-export type AsyncFlow = Outbox<unknown, Record<never, never>> | Workflow<unknown, unknown, Record<string, never>, Record<never, never>>
+export type AsyncFlow =
+  | Outbox<any, Record<never, never>>
+  | Workflow<unknown, unknown, Record<string, never>, Record<never, never>>
 
 export class Worker2 implements Worker {
   #queues: Queue<unknown>[] = []
@@ -19,7 +21,7 @@ export class Worker2 implements Worker {
     this.#asyncFlows = asyncFlows;
   }
 
-  async start<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>>(workflows: Workflow<State, FirstState, StateByStepName, Decorators>[]): Promise<void> {
+  async start(): Promise<void> {
     const readyFlows = await Promise.all(
       this.#asyncFlows.map(flow => flow.ready())
     )
@@ -31,6 +33,8 @@ export class Worker2 implements Worker {
             const { payload } = msg
 
             if (isOutboxState(payload)) {
+              console.log("its an outbox state")
+
               const outbox = readyFlows
                 .filter(isOutbox)
                 .find(outbox => outbox.name === payload.name)
@@ -40,6 +44,8 @@ export class Worker2 implements Worker {
               }
 
               await handlerOutboxState(queue, outbox, payload)
+            } else {
+              console.log("not an outbox")
             }
           } catch (error: unknown) {
             this.#executeErrorHooks(error)
