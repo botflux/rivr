@@ -1,6 +1,8 @@
 import {Outbox, OutboxResult} from "./types";
 
 export type OutboxState = {
+  type: "rivr_outbox"
+
   /**
    * An ID representing the outbox's state.
    */
@@ -39,6 +41,7 @@ export function createState<State>(
   now: Date
 ): OutboxState {
   return {
+    type: "rivr_outbox",
     id,
     name: outbox.name,
     state,
@@ -68,4 +71,9 @@ export function updateState(
     status: newStatus,
     attempt: newAttempt,
   }
+}
+
+export function isState (value: unknown): value is OutboxState {
+  return typeof value === "object" && value !== null
+    && "type" in value && value.type === "rivr_outbox"
 }
