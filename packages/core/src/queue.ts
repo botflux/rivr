@@ -4,23 +4,6 @@ export interface Consumption {
   stop(): Promise<void>
 }
 
-export class CompoundConsumption implements Consumption{
-  #consumptions: Consumption[]
-
-  constructor(consumptions: Consumption[]) {
-    this.#consumptions = consumptions;
-  }
-
-  async start(): Promise<void> {
-    await Promise.all(this.#consumptions.map(c => c.start()))
-  }
-
-  async stop(): Promise<void> {
-    await Promise.all(this.#consumptions.map(c => c.stop()))
-  }
-
-}
-
 export interface Message {
   /**
    * An ID representing the task (e.g. the workflow id, the outbox id).
