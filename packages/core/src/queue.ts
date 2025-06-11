@@ -1,14 +1,31 @@
-
 export interface Consumption {
+  /**
+   * Start the consumption
+   */
   start(): Promise<void>
+
+  /**
+   * Stop the consumption
+   */
   stop(): Promise<void>
 }
 
 export interface Message {
   /**
-   * An ID representing the task (e.g. the workflow id, the outbox id).
+   * The date after which the message should be consumed.
    */
-  taskId: string
+  pickAfter?: Date
+
+  /**
+   * The message's ID.
+   */
+  id: string
+
+  /**
+   * The message's type
+   */
+  type: string
+
   payload: unknown
 }
 

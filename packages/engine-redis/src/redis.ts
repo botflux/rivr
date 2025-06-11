@@ -1,3 +1,221 @@
+import {ConsumeOpts, Consumption, Message, Queue} from "rivr/dist/queue";
+import {createClient, RedisClientOptions} from "redis";
+import {randomUUID} from "node:crypto";
+
+type RedisQueueConstructorOpts = {
+  redis: RedisClientOptions
+  group: string
+  stream: string
+  itemCount: number
+  waitTime: number
+  xAutoClaimLoopInterval: number
+  xAutoClaimPendingMinTime: number
+  xAutoClaimLimit: number
+}
+
+async function ensureStreamCreated(
+  client: ReturnType<typeof createClient>,
+  queueOpts: RedisQueueConstructorOpts
+) {
+    await client.xGroupCreate(
+      queueOpts.stream,
+      queueOpts.group,
+      "0",
+      {
+        MKSTREAM: true,
+      }
+    )
+      .catch((error: unknown) => typeof error === "object" && error !== null && "message" in error && typeof error.message === "string" && error.message.includes("BUSYGROUP")
+        ? Promise.resolve()
+        : Promise.reject(error)
+      )
+}
+
+class RedisConsumption implements Consumption {
+  #getClient: () => Promise<ReturnType<typeof createClient>>
+  #consumeOpts: ConsumeOpts
+  #queueOpts: RedisQueueConstructorOpts
+  #consumptionId = randomUUID()
+
+  #stopped = false
+
+  constructor(getClient: () => Promise<ReturnType<typeof createClient>>, consumeOpts: ConsumeOpts, queueOpts: RedisQueueConstructorOpts) {
+    this.#getClient = getClient;
+    this.#consumeOpts = consumeOpts;
+    this.#queueOpts = queueOpts;
+  }
+
+  async start(): Promise<void> {
+    const client = await this.#getClient()
+    await ensureStreamCreated(client, this.#queueOpts);
+
+    this.#startConsuming()
+  }
+
+  async stop(): Promise<void> {
+    this.#stopped = true
+  }
+
+  async #startConsuming() {
+    try {
+      const client = await this.#getClient()
+
+      while (!this.#stopped) {
+        const result = await client.xReadGroup(
+          this.#queueOpts.group,
+          this.#consumptionId,
+          { key: this.#queueOpts.stream, id: ">" },
+          {
+            COUNT: this.#queueOpts.itemCount,
+            BLOCK: this.#queueOpts.waitTime
+          }
+        )
+
+        if (result === null || result === undefined) {
+          continue
+        }
+
+        if (!this.#isArray(result)) {
+          console.log("unrecognized value returned by redis")
+          continue
+        }
+
+        if (result.length === 0) {
+          console.log("empty results")
+          continue
+        }
+
+        const [ first ] = result
+
+        if (!this.#looksLikeRedisStreamResult(first)) {
+          console.log("unrecognized stream result item")
+          continue
+        }
+
+        const { messages } = first
+
+        for (const message of messages) {
+          if (!this.#looksLikeRedisStreamMessage(message)) {
+            console.log("message does not look like a redis stream message", message)
+            continue
+          }
+
+          try {
+            const state = JSON.parse(message.message.msg)
+            await this.#consumeOpts.onMessage(state)
+            await client.xAck(this.#queueOpts.stream, this.#queueOpts.group, message.id)
+          } catch (error: unknown) {
+            console.error("error while handling the message", error, message)
+          }
+        }
+      }
+    } catch (error: unknown) {
+      console.log("Something went wrong while consuming the redis stream. This error should be handled and the consumption be restarted", error)
+    }
+  }
+
+  #isArray(value: unknown): value is unknown[] {
+    return Array.isArray(value)
+  }
+
+  #looksLikeRedisStreamResult(data: unknown): data is { name: string, messages: unknown[] } {
+    return typeof data === "object" && data !== null
+      && "name" in data && "messages" in data
+      && typeof data.name === "string"
+      && Array.isArray(data.messages)
+  }
+
+  #looksLikeRedisStreamMessage(message: unknown): message is { id: string, message: { msg: string } } {
+    return typeof message === "object" && message !== null
+      && "message" in message && "id" in message
+      && typeof message.id === "string"
+      && typeof message.message === "object" && message.message !== null
+      && "msg" in message.message && typeof message.message.msg === "string"
+  }
+}
+
+class RedisQueue implements Queue<never> {
+  #opts: RedisQueueConstructorOpts
+  
+  #client: ReturnType<typeof createClient> | undefined
+  
+  constructor(opts: RedisQueueConstructorOpts) {
+    this.#opts = opts;
+  }
+
+  consume(opts: ConsumeOpts): Consumption {
+    return new RedisConsumption(
+      () => this.#getClient(),
+      opts,
+      this.#opts
+    )
+  }
+
+  async produce(messages: Message[], opts?: undefined): Promise<void> {
+    const client = await this.#getClient()
+
+    await Promise.all([
+      messages.map(msg => client.xAdd(this.#opts.stream, "*", { msg: JSON.stringify(msg) })),
+    ])
+  }
+
+  async disconnect(): Promise<void> {
+    await this.#client?.quit()
+  }
+
+  async #getClient(): Promise<ReturnType<typeof createClient>> {
+    if (!this.#client) {
+      this.#client = createClient(this.#opts.redis)
+    }
+
+    if (!this.#client.isOpen) {
+      await this.#client.connect()
+    }
+
+    return this.#client;
+  }
+}
+
+type RedisQueueOpts = {
+  redis: RedisClientOptions
+  group?: string
+  stream?: string
+  itemCount?: number
+  waitTime?: number
+  xAutoClaimLoopInterval?: number
+  xAutoClaimPendingMinTime?: number
+  xAutoClaimLimit?: number
+}
+
+/**
+ * Create a queue based on Redis streams.
+ *
+ * @param opts
+ */
+export function createQueue(opts: RedisQueueOpts): Queue<undefined> {
+  const {
+    redis,
+    group = "rivr:group",
+    stream = "rivr:stream",
+    itemCount = 25,
+    waitTime = 5,
+    xAutoClaimLoopInterval = 30_000,
+    xAutoClaimPendingMinTime = 30_000,
+    xAutoClaimLimit = 25,
+  } = opts
+
+  return new RedisQueue({
+    redis,
+    group,
+    stream,
+    itemCount,
+    waitTime,
+    xAutoClaimLoopInterval,
+    xAutoClaimPendingMinTime,
+    xAutoClaimLimit,
+  })
+}
+
 // import {createClient, RedisClientOptions} from "redis"
 // import {
 //   ConcreteTrigger,
@@ -14,7 +232,7 @@
 // } from "rivr";
 // import {randomUUID} from "node:crypto";
 // import {setTimeout} from "node:timers/promises"
-//
+
 // class RedisStreamConsumption implements Consumption {
 //   #redis: ReturnType<typeof createClient>
 //   #queueOpts: RedisQueueOpts
@@ -153,7 +371,7 @@
 //       && "msg" in message.message && typeof message.message.msg === "string"
 //   }
 // }
-//
+
 // type RedisQueueOpts = {
 //   redis: RedisClientOptions
 //   group: string
@@ -164,7 +382,7 @@
 //   xAutoClaimPendingMinTime: number
 //   xAutoClaimLimit: number
 // }
-//
+
 // class RedisQueue implements Queue<DefaultTriggerOpts> {
 //   #opts: RedisQueueOpts
 //

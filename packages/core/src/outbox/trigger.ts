@@ -26,7 +26,8 @@ export async function trigger<State, Decorators extends Record<never, never>, Wr
 
   await queue.produce([
     {
-      taskId: outboxState.id,
+      type: "outbox",
+      id: randomUUID(),
       payload: outboxState
     }
   ], writeOpts)
