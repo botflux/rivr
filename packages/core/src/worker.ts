@@ -1,6 +1,6 @@
 import {Consumption, Message, Queue} from "./queue";
-import {Outbox} from "./outbox/types";
-import {createOutboxHandler} from "./outbox/handler";
+import {Task} from "./task/types";
+import {createTaskHandler} from "./task/handler";
 
 export interface Worker {
   start(): Promise<void>
@@ -59,17 +59,17 @@ export type CreateDefaultWorker = {
   /**
    * Outboxes to handle
    */
-  outboxes: Outbox<any, any>[]
+  tasks: Task<any, any>[]
 }
 
 export function createWorker(opts: CreateDefaultWorker): Worker {
-  const { primary, secondaries = [], outboxes } = opts
+  const { primary, secondaries = [], tasks } = opts
 
   return new DefaultWorker(
     primary,
     secondaries,
     [
-      createOutboxHandler(outboxes as Outbox<unknown, Record<never, never>>[])
+      createTaskHandler(tasks as Task<unknown, Record<never, never>>[])
     ]
   )
 }

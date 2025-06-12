@@ -1,7 +1,6 @@
 import {createQueue} from "./redis";
-import {createOutbox} from "rivr/dist/outbox/types";
-import {createWorker} from "rivr/dist/worker";
-import {trigger} from "rivr";
+import {trigger, tasks, createWorker} from "rivr";
+import {createTask} from "rivr/dist/task/types";
 
 async function sandbox () {
   const queue = createQueue({
@@ -15,26 +14,26 @@ async function sandbox () {
     email: string
   }
 
-  const outbox = createOutbox<UserCreated>("notify_user")
+  const task = createTask<UserCreated>("notify_user")
     .decorate("sendMail", async (email: string, content: string) => console.log(
       `Sending ${content} to ${email}`
     ))
     .handler({
-      handler: async ({ state, outbox }) => {
-        await outbox.sendMail(state.email, "User created successfully")
+      handler: async ({ state, task }) => {
+        await task.sendMail(state.email, "User created successfully")
       }
     })
 
   const worker = createWorker({
     primary: queue,
-    outboxes: [ outbox ]
+    tasks: [ task ]
   })
 
   await worker.start()
 
   await trigger(
     queue,
-    outbox,
+    task,
     {
       type: "user_created",
       email: "foo@bar.com",

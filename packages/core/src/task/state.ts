@@ -1,4 +1,4 @@
-import {Outbox, OutboxResult} from "./types";
+import {Task, TaskResult} from "./types";
 
 export type OutboxState = {
   type: "rivr_outbox"
@@ -35,7 +35,7 @@ export type OutboxState = {
 }
 
 export function createState<State, Decorators extends Record<never, never>>(
-  outbox: Outbox<State, Decorators>,
+  outbox: Task<State, Decorators>,
   state: State,
   id: string,
   now: Date
@@ -53,8 +53,8 @@ export function createState<State, Decorators extends Record<never, never>>(
 
 export function updateState(
   state: OutboxState,
-  outbox: Outbox<unknown, Record<never, never>>,
-  result: OutboxResult,
+  outbox: Task<unknown, Record<never, never>>,
+  result: TaskResult,
   now: Date
 ): OutboxState {
   const newStatus = result.type === "success"
