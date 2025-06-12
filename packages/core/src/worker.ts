@@ -1,6 +1,7 @@
 import {Consumption, Message, Queue} from "./queue";
 import {Task} from "./task/types";
 import {createTaskHandler} from "./task/handler";
+import {createOutboxHandler} from "./outbox/handler";
 
 export interface Worker {
   start(): Promise<void>
@@ -69,7 +70,8 @@ export function createWorker(opts: CreateDefaultWorker): Worker {
     primary,
     secondaries,
     [
-      createTaskHandler(tasks as Task<unknown, Record<never, never>>[])
+      createTaskHandler(tasks as Task<unknown, Record<never, never>>[]),
+      createOutboxHandler(),
     ]
   )
 }
