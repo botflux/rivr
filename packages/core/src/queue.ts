@@ -37,14 +37,7 @@ export interface ConsumeOpts {
   onMessage: OnMessage
 }
 
-export interface Queue<WriteOpts> {
-  /**
-   * Create a new consumption.
-   *
-   * @param opts
-   */
-  consume(opts: ConsumeOpts): Consumption
-
+export interface Producer<WriteOpts> {
   /**
    * Produce messages in the queue.
    *
@@ -52,6 +45,17 @@ export interface Queue<WriteOpts> {
    * @param opts
    */
   produce(messages: Message[], opts?: WriteOpts): Promise<void>
-
   disconnect(): Promise<void>
 }
+
+export interface Consumer {
+  /**
+   * Create a new consumption.
+   *
+   * @param opts
+   */
+  consume(opts: ConsumeOpts): Consumption
+  disconnect(): Promise<void>
+}
+
+export interface Queue<WriteOpts> extends Producer<WriteOpts>, Consumer {}

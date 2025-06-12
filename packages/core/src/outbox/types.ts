@@ -1,4 +1,4 @@
-import {ConsumeOpts, Consumption, Message, Queue} from "../queue";
+import {ConsumeOpts, Consumption, Message, Producer, Queue} from "../queue";
 
 export const kOutbox = Symbol("kOutbox");
 
@@ -10,7 +10,7 @@ export const kOutbox = Symbol("kOutbox");
  * Then, when the message get consumed, the outbox state is
  * unpacked and the actual payload is republished.
  */
-export interface Outbox<WriteOpts> extends Queue<WriteOpts> {
+export interface Outbox<WriteOpts> extends Producer<WriteOpts> {
   [kOutbox]: true
 }
 
@@ -35,10 +35,6 @@ class DefaultOutbox<WriteOpts> implements Outbox<WriteOpts> {
       })),
       opts
     )
-  }
-
-  consume(opts: ConsumeOpts): Consumption {
-    return this.#queue.consume(opts);
   }
 
   disconnect(): Promise<void> {
