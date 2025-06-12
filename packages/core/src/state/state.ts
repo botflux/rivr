@@ -1,4 +1,4 @@
-import {Step, StepResult, Workflow} from "../types";
+import {Step, StepResult, Workflow} from "../workflow/types";
 import {randomUUID} from "crypto";
 
 export type AttemptStatus = "successful" | "failed" | "skipped" | "stopped"

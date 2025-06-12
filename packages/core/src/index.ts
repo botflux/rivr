@@ -1,5 +1,5 @@
-export * from "./workflow"
-export * from "./types"
+export * from "./workflow/workflow"
+export * from "./workflow/types"
 export * from "./state/state"
 export * from "./spec/engine-spec"
 export * from "./task/handler"
