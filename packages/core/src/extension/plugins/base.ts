@@ -94,6 +94,12 @@ export function createPlugin<
   Deps extends GenericPlugin<any, Extendable<Record<never, never>>, any, any>[]
 >(
   opts: CreatePluginOpts<DecoratorsFromDeps<Deps>, OutDecorators, Opts, Deps>
-): GenericPlugin<DecoratorsFromDeps<Deps>, Extendable<Omit<OutDecorators, keyof DecoratorsFromDeps<Deps>>>, Opts, Deps> {
-  return createGenericPlugin(opts) as GenericPlugin<DecoratorsFromDeps<Deps>, Extendable<Omit<OutDecorators, keyof DecoratorsFromDeps<Deps>>>, Opts, Deps>
+): Plugin<Omit<OutDecorators, keyof DecoratorsFromDeps<Deps>>, Opts, Deps> {
+  return createGenericPlugin(opts) as Plugin<Omit<OutDecorators, keyof DecoratorsFromDeps<Deps>>, Opts, Deps>
 }
+
+export type Plugin<
+  OutDecorators extends Record<never, never>,
+  Opts,
+  Deps extends GenericPlugin<any, Extendable<Record<never, never>>, any, any>[]
+> = GenericPlugin<Extendable<Record<never, never>>, Extendable<OutDecorators>, Opts, Deps>
