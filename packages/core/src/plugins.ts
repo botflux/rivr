@@ -43,11 +43,6 @@ export function createPlugin<T, U, Opts, Deps extends Plugin<any, any, any, any>
   return handler as unknown as Plugin<T, U, Opts, Deps>
 }
 
-createPlugin({
-  name: "foo",
-  handler: instance => instance
-})
-
 const kNothing = Symbol("kNothing")
 export type Nothing = { [kNothing]: true }
 
@@ -67,12 +62,16 @@ export type EnsureRecord<T> = T extends Record<never, never>
     ? T
     : Record<never, never>
 
+export type DecoratorsFromDeps<Deps extends Plugin<any, Extendable<Record<never, never>>, any, any>[]> = EnsureRecord<MergeUnionTypes<DecoratorsFromPlugins<UnwrapItem<Deps>>>>
+
 export function createGenericPlugin<
   OutDecorators extends Record<never, never>,
   Opts,
   Deps extends Plugin<any, Extendable<Record<never, never>>, any, any>[]
->(opts: CreateGenericPlugin<EnsureRecord<MergeUnionTypes<DecoratorsFromPlugins<UnwrapItem<Deps>>>>, OutDecorators, Opts, Deps>) {
-  return createPlugin(opts)
+>(
+  opts: CreateGenericPlugin<DecoratorsFromDeps<Deps>, OutDecorators, Opts, Deps>
+): Plugin<DecoratorsFromDeps<Deps>, Extendable<Omit<OutDecorators, keyof DecoratorsFromDeps<Deps>>>, Opts, Deps> {
+  return createPlugin(opts) as Plugin<DecoratorsFromDeps<Deps>, Extendable<Omit<OutDecorators, keyof DecoratorsFromDeps<Deps>>>, Opts, Deps>
 }
 
 const a = createGenericPlugin({
