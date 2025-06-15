@@ -1,5 +1,5 @@
 export * from "./workflow/workflow"
 export * from "./workflow/types"
-export * from "./state/state"
+export * from "./workflow/state/state"
 export * from "./spec/engine-spec"
 export * as queue from "./queue"
