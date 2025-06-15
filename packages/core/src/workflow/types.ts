@@ -251,7 +251,7 @@ export type RivrPlugin<
 }
 
 const kNothing = Symbol("nothing")
-type Nothing = { [kNothing]: true }
+export type Nothing = { [kNothing]: true }
 
 interface PluginBuilder<Deps extends RivrPlugin<any, any, any, Record<never, never>, any, any>[]> {
   input<T = Nothing> (): ReadyWorkflow<T, T, Record<string, never>, DecoratorsFromDeps<Deps>>
