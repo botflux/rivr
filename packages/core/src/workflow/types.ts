@@ -151,36 +151,12 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
   addHook(hook: "onWorkflowCompleted", handler: OnWorkflowCompletedHook<Decorators>): Workflow<State, FirstState, StateByStepName, Decorators>
 
   /**
-   * Hook on step error.
-   *
-   * @param hook
-   * @param handler
-   */
-  addHook(hook: "onStepError", handler: OnStepErrorHook<Decorators>): Workflow<State, FirstState, StateByStepName, Decorators>
-
-  /**
-   * Hook on skipped steps.
-   *
-   * @param hook
-   * @param handler
-   */
-  addHook(hook: "onStepSkipped", handler: OnStepSkippedHook<Decorators>): Workflow<State, FirstState, StateByStepName, Decorators>
-
-  /**
    * Hook on workflow stopped.
    *
    * @param hook
    * @param handler
    */
   addHook(hook: "onWorkflowStopped", handler: OnWorkflowStoppedHook<Decorators>): Workflow<State, FirstState, StateByStepName, Decorators>
-
-  /**
-   * Hook on step completed.
-   *
-   * @param hook
-   * @param handler
-   */
-  addHook(hook: "onStepCompleted", handler: OnStepCompletedHook<Decorators>): Workflow<State, FirstState, StateByStepName, Decorators>
 
   /**
    * Hook on workflow failed.
@@ -199,10 +175,7 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
   addHook(hook: "preStepHandler", handler: PreStepHandlerHook<Decorators>): Workflow<State, FirstState, StateByStepName, Decorators>
   addHook(hook: "onStepHandled", handler: OnStepHandledHook<Decorators>): Workflow<State, FirstState, StateByStepName, Decorators>
 
-  getHook(hook: "onStepCompleted"): WithContext<OnStepCompletedHook<Record<never, never>>>[]
   getHook(hook: "onWorkflowCompleted"): WithContext<OnWorkflowCompletedHook<Record<never, never>>>[]
-  getHook(hook: "onStepError"): WithContext<OnStepErrorHook<Record<never, never>>>[]
-  getHook(hook: "onStepSkipped"): WithContext<OnStepSkippedHook<Record<never, never>>>[]
   getHook(hook: "onWorkflowStopped"): WithContext<OnWorkflowStoppedHook<Record<never, never>>>[]
   getHook(hook: "onWorkflowFailed"): WithContext<OnWorkflowFailedHook<Record<never, never>>>[]
 

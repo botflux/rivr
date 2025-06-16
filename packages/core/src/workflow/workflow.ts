@@ -25,9 +25,6 @@ type StepElement<State, FirstState, StateByStepName extends EmptyStateByStep> = 
 }
 
 type Hook =
-  | { type: "onStepCompleted", hook: OnStepCompletedHook<EmptyDecorator> }
-  | { type: "onStepError", hook: OnStepErrorHook<EmptyDecorator> }
-  | { type: "onStepSkipped", hook: OnStepSkippedHook<EmptyDecorator> }
   | { type: "onWorkflowCompleted", hook: OnWorkflowCompletedHook<EmptyDecorator> }
   | { type: "onWorkflowFailed", hook: OnWorkflowFailedHook<EmptyDecorator> }
   | { type: "onWorkflowStopped", hook: OnWorkflowStoppedHook<EmptyDecorator> }

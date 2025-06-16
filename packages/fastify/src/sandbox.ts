@@ -11,7 +11,6 @@ async function sandbox () {
       name: "add-1",
       handler: ({ state }) => state + 1
     })
-    .addHook("onStepCompleted", () => console.log("Step completed"))
     .addHook("preStepHandler", (w, step, state) => {
       console.log("preStepHandler", step, state)
     })
