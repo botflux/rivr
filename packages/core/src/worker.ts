@@ -55,7 +55,6 @@ class DefaultWorker implements Worker {
 
   async stop(): Promise<void> {
     await this.#consumption?.stop()
-    await this.#opts.primary.disconnect()
   }
 
   addHook(hook: "error", fn: OnError): this {
@@ -91,20 +90,6 @@ class DefaultWorker implements Worker {
 
     const result = await this.#executeHandler(step, context, state)
     const newState = updateWorkflowState(state, step, result)
-
-    if (result.type === "success") {
-      for (const { context, item: hook } of mWorkflow.getHook("onStepCompleted")) {
-        hook(context, step, newState.toExecute.state)
-      }
-    } else if (result.type === "failure") {
-      for (const { context, item: hook } of mWorkflow.getHook("onStepError")) {
-        hook(result.error, context, newState.toExecute.state)
-      }
-    } else if (result.type === "skipped") {
-      for (const { context, item: hook } of mWorkflow.getHook("onStepSkipped")) {
-        hook(context, step, newState.toExecute.state)
-      }
-    }
 
     for (const { context, item: hook } of mWorkflow.getHook("onStepHandled")) {
       hook(context, step, result)

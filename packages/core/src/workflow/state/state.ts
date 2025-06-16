@@ -168,6 +168,7 @@ function getNextTask<State>(state: WorkflowState<State>, step: Step, result: Ste
         return [
           {
             ...state.toExecute,
+            state: nextState,
             status: "done",
           },
           "successful",
