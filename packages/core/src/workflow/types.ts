@@ -1,3 +1,5 @@
+import {WorkflowState} from "./state/state";
+
 export type Success<State> = {
   type: "success"
   state: State
@@ -51,41 +53,42 @@ export type StepOpts<Name extends string, StateIn, StateOut, FirstState, StateBy
 export type OnWorkflowCompletedHook<Decorators extends Record<never, never>> = (
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   state: unknown
-) => void
+) => (Promise<void> | void)
 export type OnStepErrorHook<Decorators extends Record<never, never>> = (
   error: unknown,
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   state: unknown
-) => void
+) => (Promise<void> | void)
 export type OnStepSkippedHook<Decorators extends Record<never, never>> = (
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step, state: unknown
-) => void
+) => (Promise<void> | void)
 export type OnWorkflowStoppedHook<Decorators extends Record<never, never>> = (
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step, state: unknown
-) => void
+) => (Promise<void> | void)
 export type OnWorkflowFailedHook<Decorators extends Record<never, never>> = (
   error: unknown,
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step,
   state: unknown
-) => void
+) => (Promise<void> | void)
 export type OnStepCompletedHook<Decorators extends Record<never, never>> = (
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step,
   state: unknown
-) => void
+) => (Promise<void> | void)
 export type PreStepHandlerHook<Decorators extends Record<never, never>> = (
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step,
   state: unknown
-) => void
+) => (Promise<void> | void)
 export type OnStepHandledHook<Decorators extends Record<never, never>> = (
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step,
-  result: StepResult<unknown>
-) => void
+  result: StepResult<unknown>,
+  newState: WorkflowState<unknown>
+) => (Promise<void> | void)
 
 export type WithContext<T> = {
   item: T

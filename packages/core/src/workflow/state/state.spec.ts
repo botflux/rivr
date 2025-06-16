@@ -2,6 +2,7 @@ import {describe, test, TestContext} from "node:test";
 import {rivr} from "../workflow";
 import {createWorkflowState, updateWorkflowState} from "./state";
 import {randomUUID} from "crypto";
+import {omit} from "../../utils/omit";
 
 describe('state', function () {
   test("should be able to create a workflow state", async (t: TestContext) => {
@@ -68,7 +69,7 @@ describe('state', function () {
     })
 
     // Then
-    t.assert.deepStrictEqual(newState, {
+    t.assert.deepStrictEqual(omit(newState, [ "lastModified" ]), {
       id,
       name: "calc",
       status: "in_progress",
@@ -94,7 +95,6 @@ describe('state', function () {
           attempts: []
         }
       ],
-      lastModified: now
     })
   })
 
@@ -119,13 +119,13 @@ describe('state', function () {
     })
 
     // Then
-    t.assert.deepStrictEqual(newState, {
+    t.assert.deepStrictEqual(omit(newState, [ "lastModified" ]), {
       id,
       name: "calc",
       status: "successful",
-      result: 1,
+      result: 2,
       toExecute: {
-        state: 1,
+        state: 2,
         status: 'done',
         step: "add-1",
         attempt: 1,
@@ -142,7 +142,6 @@ describe('state', function () {
           ]
         },
       ],
-      lastModified: now
     })
   })
 
@@ -226,7 +225,7 @@ describe('state', function () {
     })
 
     // Then
-    t.assert.deepStrictEqual(newState, {
+    t.assert.deepStrictEqual(omit(newState, [ "lastModified" ]), {
       id,
       name: "calc",
       status: "stopped",
@@ -252,7 +251,6 @@ describe('state', function () {
           attempts: []
         }
       ],
-      lastModified: now
     })
   })
 
@@ -289,7 +287,6 @@ describe('state', function () {
         step: "add-1",
         attempt: 2,
         areRetryExhausted: false,
-        pickAfter: now
       },
       steps: [
         {

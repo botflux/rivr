@@ -27,7 +27,9 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
           name: "add-1",
           handler: ({ state }) => state + 1
         })
-        .addHook("onStepHandled", (w, step, r) => result = r)
+        .addHook("onStepHandled", (w, step, r) => {
+          result = r
+        })
 
       const queue = createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
@@ -64,7 +66,9 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
           name: "multiply-by-4",
           handler: ({ state }) => state * 4
         })
-        .addHook("onWorkflowCompleted", (w, state) => result = state)
+        .addHook("onWorkflowCompleted", (w, state) => {
+          result = state
+        })
 
       const queue = createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
@@ -99,7 +103,9 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
             throw new Error("oops")
           }
         })
-        .addHook("onStepHandled", (w, step, r) => result = r)
+        .addHook("onStepHandled", (w, step, r) => {
+          result = r
+        })
 
       const queue = createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
@@ -136,7 +142,9 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
           name: "formatting",
           handler: ({ state }) => `State is ${state}`,
         })
-        .addHook("onWorkflowCompleted", (context, r) => result = r)
+        .addHook("onWorkflowCompleted", (context, r) => {
+          result = r
+        })
 
       const queue = createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
@@ -173,7 +181,9 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
           name: "formatting",
           handler: ({ state }) => `State is ${state}`,
         })
-        .addHook("onStepHandled", (context, step, r) => result = r)
+        .addHook("onStepHandled", (context, step, r) => {
+          result = r
+        })
 
       const queue = createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
@@ -215,7 +225,9 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
           name: "add-1",
           handler: ({ state }) => state + 1
         })
-        .addHook("onStepHandled", (ctx, step, result) => results.push(result))
+        .addHook("onStepHandled", (ctx, step, result) => {
+          results.push(result)
+        })
 
       const queue = createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
@@ -299,7 +311,9 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
           handler: ctx => ctx.err(new Error(`oops ${ctx.attempt}`)),
           maxAttempts: 5
         })
-        .addHook("onStepHandled", (ctx, step, result) => results.push(result))
+        .addHook("onStepHandled", (ctx, step, result) => {
+          results.push(result)
+        })
 
       const queue = createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
@@ -362,7 +376,9 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
           name: "multiply-by-4",
           handler: ({ state }) => state * 4,
         })
-        .addHook("onWorkflowCompleted", (ctx, state) => result = state)
+        .addHook("onWorkflowCompleted", (ctx, state) => {
+          result = state
+        })
 
       const queue = createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
@@ -405,7 +421,9 @@ export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
         .addHook("onStepHandled", (ctx, step, result) => {
           results.push(result)
         })
-        .addHook("onWorkflowFailed", () => end = new Date().getTime())
+        .addHook("onWorkflowFailed", () => {
+          end = new Date().getTime()
+        })
 
       const queue = createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
@@ -465,10 +483,13 @@ export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
           delayBetweenAttempts: attempt => attempt * 100,
           maxAttempts: 5
         })
+        .addHook("onWorkflowFailed", () => {
+          end = new Date().getTime()
+        })
         .addHook("onStepHandled", (ctx, step, result) => {
           results.push(result)
         })
-        .addHook("onWorkflowFailed", () => end = new Date().getTime())
+
 
       const queue = createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
