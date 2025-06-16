@@ -29,7 +29,7 @@ export interface Worker {
 
 class DefaultWorker implements Worker {
   #opts: CreateWorkerOpts
-  #consumption: Consumption | undefined
+  #consumptions: Consumption[] = []
   #onErrorHooks: OnError[] = []
 
   constructor(opts: CreateWorkerOpts) {
@@ -39,7 +39,10 @@ class DefaultWorker implements Worker {
   async start(): Promise<void> {
     await Promise.all(this.#opts.workflows.map(w => w.ready()))
 
-    this.#consumption = this.#opts.primary.consume({
+    const { primary, secondaries = [] } = this.#opts
+    const queues = [ primary, ...secondaries ]
+
+    this.#consumptions = queues.map(queue => queue.consume({
       onMessage: async msg => {
         const { payload } = msg
 
@@ -52,13 +55,15 @@ class DefaultWorker implements Worker {
         }
 
       }
-    })
+    }))
 
-    await this.#consumption?.start()
+    await Promise.all(
+      this.#consumptions.map(c => c.start())
+    )
   }
 
   async stop(): Promise<void> {
-    await this.#consumption?.stop()
+    await Promise.all(this.#consumptions.map(c => c.stop()))
   }
 
   addHook(hook: "error", fn: OnError): this {
@@ -161,6 +166,14 @@ class DefaultWorker implements Worker {
 
 export type CreateWorkerOpts = {
   primary: Queue<unknown>
+
+  /**
+   * A list of read-only queues.
+   *
+   * Usually, the secondaries are your database-backed queues,
+   * while your primary is a messaging system.
+   */
+  secondaries?: Queue<unknown>[]
 
   /**
    * The workflows the worker must execute.
