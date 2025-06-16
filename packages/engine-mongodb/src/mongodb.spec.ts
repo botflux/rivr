@@ -20,7 +20,8 @@ describe("mongodb queue", function () {
     url: container.getConnectionString(),
     clientOpts: { directConnection: true },
     dbName: randomUUID(),
-    delayBetweenEmptyPolls: 100
+    delayBetweenEmptyPolls: 100,
+    enableChangeStream: true
   })
   
   basicFlow({ createQueue })

@@ -5,6 +5,7 @@ export const kOutbox = Symbol("kOutbox");
 export type OutboxMessage = {
   id: string
   type: string
+  createdAt: Date
   payload: Message
 }
 

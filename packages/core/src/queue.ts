@@ -27,6 +27,8 @@ export interface Message {
   type: string
 
   payload: unknown
+
+  createdAt: Date
 }
 
 export interface OnMessage {

@@ -31,7 +31,8 @@ export async function trigger<State, FirstState, WriteOpts> (
     {
       type: "workflow",
       id: randomUUID(),
-      payload: workflowState
+      payload: workflowState,
+      createdAt: new Date()
     }
   ], opts)
 
@@ -62,7 +63,8 @@ export async function triggerFrom<State, FirstState, StateByStepName extends Rec
     {
       type: "workflow",
       id: randomUUID(),
-      payload: workflowState
+      payload: workflowState,
+      createdAt: new Date()
     }
   ], opts)
 

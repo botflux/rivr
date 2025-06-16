@@ -125,6 +125,7 @@ class DefaultWorker implements Worker {
           type: "workflow",
           payload: newState,
           ...newState.toExecute.pickAfter !== undefined && { pickAfter: newState.toExecute.pickAfter },
+          createdAt: new Date()
         }
       ])
     }
