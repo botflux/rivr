@@ -202,7 +202,6 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
 
 export function advancedFlow({ createQueue }: QueueSpecOpts) {
   describe('advanced flow', function () {
-
     test("should be able to skip a step", async (t: TestContext) => {
       // Given
       const results: StepResult<unknown>[] = []
@@ -385,6 +384,135 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
       // Then
       await waitForPredicate(() => result !== undefined)
       t.assert.strictEqual(result, 44)
+    })
+  })
+}
+
+export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
+  describe('time base flow', function () {
+    test("should be able to delay retries", async (t: TestContext) => {
+      // Given
+      const results: StepResult<unknown>[] = []
+      let end: number = 0
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "always-fails",
+          handler: ctx => ctx.err(new Error(`oops ${ctx.attempt}`)),
+          delayBetweenAttempts: 100,
+          maxAttempts: 5
+        })
+        .addHook("onStepHandled", (ctx, step, result) => {
+          results.push(result)
+        })
+        .addHook("onWorkflowFailed", () => end = new Date().getTime())
+
+      const queue = createQueue()
+      const worker = createWorker({ primary: queue, workflows: [ workflow ] })
+
+      t.after(async () => {
+        await worker.stop()
+        await queue.disconnect()
+      })
+
+      await worker.start()
+
+      // When
+      const start = new Date().getTime()
+      await trigger(
+        queue,
+        workflow,
+        10
+      )
+
+      // Then
+      await waitForPredicate(() => results.length === 5)
+      // it is 400ms and not 500ms because only 4 tries are delayed, the first one is not.
+      t.assert.strictEqual(end - start > 400, `${end - start} is not greater than 400ms`)
+      t.assert.deepStrictEqual(results, [
+        {
+          type: "failure",
+          error: new Error("oops 1")
+        },
+        {
+          type: "failure",
+          error: new Error("oops 2")
+        },
+        {
+          type: "failure",
+          error: new Error("oops 3")
+        },
+        {
+          type: "failure",
+          error: new Error("oops 4")
+        },
+        {
+          type: "failure",
+          error: new Error("oops 5")
+        }
+      ])
+    })
+
+    test("should be able to increase the delay between tries", async (t: TestContext) => {
+      // Given
+      const results: StepResult<unknown>[] = []
+      let end: number = 0
+
+      const workflow = rivr.workflow<number>("complex-calculation")
+        .step({
+          name: "always-fails",
+          handler: ctx => ctx.err(new Error(`oops ${ctx.attempt}`)),
+          delayBetweenAttempts: attempt => attempt * 100,
+          maxAttempts: 5
+        })
+        .addHook("onStepHandled", (ctx, step, result) => {
+          results.push(result)
+        })
+        .addHook("onWorkflowFailed", () => end = new Date().getTime())
+
+      const queue = createQueue()
+      const worker = createWorker({ primary: queue, workflows: [ workflow ] })
+
+      t.after(async () => {
+        await worker.stop()
+        await queue.disconnect()
+      })
+
+      await worker.start()
+
+      // When
+      const start = new Date().getTime()
+      await trigger(
+        queue,
+        workflow,
+        10
+      )
+
+      // Then
+      await waitForPredicate(() => results.length === 5)
+      t.assert.strictEqual(end - start > 200 + 300 + 400 + 500, `${end - start} is not greater than 1400ms`)
+      t.assert.deepStrictEqual(results, [
+        {
+          type: "failure",
+          error: new Error("oops 1")
+        },
+        {
+          type: "failure",
+          error: new Error("oops 2")
+        },
+        {
+          type: "failure",
+          error: new Error("oops 3")
+        },
+        {
+          type: "failure",
+          error: new Error("oops 4")
+        },
+        {
+          type: "failure",
+          error: new Error("oops 5")
+        }
+      ])
     })
   })
 }
