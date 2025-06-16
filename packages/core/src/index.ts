@@ -1,6 +1,7 @@
 export * from "./workflow/workflow"
 export * from "./workflow/types"
 export * from "./workflow/state/state"
+export * from "./workflow/state/storage"
 export * from "./spec/engine-spec"
 export * from "./queue"
 export * from "./worker"

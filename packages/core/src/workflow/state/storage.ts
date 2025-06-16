@@ -9,6 +9,7 @@ export type ListWorkflowStateResult<State> = {
   previousPage?: number
   nextPage?: number
   results: WorkflowState<State>[]
+  totalCount: number
 }
 
 export interface WorkflowStateStorage {
@@ -45,5 +46,5 @@ export interface SearchableWorkflowStateStorage extends WorkflowStateStorage {
    *
    * @param opts
    */
-  search<State>(opts: SearchWorkflowStateOpts): Promise<ListWorkflowStateResult<State>>
+  search<State>(opts?: SearchWorkflowStateOpts): Promise<ListWorkflowStateResult<State>>
 }
