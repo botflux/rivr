@@ -1,24 +1,33 @@
-//
-// import {test, before, after, type TestContext, describe, beforeEach, afterEach} from "node:test"
-// import { MongoDBContainer, StartedMongoDBContainer } from "@testcontainers/mongodb"
-// import { randomUUID } from "crypto"
-// import { setTimeout } from "timers/promises"
-// import { createEngine } from "./mongodb"
-// import {advancedFlowControl, basicFlowControl, extension, installUnhandledRejectionHook, rivr, rivrPlugin} from "rivr"
-// import {Network, StartedNetwork} from "testcontainers";
-// import {CreatedProxy, StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
-// import {MongoBulkWriteError, MongoServerSelectionError} from "mongodb";
-//
-// let container!: StartedMongoDBContainer
-//
-// installUnhandledRejectionHook()
-// before(async () => {
-//   container = await new MongoDBContainer("mongo:8").start()
-// })
-//
-// after(async () => {
-//   await container?.stop()
-// })
+import {MongoDBContainer, StartedMongoDBContainer} from "@testcontainers/mongodb";
+import {advancedFlow, basicFlow, installUnhandledRejectionHook, timeBasedFlow} from "rivr";
+import { createQueue as createMongoQueue } from "./queue"
+import {after, before, describe} from "node:test";
+import {randomUUID} from "node:crypto";
+
+let container!: StartedMongoDBContainer
+
+installUnhandledRejectionHook()
+before(async () => {
+  container = await new MongoDBContainer("mongo:8").start()
+})
+
+after(async () => {
+  await container?.stop()
+})
+
+describe("mongodb queue", function () {
+  const createQueue = () => createMongoQueue({
+    url: container.getConnectionString(),
+    clientOpts: { directConnection: true },
+    dbName: randomUUID(),
+    delayBetweenEmptyPolls: 100
+  })
+  
+  basicFlow({ createQueue })
+  advancedFlow({ createQueue })
+  timeBasedFlow({ createQueue })
+})
+
 //
 // describe('mongodb', function () {
 //   const makeEngine = () => createEngine({

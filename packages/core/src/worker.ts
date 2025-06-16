@@ -123,7 +123,8 @@ class DefaultWorker implements Worker {
         {
           id: randomUUID(),
           type: "workflow",
-          payload: newState
+          payload: newState,
+          ...newState.toExecute.pickAfter !== undefined && { pickAfter: newState.toExecute.pickAfter },
         }
       ])
     }

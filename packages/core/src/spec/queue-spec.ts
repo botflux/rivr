@@ -446,7 +446,7 @@ export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
       // Then
       await waitForPredicate(() => results.length === 5)
       // it is 400ms and not 500ms because only 4 tries are delayed, the first one is not.
-      t.assert.strictEqual(end - start > 400, `${end - start} is not greater than 400ms`)
+      t.assert.strictEqual(end - start > 400, true, `${end - start} is not greater than 400ms`)
       t.assert.deepStrictEqual(results, [
         {
           type: "failure",
@@ -511,7 +511,7 @@ export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
 
       // Then
       await waitForPredicate(() => results.length === 5)
-      t.assert.strictEqual(end - start > 200 + 300 + 400 + 500, `${end - start} is not greater than 1400ms`)
+      t.assert.strictEqual(end - start > 200 + 300 + 400 + 500, true, `${end - start} is not greater than 1400ms`)
       t.assert.deepStrictEqual(results, [
         {
           type: "failure",
