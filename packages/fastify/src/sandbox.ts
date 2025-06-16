@@ -9,10 +9,7 @@ async function sandbox () {
   const w = rivr.workflow<number>("my-workflow")
     .step({
       name: "add-1",
-      handler: ({ state }) => {
-        console.log("Step completed")
-        return state + 1
-      }
+      handler: ({ state }) => state + 1
     })
     .addHook("onStepCompleted", () => console.log("Step completed"))
 

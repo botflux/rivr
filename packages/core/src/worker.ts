@@ -88,6 +88,34 @@ class DefaultWorker implements Worker {
     const result = await this.#executeHandler(step, context, state)
     const newState = updateWorkflowState(state, step, result)
 
+    if (result.type === "success") {
+      for (const { context, item: hook } of mWorkflow.getHook("onStepCompleted")) {
+        hook(context, step, newState.toExecute.state)
+      }
+    } else if (result.type === "failure") {
+      for (const { context, item: hook } of mWorkflow.getHook("onStepError")) {
+        hook(result.error, context, newState.toExecute.state)
+      }
+    } else if (result.type === "skipped") {
+      for (const { context, item: hook } of mWorkflow.getHook("onStepSkipped")) {
+        hook(context, step, newState.toExecute.state)
+      }
+    }
+
+    if (newState.status === "successful") {
+      for (const { context, item: hook } of mWorkflow.getHook("onWorkflowCompleted")) {
+        hook(context, newState.toExecute.state)
+      }
+    } else if (result.type === "stopped") {
+      for (const { context, item: hook } of mWorkflow.getHook("onWorkflowStopped")) {
+        hook(context, step, newState.toExecute.state)
+      }
+    } else if (result.type === "failure") {
+      for (const { context, item: hook } of mWorkflow.getHook("onWorkflowFailed")) {
+        hook(result.error, context, step, newState.toExecute.state)
+      }
+    }
+
     if (newState.status === "in_progress") {
       await this.#opts.primary.produce([
         {
