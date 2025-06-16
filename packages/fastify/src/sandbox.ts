@@ -12,6 +12,9 @@ async function sandbox () {
       handler: ({ state }) => state + 1
     })
     .addHook("onStepCompleted", () => console.log("Step completed"))
+    .addHook("preStepHandler", (w, step, state) => {
+      console.log(step, state)
+    })
 
   const worker = createWorker({
     primary: queue,

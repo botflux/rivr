@@ -4,7 +4,7 @@ import {
   OnStepSkippedHook,
   OnWorkflowCompletedHook,
   OnWorkflowFailedHook,
-  OnWorkflowStoppedHook, PlainPlugin,
+  OnWorkflowStoppedHook, PlainPlugin, PreStepHandlerHook,
   ReadyWorkflow, RivrPlugin,
   Step,
   StepOpts,
@@ -31,6 +31,7 @@ type Hook =
   | { type: "onWorkflowCompleted", hook: OnWorkflowCompletedHook<EmptyDecorator> }
   | { type: "onWorkflowFailed", hook: OnWorkflowFailedHook<EmptyDecorator> }
   | { type: "onWorkflowStopped", hook: OnWorkflowStoppedHook<EmptyDecorator> }
+  | { type: "preStepHandler", hook: PreStepHandlerHook<EmptyDecorator> }
 
 type HookElement<State, FirstState, StateByStepName extends EmptyStateByStep> = {
   type: "hook"

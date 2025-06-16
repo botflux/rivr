@@ -85,6 +85,10 @@ class DefaultWorker implements Worker {
 
     const { item: step, context } = mStepAndExecutionContext
 
+    for (const { context, item: hook } of mWorkflow.getHook("preStepHandler")) {
+      hook(context, step, state.toExecute.state)
+    }
+
     const result = await this.#executeHandler(step, context, state)
     const newState = updateWorkflowState(state, step, result)
 
