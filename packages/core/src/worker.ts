@@ -2,6 +2,8 @@ import {Consumption, Queue} from "./queue";
 import {updateWorkflowState, WorkflowState} from "./workflow/state/state";
 import {ReadyWorkflow, Step, StepResult, Workflow} from "./workflow/types";
 import {randomUUID} from "crypto";
+import {isOutboxState} from "./outbox/handler";
+import {OutboxState} from "./outbox/types";
 
 export type OnError = (error: unknown) => void
 
@@ -41,12 +43,14 @@ class DefaultWorker implements Worker {
       onMessage: async msg => {
         const { payload } = msg
 
-        if (!this.#isWorkflowState(payload)) {
-          console.warn("not a workflow state")
-          return
+        if (this.#isWorkflowState(payload)) {
+          await this.#handleWorkflow(payload)
+        } else if (isOutboxState(payload)) {
+          await this.#handleOutbox(payload)
+        } else {
+          console.warn("unknown message", msg)
         }
 
-        await this.#handleWorkflow(payload)
       }
     })
 
@@ -148,6 +152,10 @@ class DefaultWorker implements Worker {
     return typeof value === "object" && value !== null
       && "type" in value && typeof value.type === "string"
       && [ "stopped", "success", "failure", "skipped" ].includes(value.type)
+  }
+
+  async #handleOutbox(state: OutboxState) {
+    await this.#opts.primary.produce([ state.payload ])
   }
 }
 

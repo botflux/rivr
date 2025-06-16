@@ -2,6 +2,12 @@ import {Message, Producer, Queue} from "../queue";
 
 export const kOutbox = Symbol("kOutbox");
 
+export type OutboxMessage = {
+  id: string
+  type: string
+  payload: Message
+}
+
 /**
  * An outbox is just a thin wrapper around a queue.
  * Everytime you produce through an outbox instance,
@@ -10,13 +16,21 @@ export const kOutbox = Symbol("kOutbox");
  * Then, when the message get consumed, the outbox state is
  * unpacked and the actual payload is republished.
  */
-export interface Outbox<WriteOpts> extends Producer<WriteOpts> {
+export interface Outbox<WriteOpts> {
   [kOutbox]: true
+
+  /**
+   * Produce messages in an outbox.
+   *
+   * @param messages
+   * @param opts
+   */
+  produce(messages: OutboxMessage[], opts?: WriteOpts): Promise<void>
 }
 
 export type OutboxState = {
   type: "outbox"
-  payload: unknown
+  payload: Message
 }
 
 class DefaultOutbox<WriteOpts> implements Outbox<WriteOpts> {
@@ -27,12 +41,9 @@ class DefaultOutbox<WriteOpts> implements Outbox<WriteOpts> {
     this.#queue = queue;
   }
 
-  async produce(messages: Message[], opts?: WriteOpts): Promise<void> {
+  async produce(messages: OutboxMessage[], opts?: WriteOpts): Promise<void> {
     await this.#queue.produce(
-      messages.map(message => ({
-        ...message,
-        payload: { type: "outbox", payload: message.payload } satisfies OutboxState,
-      })),
+      messages,
       opts
     )
   }
