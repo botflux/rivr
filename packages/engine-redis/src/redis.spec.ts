@@ -1,5 +1,5 @@
 import {describe, before, after} from "node:test";
-import {basicFlow, installUnhandledRejectionHook} from "rivr"
+import {advancedFlow, basicFlow, installUnhandledRejectionHook} from "rivr"
 import {RedisContainer, StartedRedisContainer} from "@testcontainers/redis";
 import {createQueue as createRedisQueue} from "./redis";
 import {randomUUID} from "node:crypto";
@@ -23,4 +23,5 @@ describe('redis engine', function () {
   })
 
   basicFlow({ createQueue })
+  advancedFlow({ createQueue })
 })

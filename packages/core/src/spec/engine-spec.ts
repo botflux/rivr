@@ -210,7 +210,7 @@
 //     })
 //   })
 // }
-//
+
 // export function extension (opts: TestOpts) {
 //   describe('extension', function () {
 //     test("should be able to add a property on the workflow", async (t: TestContext) => {
@@ -456,7 +456,7 @@
 //     })
 //   })
 // }
-//
+
 // export function advancedFlowControl (opts: TestOpts) {
 //   describe('advanced flow control', function () {
 //     test("should be able to skip a step", async (t) => {
