@@ -106,6 +106,10 @@ class DefaultWorker implements Worker {
       }
     }
 
+    for (const { context, item: hook } of mWorkflow.getHook("onStepHandled")) {
+      hook(context, step, result)
+    }
+
     if (newState.status === "successful") {
       for (const { context, item: hook } of mWorkflow.getHook("onWorkflowCompleted")) {
         hook(context, newState.toExecute.state)
@@ -149,7 +153,7 @@ class DefaultWorker implements Worker {
 
       return this.#isStepResult(stepResultOrResult)
         ? stepResultOrResult
-        : { type: "success", state }
+        : { type: "success", state: stepResultOrResult }
     } catch (error: unknown) {
       return { type: "failure", error }
     }

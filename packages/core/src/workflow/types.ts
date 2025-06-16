@@ -81,6 +81,11 @@ export type PreStepHandlerHook<Decorators extends Record<never, never>> = (
   step: Step,
   state: unknown
 ) => void
+export type OnStepHandledHook<Decorators extends Record<never, never>> = (
+  workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
+  step: Step,
+  result: StepResult<unknown>
+) => void
 
 export type WithContext<T> = {
   item: T
@@ -192,6 +197,7 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
    * @param handler
    */
   addHook(hook: "preStepHandler", handler: PreStepHandlerHook<Decorators>): Workflow<State, FirstState, StateByStepName, Decorators>
+  addHook(hook: "onStepHandled", handler: OnStepHandledHook<Decorators>): Workflow<State, FirstState, StateByStepName, Decorators>
 
   getHook(hook: "onStepCompleted"): WithContext<OnStepCompletedHook<Record<never, never>>>[]
   getHook(hook: "onWorkflowCompleted"): WithContext<OnWorkflowCompletedHook<Record<never, never>>>[]
@@ -199,7 +205,9 @@ export type Workflow<State, FirstState, StateByStepName extends Record<never, ne
   getHook(hook: "onStepSkipped"): WithContext<OnStepSkippedHook<Record<never, never>>>[]
   getHook(hook: "onWorkflowStopped"): WithContext<OnWorkflowStoppedHook<Record<never, never>>>[]
   getHook(hook: "onWorkflowFailed"): WithContext<OnWorkflowFailedHook<Record<never, never>>>[]
+
   getHook(hook: "preStepHandler"): WithContext<PreStepHandlerHook<Record<never, never>>>[]
+  getHook(hook: "onStepHandled"): WithContext<OnStepHandledHook<Record<never, never>>>[]
 
   /**
    * Execute the dependency graph.

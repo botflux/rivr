@@ -1,6 +1,6 @@
 import {
   OnStepCompletedHook,
-  OnStepErrorHook,
+  OnStepErrorHook, OnStepHandledHook,
   OnStepSkippedHook,
   OnWorkflowCompletedHook,
   OnWorkflowFailedHook,
@@ -32,6 +32,7 @@ type Hook =
   | { type: "onWorkflowFailed", hook: OnWorkflowFailedHook<EmptyDecorator> }
   | { type: "onWorkflowStopped", hook: OnWorkflowStoppedHook<EmptyDecorator> }
   | { type: "preStepHandler", hook: PreStepHandlerHook<EmptyDecorator> }
+  | { type: "onStepHandled", hook: OnStepHandledHook<EmptyDecorator> }
 
 type HookElement<State, FirstState, StateByStepName extends EmptyStateByStep> = {
   type: "hook"
