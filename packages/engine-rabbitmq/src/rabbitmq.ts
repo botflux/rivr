@@ -87,6 +87,7 @@ type RabbitMQQueueOpts = {
   exchange: string
   delayedExchange: string
   queue: string
+  enableDelayedMessageExchange: boolean
 }
 
 class RabbitMQQueue implements Queue<never> {
@@ -106,6 +107,10 @@ class RabbitMQQueue implements Queue<never> {
       if (message.pickAfter === undefined) {
         this.#publishMessage(channel, this.#opts.exchange, message)
       } else {
+        if (!this.#opts.enableDelayedMessageExchange) {
+          throw new Error("Cannot publish a delayed message in the RabbitMQ queue without `enabledDelayedMessageExchange` set to `true`.")
+        }
+
         this.#publishMessage(channel, this.#opts.delayedExchange, message)
       }
     }
@@ -175,24 +180,70 @@ async function ensureQueuesExists(channel: Channel, opts: RabbitMQQueueOpts) {
       "x-queue-type": "quorum"
     }
   })
-  await channel.assertExchange(opts.exchange, "direct", { durable: true })
-  await channel.assertExchange(opts.delayedExchange, "x-delayed-message", {
-    durable: true,
-    arguments: {
-      "x-delayed-type": "direct"
-    }
-  })
 
+  await channel.assertExchange(opts.exchange, "direct", { durable: true })
   await channel.bindQueue(opts.queue, opts.exchange, "")
-  await channel.bindQueue(opts.queue, opts.delayedExchange, "")
+
+  if (opts.enableDelayedMessageExchange) {
+    await channel.assertExchange(opts.delayedExchange, "x-delayed-message", {
+      durable: true,
+      arguments: {
+        "x-delayed-type": "direct"
+      }
+    })
+    await channel.bindQueue(opts.queue, opts.delayedExchange, "")
+  }
 }
 
 export type CreateRabbitMQQueueOpts = {
+
+  /**
+   * The URL to connect to RabbitMQ.
+   */
   url: string
+
+  /**
+   * The option passed as second argument of `require("amqplib").connect`.
+   */
   socketOpts?: SocketOptions
+
+  /**
+   * The exchange used for publishing non-delayed messages.
+   *
+   * @default {'rivr-exchange'}
+   */
   exchange?: string
+
+  /**
+   * The exchange used for publishing delayed messages.
+   *
+   * Please note that the `enableDelayedMessageExchange` flag must be enabled
+   * in order to publish delayed messages.
+   *
+   * @default {'rivr-delayed-exchange'}
+   */
   delayedExchange?: string
+
+  /**
+   * The queue bound to the `exchange` and `delayedExchange`.
+   *
+   * @default {'rivr-queue'}
+   */
   queue?: string
+
+  /**
+   * True to enable delayed message publishing.
+   * Your RabbitMQ instance must have the [delayed message plugin](https://github.com/rabbitmq/rabbitmq-delayed-message-exchange) enabled.
+   *
+   * As of june 2025, the plugin is not recommended for production use,
+   * and the README states that the delayed messages are stored in an un-replicated mnesia table.
+   *
+   * When false, you'll need another queue implementation to store the delayed exchange.
+   * Rivr supports consuming from multiple `Queue` implementation out of the box.
+   *
+   * @default {false}
+   */
+  enableDelayedMessageExchange?: boolean
 }
 
 export function createQueue(opts: CreateRabbitMQQueueOpts): Queue<never> {
@@ -201,6 +252,7 @@ export function createQueue(opts: CreateRabbitMQQueueOpts): Queue<never> {
     exchange = "rivr-exchange",
     queue = "rivr-messages",
     socketOpts,
+    enableDelayedMessageExchange = false,
     ...rest
   } = opts
 
@@ -209,6 +261,7 @@ export function createQueue(opts: CreateRabbitMQQueueOpts): Queue<never> {
     delayedExchange,
     exchange,
     queue,
-    socketOpts
+    socketOpts,
+    enableDelayedMessageExchange
   })
 }

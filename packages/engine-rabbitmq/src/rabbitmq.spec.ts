@@ -9,7 +9,7 @@
 import {after, before, describe} from "node:test";
 import {advancedFlow, basicFlow, installUnhandledRejectionHook, timeBasedFlow} from "rivr";
 import {GenericContainerBuilder, Wait} from "testcontainers";
-import {StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
+import {RabbitMQContainer, StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
 import { join } from "node:path";
 import {randomUUID} from "node:crypto";
 import {createQueue as createRabbitMQQueue} from "./rabbitmq";
@@ -17,49 +17,69 @@ import {createQueue as createRabbitMQQueue} from "./rabbitmq";
 installUnhandledRejectionHook()
 
 describe("rabbitmq engine", () => {
-  let container!: StartedRabbitMQContainer
+  describe('with delayed message plugin', function () {
+    let container!: StartedRabbitMQContainer
 
-  before(async () => {
-    const customImage = await new GenericContainerBuilder(join(__dirname, ".."), join("config", "Dockerfile"))
-      .withCache(true)
-      .build("custom-rabbitmq-with-delayed-exchange:latest")
+    before(async () => {
+      const customImage = await new GenericContainerBuilder(join(__dirname, ".."), join("config", "Dockerfile"))
+        .withCache(true)
+        .build("custom-rabbitmq-with-delayed-exchange:latest")
 
-    const AMQP_PORT = 5672;
-    const AMQPS_PORT = 5671;
-    const RABBITMQ_DEFAULT_USER = "guest";
-    const RABBITMQ_DEFAULT_PASS = "guest";
+      const AMQP_PORT = 5672;
+      const AMQPS_PORT = 5671;
+      const RABBITMQ_DEFAULT_USER = "guest";
+      const RABBITMQ_DEFAULT_PASS = "guest";
 
-    container = new StartedRabbitMQContainer(
-      await customImage
-        .withExposedPorts(AMQP_PORT, AMQPS_PORT)
-        .withEnvironment({
-          RABBITMQ_DEFAULT_USER,
-          RABBITMQ_DEFAULT_PASS
-        })
-        .withWaitStrategy(Wait.forLogMessage("Server startup complete"))
-        .withStartupTimeout(30_000)
-        .start()
-    )
+      container = new StartedRabbitMQContainer(
+        await customImage
+          .withExposedPorts(AMQP_PORT, AMQPS_PORT)
+          .withEnvironment({
+            RABBITMQ_DEFAULT_USER,
+            RABBITMQ_DEFAULT_PASS
+          })
+          .withWaitStrategy(Wait.forLogMessage("Server startup complete"))
+          .withStartupTimeout(30_000)
+          .start()
+      )
 
-    // container = await new RabbitMQContainer("rabbitmq:4.1").start()
+      // container = await new RabbitMQContainer("rabbitmq:4.1").start()
+    })
+
+    after(async () => {
+      await container?.stop()
+    })
+
+    const createQueue = () => createRabbitMQQueue({
+      url: container.getAmqpUrl(),
+      exchange: randomUUID(),
+      queue: randomUUID(),
+      delayedExchange: randomUUID(),
+      enableDelayedMessageExchange: true
+    })
+
+    basicFlow({ createQueue })
+    advancedFlow({ createQueue })
+    timeBasedFlow({ createQueue })
   })
 
-  after(async () => {
-    await container?.stop()
+  describe('without delayed message plugin', function () {
+    let container!: StartedRabbitMQContainer
+
+    before(async () => {
+      container = await new RabbitMQContainer("rabbitmq:4.1").start()
+    })
+
+    after(async () => {
+      await container?.stop()
+    })
+
+    const createQueue = () => createRabbitMQQueue({
+      url: container.getAmqpUrl(),
+      exchange: randomUUID(),
+      queue: randomUUID(),
+    })
+
+    basicFlow({ createQueue })
+    advancedFlow({ createQueue })
   })
-
-  const createQueue = () => createRabbitMQQueue({
-    url: container.getAmqpUrl(),
-    exchange: randomUUID(),
-    queue: randomUUID(),
-    delayedExchange: randomUUID(),
-  })
-
-  basicFlow({ createQueue })
-  advancedFlow({ createQueue })
-  timeBasedFlow({ createQueue })
-
-  // advancedFlowControl({ createEngine: makeEngine })
-  // extension({ createEngine: makeEngine })
 })
-
