@@ -415,14 +415,14 @@ export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
         .step({
           name: "always-fails",
           handler: ctx => ctx.err(new Error(`oops ${ctx.attempt}`)),
-          delayBetweenAttempts: 100,
+          delayBetweenAttempts: 200,
           maxAttempts: 5
-        })
-        .addHook("onStepHandled", (ctx, step, result) => {
-          results.push(result)
         })
         .addHook("onWorkflowFailed", () => {
           end = new Date().getTime()
+        })
+        .addHook("onStepHandled", (ctx, step, result) => {
+          results.push(result)
         })
 
       const queue = createQueue()
@@ -444,9 +444,8 @@ export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
       )
 
       // Then
-      await waitForPredicate(() => results.length === 5)
-      // it is 400ms and not 500ms because only 4 tries are delayed, the first one is not.
-      t.assert.strictEqual(end - start > 400, true, `${end - start} is not greater than 400ms`)
+      await waitForPredicate(() => results.length === 5 && end !== 0)
+      t.assert.strictEqual(end - start > 800, true, `${end - start}ms is not greater than 800ms`)
       t.assert.deepStrictEqual(results, [
         {
           type: "failure",
@@ -510,8 +509,8 @@ export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
       )
 
       // Then
-      await waitForPredicate(() => results.length === 5)
-      t.assert.strictEqual(end - start > 200 + 300 + 400 + 500, true, `${end - start} is not greater than 1400ms`)
+      await waitForPredicate(() => results.length === 5 && end !== 0)
+      t.assert.strictEqual(end - start > 200 + 300 + 400 + 500, true, `${end - start}ms is not greater than 1400ms`)
       t.assert.deepStrictEqual(results, [
         {
           type: "failure",

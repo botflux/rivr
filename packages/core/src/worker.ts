@@ -108,11 +108,11 @@ class DefaultWorker implements Worker {
       for (const { context, item: hook } of mWorkflow.getHook("onWorkflowCompleted")) {
         await hook(context, newState.toExecute.state)
       }
-    } else if (result.type === "stopped") {
+    } else if (newState.status === "stopped") {
       for (const { context, item: hook } of mWorkflow.getHook("onWorkflowStopped")) {
         await hook(context, step, newState.toExecute.state)
       }
-    } else if (result.type === "failure") {
+    } else if (newState.status === "failed" && result.type === "failure") {
       for (const { context, item: hook } of mWorkflow.getHook("onWorkflowFailed")) {
         await hook(result.error, context, step, newState.toExecute.state)
       }

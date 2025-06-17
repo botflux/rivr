@@ -14,6 +14,7 @@
   },
   "scripts": {
     "test": "borp --timeout 60000 *.spec.ts",
+    "test:only": "borp --only --timeout 60000 *.spec.ts",
     "sandbox": "ts-node ./src/sandbox.ts"
   },
   "repository": {
