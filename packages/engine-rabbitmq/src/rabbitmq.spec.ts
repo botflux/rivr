@@ -17,7 +17,28 @@ import {createQueue as createRabbitMQQueue} from "./rabbitmq";
 installUnhandledRejectionHook()
 
 describe("rabbitmq engine", () => {
-  describe('with delayed message plugin', function () {
+  describe('recommended setup (without delayed exchange)', function () {
+    let container!: StartedRabbitMQContainer
+
+    before(async () => {
+      container = await new RabbitMQContainer("rabbitmq:4.1").start()
+    })
+
+    after(async () => {
+      await container?.stop()
+    })
+
+    const createQueue = () => createRabbitMQQueue({
+      url: container.getAmqpUrl(),
+      exchange: randomUUID(),
+      queue: randomUUID(),
+    })
+
+    basicFlow({ createQueue })
+    advancedFlow({ createQueue })
+  })
+
+  describe('not-recommended setup (with delayed exchange)', function () {
     let container!: StartedRabbitMQContainer
 
     before(async () => {
@@ -60,26 +81,5 @@ describe("rabbitmq engine", () => {
     basicFlow({ createQueue })
     advancedFlow({ createQueue })
     timeBasedFlow({ createQueue })
-  })
-
-  describe('without delayed message plugin', function () {
-    let container!: StartedRabbitMQContainer
-
-    before(async () => {
-      container = await new RabbitMQContainer("rabbitmq:4.1").start()
-    })
-
-    after(async () => {
-      await container?.stop()
-    })
-
-    const createQueue = () => createRabbitMQQueue({
-      url: container.getAmqpUrl(),
-      exchange: randomUUID(),
-      queue: randomUUID(),
-    })
-
-    basicFlow({ createQueue })
-    advancedFlow({ createQueue })
   })
 })
