@@ -155,7 +155,7 @@ class ChangeStreamConsumption implements Consumption {
             await this.#consumeOpts.onMessage(rest)
             await this.#getCollection().updateOne({ id: rest.id }, { $set: { status: "done" } })
           } catch (error: unknown) {
-            console.log("error while handling a message with mongodb change stream")
+            console.log("error while handling a message with mongodb change stream", error)
           }
         }
       }
@@ -192,6 +192,10 @@ class MongoDBQueue implements Queue<MongoDBWriteOpts> {
     const { session } = opts
 
     await this.#getCollection().insertMany(messages.map(message => ({ ...message, status: "todo" })), { session })
+  }
+
+  supportsDelayedMessages(): boolean {
+    return true
   }
 
   async disconnect(): Promise<void> {

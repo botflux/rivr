@@ -54,6 +54,10 @@ class MemoryQueue implements Queue<never> {
     }
   }
 
+  supportsDelayedMessages(): boolean {
+    return false
+  }
+
   async disconnect(): Promise<void> {
   }
 

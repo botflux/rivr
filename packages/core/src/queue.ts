@@ -47,6 +47,12 @@ export interface Producer<WriteOpts> {
    * @param opts
    */
   produce(messages: Message[], opts?: WriteOpts): Promise<void>
+
+  /**
+   * Returns true if delayed messages can be produced; otherwise false.
+   */
+  supportsDelayedMessages(): boolean
+
   disconnect(): Promise<void>
 }
 

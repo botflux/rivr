@@ -1,4 +1,4 @@
-import {Consumption, Queue} from "./queue";
+import {Consumption, Message, Queue} from "./queue";
 import {updateWorkflowState, WorkflowState} from "./workflow/state/state";
 import {ReadyWorkflow, Step, StepResult, Workflow} from "./workflow/types";
 import {randomUUID} from "crypto";
@@ -119,7 +119,7 @@ class DefaultWorker implements Worker {
     }
 
     if (newState.status === "in_progress") {
-      await this.#opts.primary.produce([
+      await this.#produce([
         {
           id: randomUUID(),
           type: "workflow",
@@ -162,7 +162,27 @@ class DefaultWorker implements Worker {
   }
 
   async #handleOutbox(state: OutboxState) {
-    await this.#opts.primary.produce([ state.payload ])
+    await this.#produce([ state.payload ])
+  }
+
+  async #produce(messages: Message[]) {
+    const delayedMessages = messages.filter(message => message.pickAfter !== undefined)
+    const notDelayedMessages = messages.filter(message => message.pickAfter === undefined)
+
+    const delayedProducer = [ this.#opts.primary, ...this.#opts.secondaries ?? [] ]
+      .find(p => p.supportsDelayedMessages())
+
+    if (delayedProducer === undefined && delayedMessages.length !== 0) {
+      throw new Error("Cannot produce delayed messages because the worker has no queues supporting them configured")
+    }
+
+    if (delayedMessages.length > 0) {
+      await delayedProducer?.produce(delayedMessages)
+    }
+
+    if (notDelayedMessages.length > 0) {
+      await this.#opts.primary.produce(notDelayedMessages)
+    }
   }
 }
 

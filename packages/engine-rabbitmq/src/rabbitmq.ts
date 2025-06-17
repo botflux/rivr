@@ -118,6 +118,10 @@ class RabbitMQQueue implements Queue<never> {
     await channel.waitForConfirms()
   }
 
+  supportsDelayedMessages(): boolean {
+    return this.#opts.enableDelayedMessageExchange
+  }
+
   async disconnect(): Promise<void> {
     await this.#publishChannel?.close()
     await this.#connection?.close()
