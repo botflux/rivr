@@ -67,6 +67,33 @@ describe('rabbitmq resilience test suite', function () {
     const mError = await queue.disconnect().catch(e => e)
     t.assert.deepStrictEqual(mError, undefined)
   })
+
+  describe('produce', function () {
+    test("should be able to fail fast", async (t: TestContext) => {
+      // Given
+      const proxy = await toxiproxy.createProxy({
+        name: `rabbitmq-${randomUUID()}`,
+        enabled: true,
+        upstream: "rabbitmq:5672"
+      })
+
+      t.after(() => proxy.instance.remove())
+
+      const queue = createQueue({
+        url: `amqp://${proxy.host}:${proxy.port}`,
+      })
+
+      // produce a message to warmup the queue.
+      await queue.produce([ randomMessage(), ])
+
+      // When
+      await proxy.setEnabled(false)
+
+      // Then
+      const mError = await queue.produce([ randomMessage() ]).catch(e => e)
+      t.assert.match((mError as Error).message, /closed/, `${(mError as Error)?.message} does not match '/closed/'`)
+    })
+  })
 })
 
 function randomMessage(): Message {
