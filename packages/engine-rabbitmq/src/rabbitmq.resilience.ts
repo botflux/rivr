@@ -31,6 +31,15 @@ describe('rabbitmq resilience test suite', function () {
     await network?.stop()
   })
 
+  test("should be able to disconnect a already disconnected queue", async (t: TestContext) => {
+    // Given
+    // When
+    const mError = await createQueue({ url: "" }).disconnect().catch(e => e)
+
+    // Then
+    t.assert.strictEqual(mError, undefined)
+  })
+
   test("should be able to disconnect the queue even if the connection was lost", async (t: TestContext) => {
     // Given
     const proxy = await toxiproxy.createProxy({
