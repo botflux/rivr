@@ -123,8 +123,21 @@ class RabbitMQQueue implements Queue<never> {
   }
 
   async disconnect(): Promise<void> {
-    await this.#publishChannel?.close()
-    await this.#connection?.close()
+    try {
+      await this.#publishChannel?.close()
+    } catch (e: unknown) {
+      if (!this.#isUnexpectedCloseError(e)) {
+        throw e
+      }
+    }
+
+    try {
+      await this.#connection?.close()
+    } catch (e: unknown) {
+      if (!this.#isUnexpectedCloseError(e)) {
+        throw e
+      }
+    }
   }
 
   consume(opts: ConsumeOpts): Consumption {
@@ -138,6 +151,7 @@ class RabbitMQQueue implements Queue<never> {
   async #getConnection(): Promise<ChannelModel> {
     if (this.#connection === undefined) {
       this.#connection = await connect(this.#opts.url, this.#opts.socketOpts)
+      this.#connection.on("error", () => {})
     }
 
     return this.#connection
@@ -174,6 +188,20 @@ class RabbitMQQueue implements Queue<never> {
 
   #calculateDelay(pickAfter: Date, now: Date = new Date()): number {
     return pickAfter.getTime() - now.getTime();
+  }
+
+  #isUnexpectedCloseError(error: unknown): boolean {
+    if (!isError(error)) {
+      return false
+    }
+
+    const possibilities = [
+      "Unexpected close",
+      "Channel closed",
+      /Connection closed/
+    ]
+
+    return possibilities.some(element => (error.message as string).match(element))
   }
 }
 
@@ -268,4 +296,9 @@ export function createQueue(opts: CreateRabbitMQQueueOpts): Queue<never> {
     socketOpts,
     enableDelayedMessageExchange
   })
+}
+
+function isError(error: unknown): error is Error {
+  return typeof error === "object" && error !== null
+    && "message" in error && typeof error.message === "string"
 }

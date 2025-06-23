@@ -4,16 +4,20 @@
   "description": "A RabbitMQ engine for rivr workflows",
   "main": "dist/rabbitmq.js",
   "devDependencies": {
-    "@testcontainers/rabbitmq": "^11.0.0",
+    "@testcontainers/rabbitmq": "^11.0.3",
+    "@testcontainers/toxiproxy": "^11.0.3",
     "@types/amqplib": "^0.10.7",
     "@types/node": "^22.15.28",
+    "@types/wtfnode": "^0.7.3",
     "borp": "^0.20.0",
-    "testcontainers": "^11.0.0",
+    "testcontainers": "^11.0.3",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "wtfnode": "^0.10.0"
   },
   "scripts": {
     "test": "borp --timeout 60000 *.spec.ts",
+    "test:resilience": "node -r ts-node/register --test-timeout 12000 $(find src -name \"*.resilience.ts\")",
     "test:only": "borp --only --timeout 120000 *.spec.ts",
     "sandbox": "ts-node ./src/sandbox.ts"
   },
