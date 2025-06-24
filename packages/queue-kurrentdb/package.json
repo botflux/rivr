@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "description": "KurrentDB module for rivr",
   "main": "dist/kurrentdb.js",
-  "devDependencies": {},
+  "dependencies": {
+    "@kurrent/kurrentdb-client": "^1.0.3",
+    "@testcontainers/kurrentdb": "^11.0.3",
+    "testcontainers": "^11.0.3"
+  },
   "scripts": {
     "test": "borp --timeout 60000 \"*.test.ts\""
   },
@@ -20,5 +24,8 @@
   "bugs": {
     "url": "https://github.com/botflux/rivr/issues"
   },
-  "homepage": "https://github.com/botflux/rivr#readme"
+  "homepage": "https://github.com/botflux/rivr#readme",
+  "devDependencies": {
+    "@types/node": "^24.0.4"
+  }
 }
