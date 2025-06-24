@@ -1,0 +1,24 @@
+{
+  "name": "@rivr/queue-kurrentdb",
+  "version": "1.0.0",
+  "description": "KurrentDB module for rivr",
+  "main": "dist/kurrentdb.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "borp --timeout 60000 \"*.test.ts\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/botflux/rivr.git"
+  },
+  "keywords": [
+    "workflows",
+    "kurrentdb"
+  ],
+  "author": "botflux",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/botflux/rivr/issues"
+  },
+  "homepage": "https://github.com/botflux/rivr#readme"
+}
