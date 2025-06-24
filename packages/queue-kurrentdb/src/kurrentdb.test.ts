@@ -100,7 +100,7 @@ describe('kurrentdb', function () {
     t.assert.deepStrictEqual(msg, randomMsg)
   })
 
-  test("should be able to call .start() multiple times", async (t: TestContext) => {
+  test("should be able to not override the subscription", async (t: TestContext) => {
     // Given
     const queue = createQueue({
       connectionString: kurrentdb.getConnectionString(),
@@ -139,6 +139,56 @@ describe('kurrentdb', function () {
     // When
     // Then
     const mError = await consumption.start().catch(e => e)
+    t.assert.strictEqual(mError, undefined)
+  })
+
+  test("should be able to create the persistent subscription once", async (t: TestContext) => {
+    // Given
+    const queue = createQueue({
+      connectionString: kurrentdb.getConnectionString(),
+      createPersistentSubscriptionOpts: {
+        groupName: randomUUID(),
+        startFrom: "start",
+        resolveLinkTos: true,
+        extraStatistics: true,
+        messageTimeout: 10_000,
+        maxRetryCount: 10,
+        checkPointAfter: 3_000,
+        checkPointLowerBound: 10,
+        checkPointUpperBound: 100,
+        readBatchSize: 20,
+        liveBufferSize: 500,
+        historyBufferSize: 500,
+        consumerStrategyName: "RoundRobin",
+        maxSubscriberCount: "unbounded"
+      }
+    })
+
+    t.after(async () => {
+      await queue.disconnect()
+    })
+
+    const consumption1 = queue.consume({
+      onMessage: async () => {}
+    })
+
+    t.after(async () => {
+      await consumption1.stop()
+    })
+
+    await consumption1.start()
+
+    const consumption2 = queue.consume({
+      onMessage: async () => {}
+    })
+
+    t.after(async () => {
+      await consumption2.stop()
+    })
+
+    // When
+    // Then
+    const mError = await consumption2.start().catch(e => e)
     t.assert.strictEqual(mError, undefined)
   })
 })

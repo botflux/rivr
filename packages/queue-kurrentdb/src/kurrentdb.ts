@@ -1,7 +1,7 @@
 import {ConsumeOpts, Consumption, Message, Queue} from "rivr";
 import {
   JSONEventType,
-  KurrentDBClient,
+  KurrentDBClient, PersistentSubscriptionExistsError,
   PersistentSubscriptionToStream,
   PersistentSubscriptionToStreamSettings
 } from "@kurrent/kurrentdb-client"
@@ -50,11 +50,17 @@ class PersistentSubscriptionConsumption implements Consumption {
       }
     } = this.#opts
 
-    await client.createPersistentSubscriptionToStream(
-      `$et-${eventType}`,
-      groupName,
-      rest
-    )
+    try {
+      await client.createPersistentSubscriptionToStream(
+        `$et-${eventType}`,
+        groupName,
+        rest
+      )
+    } catch (error: unknown) {
+      if (!(error instanceof PersistentSubscriptionExistsError)) {
+        throw error
+      }
+    }
   }
 
   async #startConsuming(): Promise<void> {
