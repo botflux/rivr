@@ -80,7 +80,6 @@ describe('kurrentdb', function () {
     const randomMsg = randomMessage()
     let msg!: unknown
 
-
     const consumption = queue.consume({
       onMessage: async msg1 => {
         msg = msg1
@@ -99,6 +98,48 @@ describe('kurrentdb', function () {
     // Then
     await waitForPredicate(() => msg !== undefined, 5_000)
     t.assert.deepStrictEqual(msg, randomMsg)
+  })
+
+  test("should be able to call .start() multiple times", async (t: TestContext) => {
+    // Given
+    const queue = createQueue({
+      connectionString: kurrentdb.getConnectionString(),
+      createPersistentSubscriptionOpts: {
+        groupName: randomUUID(),
+        startFrom: "start",
+        resolveLinkTos: true,
+        extraStatistics: true,
+        messageTimeout: 10_000,
+        maxRetryCount: 10,
+        checkPointAfter: 3_000,
+        checkPointLowerBound: 10,
+        checkPointUpperBound: 100,
+        readBatchSize: 20,
+        liveBufferSize: 500,
+        historyBufferSize: 500,
+        consumerStrategyName: "RoundRobin",
+        maxSubscriberCount: "unbounded"
+      }
+    })
+
+    t.after(async () => {
+      await queue.disconnect()
+    })
+
+    const consumption = queue.consume({
+      onMessage: async msg => {}
+    })
+
+    t.after(async () => {
+      await consumption.stop()
+    })
+
+    await consumption.start()
+
+    // When
+    // Then
+    const mError = await consumption.start().catch(e => e)
+    t.assert.strictEqual(mError, undefined)
   })
 })
 

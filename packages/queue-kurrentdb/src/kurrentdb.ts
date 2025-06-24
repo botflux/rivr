@@ -29,6 +29,10 @@ class PersistentSubscriptionConsumption implements Consumption {
   }
 
   async start(): Promise<void> {
+    if (this.#subscription !== undefined) {
+      return
+    }
+
     await this.#ensurePersistentSubscriptionCreated()
     this.#startConsuming()
   }
