@@ -4,11 +4,12 @@ import {
   KurrentDBClient,
   PersistentSubscriptionExistsError,
   PersistentSubscriptionToStream,
-  PersistentSubscriptionToStreamSettings, SubscribeToPersistentSubscriptionToStreamOptions
+  PersistentSubscriptionToStreamSettings, SubscribeToPersistentSubscriptionToStreamOptions, UnavailableError
 } from "@kurrent/kurrentdb-client"
 import {JSONEventData} from "@kurrent/kurrentdb-client/dist/types/events";
 import {CreateQueueOpts} from "./public-types";
 import {DuplexOptions} from "node:stream";
+import { setTimeout } from "node:timers/promises"
 
 type KurrentDBQueueOpts = {
   connectionString: string
@@ -37,6 +38,7 @@ class PersistentSubscriptionConsumption implements Consumption {
   #opts: KurrentDBQueueOpts
   #consumeOpts: ConsumeOpts
   #subscription?: PersistentSubscriptionToStream<MessageEvent>
+  #stopReconnecting = false
 
   constructor(getClient: () => KurrentDBClient, opts: KurrentDBQueueOpts, consumeOpts: ConsumeOpts) {
     this.#getClient = getClient;
@@ -50,10 +52,12 @@ class PersistentSubscriptionConsumption implements Consumption {
     }
 
     await this.#ensurePersistentSubscriptionCreated()
+    this.#stopReconnecting = false
     this.#startConsuming()
   }
 
   async stop(): Promise<void> {
+    this.#stopReconnecting = true
     await this.#subscription?.unsubscribe()
   }
 
@@ -78,42 +82,48 @@ class PersistentSubscriptionConsumption implements Consumption {
   }
 
   async #startConsuming(): Promise<void> {
-    try {
-      const client = this.#getClient()
+    while (!this.#stopReconnecting) {
+      try {
+        const client = this.#getClient()
 
-      const subscription = client.subscribeToPersistentSubscriptionToStream<MessageEvent>(
-        `$ce-${streamPrefix}${this.#opts.streamInfix}`,
-        this.#opts.groupName,
-        this.#opts.subscribeOpts,
-        this.#opts.duplexOpts
-      )
+        const subscription = client.subscribeToPersistentSubscriptionToStream<MessageEvent>(
+          `$ce-${streamPrefix}${this.#opts.streamInfix}`,
+          this.#opts.groupName,
+          this.#opts.subscribeOpts,
+          this.#opts.duplexOpts
+        )
 
-      this.#subscription = subscription
+        this.#subscription = subscription
 
-      for await (const event of subscription) {
-        try {
-          const { event: e } = event
+        for await (const event of subscription) {
+          try {
+            const { event: e } = event
 
-          if (e === undefined) {
-            console.warn("event is undefined")
-            continue
+            if (e === undefined) {
+              console.warn("event is undefined")
+              continue
+            }
+
+            const { data } = e
+            const { pickAfter, createdAt, ...rest } = data
+
+            await this.#consumeOpts.onMessage({
+              ...rest,
+              ...pickAfter !== undefined && { pickAfter: new Date(pickAfter) },
+              createdAt: new Date(createdAt)
+            })
+            await subscription.ack(event)
+          } catch (error: unknown) {
+            await subscription.nack("retry", "failed to process event", event)
           }
-
-          const { data } = e
-          const { pickAfter, createdAt, ...rest } = data
-
-          await this.#consumeOpts.onMessage({
-            ...rest,
-            ...pickAfter !== undefined && { pickAfter: new Date(pickAfter) },
-            createdAt: new Date(createdAt)
-          })
-          await subscription.ack(event)
-        } catch (error: unknown) {
-          await subscription.nack("retry", "failed to process event", event)
         }
+      } catch (e: unknown) {
+        if (!(e instanceof UnavailableError)) {
+          throw e
+        }
+        console.log("error consuming the subscription from kurrentdb", e)
+        await setTimeout(500)
       }
-    } catch (e: unknown) {
-      console.error("error while consuming a kurrentdb stream", e)
     }
   }
 }

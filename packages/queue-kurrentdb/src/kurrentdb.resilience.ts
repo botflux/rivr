@@ -78,9 +78,80 @@ describe('kurrentdb resilience', function () {
     t.assert.notStrictEqual(outageError, undefined)
     t.assert.strictEqual(recoveryError, undefined)
   })
+
+  test("should be able to reconnect into the persistent subscription in case of a kurrentdb failure", async (t: TestContext) => {
+    // Given
+    const proxy = await toxiproxy.createProxy({
+      enabled: true,
+      name: `kurrentdb-${randomUUID()}`,
+      upstream: `kurrentdb:2113`
+    })
+
+    t.after(async () => {
+      await proxy.instance.remove()
+    })
+
+    const groupName = randomUUID();
+    const streamInfix = randomInfix();
+
+    const unstable = createQueue({
+      connectionString: `kurrentdb://${proxy.host}:${proxy.port}?tls=false`,
+      createSubscriptionOpts: {
+        groupName
+      },
+      streamInfix
+    })
+
+    t.after(async () => {
+      await unstable.disconnect()
+    })
+
+    const stable = createQueue({
+      connectionString: kurrentdb.getConnectionString(),
+      createSubscriptionOpts: {
+        groupName
+      },
+      streamInfix
+    })
+
+    const receivedMessages: Message[] = []
+    const consumption = unstable.consume({
+      onMessage: async (msg) => {
+        receivedMessages.push(msg)
+      }
+    })
+
+    t.after(async () => {
+      await consumption.stop()
+    })
+
+    await consumption.start()
+
+    const firstMessage = randomMessage()
+    await stable.produce([firstMessage])
+
+    await waitForPredicate(() => receivedMessages.length === 1, 5_000)
+
+    // When
+    await proxy.setEnabled(false)
+    const secondMessage = randomMessage()
+    await stable.produce([secondMessage])
+
+    await proxy.setEnabled(true)
+
+    // Then - should be able to receive messages after reconnection
+    await waitForPredicate(() => receivedMessages.length === 2, 5_000)
+    t.assert.strictEqual(receivedMessages.length, 2)
+    t.assert.deepStrictEqual(receivedMessages, [ firstMessage, secondMessage ])
+  })
 })
 
-
+async function waitForPredicate(fn: () => boolean, ms = 5_000) {
+  let now = new Date().getTime()
+  while (!fn() && new Date().getTime() - now < ms) {
+    await setTimeout(20)
+  }
+}
 
 function randomInfix() {
   return randomUUID().replace("-", "").substring(0, 7)
