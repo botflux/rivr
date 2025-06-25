@@ -10,6 +10,7 @@ import {JSONEventData} from "@kurrent/kurrentdb-client/dist/types/events";
 type KurrentDBQueueOpts = {
   connectionString: string
   createPersistentSubscriptionOpts: CreatePersistentSubscriptionOpts
+  streamNameFromMessage: (msg: Message) => string
 }
 
 const eventType = "rivr-message" as const
@@ -115,19 +116,20 @@ class KurrentDBQueue implements Queue<never> {
 
   async produce(messages: Message[], opts?: undefined): Promise<void> {
     const client = this.#getClient()
+    const messagesByStream = Array.from(this.#groupMessagesByStream(messages).entries())
+    const eventsByStream = messagesByStream.map(([ stream, messages ]) => [
+      stream,
+      messages.map(msg => ({
+        type: "rivr-message",
+        id: msg.id,
+        contentType: "application/json",
+        data: msg,
+        metadata: {}
+      } as JSONEventData<KurrentEventType>))
+    ] as const)
 
-    const events: JSONEventData<KurrentEventType>[] = messages.map(msg => ({
-      type: "rivr-message",
-      id: msg.id,
-      contentType: "application/json",
-      data: msg,
-      metadata: {}
-    }))
-
-    await client.appendToStream(
-      "rivr-v1",
-      events,
-    )
+    await Promise.all(eventsByStream.map(([ stream, events ]) =>
+      client.appendToStream(stream, events)))
   }
 
   supportsDelayedMessages(): boolean {
@@ -153,11 +155,36 @@ class KurrentDBQueue implements Queue<never> {
 
     return this.#client
   }
+
+  #groupMessagesByStream(messages: Message[]): Map<string, Message[]> {
+    return messages.reduce(
+      (map, message) => {
+        const streamName = this.#opts.streamNameFromMessage(message)
+        const existing = map.get(streamName) ?? []
+
+        return map.set(streamName, [ ...existing, message ])
+      },
+      new Map<string, Message[]>()
+    )
+  }
 }
 
 export type CreateQueueOpts = {
   connectionString: string
   createPersistentSubscriptionOpts: CreatePersistentSubscriptionOpts
+  /**
+   * Build the stream name from a message.
+   * This function allows to shard the queue in multiple streams.
+   * Sharding the queue enables you to delete old stream easily.
+   *
+   * By default, the queue is sharded by hour.
+   *
+   * Depending on your workload, you may want to select another
+   * suffix, such as a stream per minute, or a stream per day.
+   *
+   * @param msg
+   */
+  streamNameFromMessage?: (msg: Message) => string
 }
 
 export type CreatePersistentSubscriptionOpts = {
@@ -166,10 +193,18 @@ export type CreatePersistentSubscriptionOpts = {
 
 export function createQueue(opts: CreateQueueOpts): Queue<never> {
   const {
+    streamNameFromMessage = shardQueueByHour,
     ...rest
   } = opts
 
   return new KurrentDBQueue({
     ...rest,
+    streamNameFromMessage
   })
+}
+
+function shardQueueByHour (msg: Message): string {
+  const date = msg.createdAt.toISOString().substring(0, 13)
+
+  return `rivr-messages-${date}`
 }
