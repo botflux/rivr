@@ -9,7 +9,9 @@
     "testcontainers": "^11.0.3"
   },
   "scripts": {
-    "test": "borp --timeout 60000 \"*.test.ts\""
+    "test": "borp --timeout 60000 \"*.test.ts\"",
+    "test:only": "borp --only --timeout 60000 \"*.test.ts\"",
+    "sandbox": "ts-node ./src/sandbox.ts"
   },
   "repository": {
     "type": "git",
@@ -26,6 +28,7 @@
   },
   "homepage": "https://github.com/botflux/rivr#readme",
   "devDependencies": {
-    "@types/node": "^24.0.4"
+    "@types/node": "^24.0.4",
+    "ts-node": "^10.9.2"
   }
 }

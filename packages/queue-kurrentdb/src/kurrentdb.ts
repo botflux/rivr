@@ -3,26 +3,37 @@ import {
   JSONEventType,
   KurrentDBClient,
   PersistentSubscriptionExistsError,
-  PersistentSubscriptionToStream
+  PersistentSubscriptionToStream,
+  PersistentSubscriptionToStreamSettings
 } from "@kurrent/kurrentdb-client"
 import {JSONEventData} from "@kurrent/kurrentdb-client/dist/types/events";
-import {CreatePersistentSubscriptionOpts, CreateQueueOpts} from "./public-types";
+import {CreateQueueOpts} from "./public-types";
 
 type KurrentDBQueueOpts = {
   connectionString: string
-  createPersistentSubscriptionOpts: CreatePersistentSubscriptionOpts
+  groupName: string
+  persistentSubscriptionCreationOpts: PersistentSubscriptionToStreamSettings
   partitionStream: (msg: Message) => string
+  streamInfix: string
 }
 
-const eventType = "rivr-message" as const
+type RawMessage = Omit<Message, "pickAfter" | "createdAt"> & {
+  pickAfter?: string
+  createdAt: string
+}
 
-type KurrentEventType = JSONEventType<typeof eventType, Record<never, never>, Record<string, never>>
+const streamPrefix = "RivrMessages"
+
+type MessageEvent = JSONEventData<JSONEventType<
+  "rivr_message_created",
+  RawMessage
+>>
 
 class PersistentSubscriptionConsumption implements Consumption {
   #getClient: () => KurrentDBClient
   #opts: KurrentDBQueueOpts
   #consumeOpts: ConsumeOpts
-  #subscription?: PersistentSubscriptionToStream<JSONEventData<KurrentEventType>>
+  #subscription?: PersistentSubscriptionToStream<MessageEvent>
 
   constructor(getClient: () => KurrentDBClient, opts: KurrentDBQueueOpts, consumeOpts: ConsumeOpts) {
     this.#getClient = getClient;
@@ -46,17 +57,15 @@ class PersistentSubscriptionConsumption implements Consumption {
   async #ensurePersistentSubscriptionCreated() {
     const client = this.#getClient()
     const {
-      createPersistentSubscriptionOpts: {
-        groupName = "rivr-messages",
-        ...rest
-      }
+      persistentSubscriptionCreationOpts,
+      groupName
     } = this.#opts
 
     try {
       await client.createPersistentSubscriptionToStream(
-        `$et-${eventType}`,
+        `$ce-${streamPrefix}${this.#opts.streamInfix}`,
         groupName,
-        rest
+        persistentSubscriptionCreationOpts
       )
     } catch (error: unknown) {
       if (!(error instanceof PersistentSubscriptionExistsError)) {
@@ -69,9 +78,9 @@ class PersistentSubscriptionConsumption implements Consumption {
     try {
       const client = this.#getClient()
 
-      const subscription = client.subscribeToPersistentSubscriptionToStream<JSONEventData<KurrentEventType>>(
-        `$et-${eventType}`,
-        this.#opts.createPersistentSubscriptionOpts.groupName ?? "rivr-consumers",
+      const subscription = client.subscribeToPersistentSubscriptionToStream<MessageEvent>(
+        `$ce-${streamPrefix}${this.#opts.streamInfix}`,
+        this.#opts.groupName,
         {
           bufferSize: 100,
         },
@@ -89,7 +98,7 @@ class PersistentSubscriptionConsumption implements Consumption {
           }
 
           const { data } = e
-          const { pickAfter, createdAt, ...rest } = data as Message
+          const { pickAfter, createdAt, ...rest } = data
 
           await this.#consumeOpts.onMessage({
             ...rest,
@@ -119,14 +128,18 @@ class KurrentDBQueue implements Queue<never> {
     const client = this.#getClient()
     const messagesByStream = Array.from(this.#groupMessagesByStream(messages).entries())
     const eventsByStream = messagesByStream.map(([ stream, messages ]) => [
-      stream,
-      messages.map(msg => ({
-        type: "rivr-message",
-        id: msg.id,
+      `${streamPrefix}${this.#opts.streamInfix}-${stream}`,
+      messages.map(({ createdAt, pickAfter, ...rest }) => ({
+        type: "rivr_message_created",
+        id: rest.id,
         contentType: "application/json",
-        data: msg,
+        data: {
+          ...rest,
+          createdAt: createdAt.toISOString(),
+          ...pickAfter !== undefined && { pickAfter: pickAfter.toISOString() },
+        },
         metadata: {}
-      } as JSONEventData<KurrentEventType>))
+      } as MessageEvent))
     ] as const)
 
     await Promise.all(eventsByStream.map(([ stream, events ]) =>
@@ -173,17 +186,45 @@ class KurrentDBQueue implements Queue<never> {
 export function createQueue(opts: CreateQueueOpts): Queue<never> {
   const {
     partitionStream = shardQueueByHour,
+    createSubscriptionOpts: {
+      groupName = "rivr-consumers",
+      messageTimeout = 30_000,
+      checkPointAfter = 2_000,
+      checkPointLowerBound = 10,
+      checkPointUpperBound = 1_000,
+      consumerStrategyName = "RoundRobin",
+      extraStatistics = false,
+      historyBufferSize = 500,
+      liveBufferSize = 500,
+      maxRetryCount = 10,
+      maxSubscriberCount = "unbounded",
+      readBatchSize = 20,
+    } = {},
     ...rest
   } = opts
 
   return new KurrentDBQueue({
     ...rest,
-    partitionStream: partitionStream
+    partitionStream: partitionStream,
+    groupName,
+    persistentSubscriptionCreationOpts: {
+      resolveLinkTos: true,
+      messageTimeout,
+      maxSubscriberCount,
+      consumerStrategyName,
+      historyBufferSize,
+      liveBufferSize,
+      readBatchSize,
+      checkPointUpperBound,
+      checkPointLowerBound,
+      checkPointAfter,
+      startFrom: "start",
+      maxRetryCount,
+      extraStatistics,
+    }
   })
 }
 
 function shardQueueByHour (msg: Message): string {
-  const date = msg.createdAt.toISOString().substring(0, 13)
-
-  return `rivr-messages-${date}`
+  return msg.createdAt.toISOString().substring(0, 13)
 }

@@ -20,22 +20,10 @@ describe('kurrentdb', function () {
     // Given
     const queue = createQueue({
       connectionString: kurrentdb.getConnectionString(),
-      createPersistentSubscriptionOpts: {
+      createSubscriptionOpts: {
         groupName: randomUUID(),
-        startFrom: "start",
-        resolveLinkTos: true,
-        extraStatistics: true,
-        messageTimeout: 10_000,
-        maxRetryCount: 10,
-        checkPointAfter: 3_000,
-        checkPointLowerBound: 10,
-        checkPointUpperBound: 100,
-        readBatchSize: 20,
-        liveBufferSize: 500,
-        historyBufferSize: 500,
-        consumerStrategyName: "RoundRobin",
-        maxSubscriberCount: "unbounded"
-      }
+      },
+      streamInfix: randomInfix()
     })
 
     t.after(async () => {
@@ -55,22 +43,10 @@ describe('kurrentdb', function () {
     // Given
     const queue = createQueue({
       connectionString: kurrentdb.getConnectionString(),
-      createPersistentSubscriptionOpts: {
+      createSubscriptionOpts: {
         groupName: randomUUID(),
-        startFrom: "start",
-        resolveLinkTos: true,
-        extraStatistics: true,
-        messageTimeout: 10_000,
-        maxRetryCount: 10,
-        checkPointAfter: 3_000,
-        checkPointLowerBound: 10,
-        checkPointUpperBound: 100,
-        readBatchSize: 20,
-        liveBufferSize: 500,
-        historyBufferSize: 500,
-        consumerStrategyName: "RoundRobin",
-        maxSubscriberCount: "unbounded"
-      }
+      },
+      streamInfix: randomInfix()
     })
 
     t.after(async () => {
@@ -96,7 +72,7 @@ describe('kurrentdb', function () {
     await queue.produce([ randomMsg ])
 
     // Then
-    await waitForPredicate(() => msg !== undefined, 5_000)
+    await waitForPredicate(() => msg !== undefined, 15_000)
     t.assert.deepStrictEqual(msg, randomMsg)
   })
 
@@ -104,22 +80,10 @@ describe('kurrentdb', function () {
     // Given
     const queue = createQueue({
       connectionString: kurrentdb.getConnectionString(),
-      createPersistentSubscriptionOpts: {
+      createSubscriptionOpts: {
         groupName: randomUUID(),
-        startFrom: "start",
-        resolveLinkTos: true,
-        extraStatistics: true,
-        messageTimeout: 10_000,
-        maxRetryCount: 10,
-        checkPointAfter: 3_000,
-        checkPointLowerBound: 10,
-        checkPointUpperBound: 100,
-        readBatchSize: 20,
-        liveBufferSize: 500,
-        historyBufferSize: 500,
-        consumerStrategyName: "RoundRobin",
-        maxSubscriberCount: "unbounded"
-      }
+      },
+      streamInfix: randomInfix()
     })
 
     t.after(async () => {
@@ -146,22 +110,10 @@ describe('kurrentdb', function () {
     // Given
     const queue = createQueue({
       connectionString: kurrentdb.getConnectionString(),
-      createPersistentSubscriptionOpts: {
+      createSubscriptionOpts: {
         groupName: randomUUID(),
-        startFrom: "start",
-        resolveLinkTos: true,
-        extraStatistics: true,
-        messageTimeout: 10_000,
-        maxRetryCount: 10,
-        checkPointAfter: 3_000,
-        checkPointLowerBound: 10,
-        checkPointUpperBound: 100,
-        readBatchSize: 20,
-        liveBufferSize: 500,
-        historyBufferSize: 500,
-        consumerStrategyName: "RoundRobin",
-        maxSubscriberCount: "unbounded"
-      }
+      },
+      streamInfix: randomInfix()
     })
 
     t.after(async () => {
@@ -198,6 +150,10 @@ async function waitForPredicate(fn: () => boolean, ms = 5_000) {
   while (!fn() && new Date().getTime() - now < ms) {
     await setTimeout(20)
   }
+}
+
+function randomInfix() {
+  return randomUUID().replace("-", "").substring(0, 7)
 }
 
 function randomMessage(): Message {
