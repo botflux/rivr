@@ -185,6 +185,12 @@ class KurrentDBQueue implements Queue<never> {
   }
 }
 
+export class RivrInvalidStreamInfixError extends Error {
+  constructor(invalidInfix: string) {
+    super(`Cannot use '${invalidInfix}' as an infix because it contains '-'. This limitation is due to the consumption implementation that is based on category stream ('$ce-')`);
+  }
+}
+
 export function createQueue(opts: CreateQueueOpts): Queue<never> {
   const {
     partitionStream = shardQueueByHour,
@@ -202,11 +208,17 @@ export function createQueue(opts: CreateQueueOpts): Queue<never> {
       maxSubscriberCount = "unbounded",
       readBatchSize = 20,
     } = {},
+    streamInfix,
     ...rest
   } = opts
 
+  if (streamInfix.includes("-")) {
+    throw new RivrInvalidStreamInfixError(streamInfix)
+  }
+
   return new KurrentDBQueue({
     ...rest,
+    streamInfix,
     partitionStream: partitionStream,
     groupName,
     persistentSubscriptionCreationOpts: {

@@ -1,6 +1,6 @@
 import {after, before, describe, test, TestContext} from "node:test"
 import {KurrentDbContainer, StartedKurrentDbContainer} from "@testcontainers/kurrentdb"
-import {createQueue} from "./kurrentdb";
+import {createQueue, RivrInvalidStreamInfixError} from "./kurrentdb";
 import {Message} from "rivr";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
@@ -142,6 +142,16 @@ describe('kurrentdb', function () {
     // Then
     const mError = await consumption2.start().catch(e => e)
     t.assert.strictEqual(mError, undefined)
+  })
+  
+  test("should be able to ensure the infix does not contain '-'", (t) => {
+    // Given
+    // When
+    // Then
+    t.assert.throws(
+      () => createQueue({ streamInfix: "foo-bar", connectionString: "" }),
+      new RivrInvalidStreamInfixError("foo-bar")
+    )
   })
 })
 
