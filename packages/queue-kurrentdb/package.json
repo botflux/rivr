@@ -11,6 +11,7 @@
   "scripts": {
     "test": "borp --timeout 60000 \"*.test.ts\"",
     "test:only": "borp --only --timeout 60000 \"*.test.ts\"",
+    "test:resilience": "borp --timeout 120000 \"*.resilience.ts\"",
     "sandbox": "ts-node ./src/sandbox.ts"
   },
   "repository": {
@@ -28,6 +29,7 @@
   },
   "homepage": "https://github.com/botflux/rivr#readme",
   "devDependencies": {
+    "@testcontainers/toxiproxy": "^11.0.3",
     "@types/node": "^24.0.4",
     "ts-node": "^10.9.2"
   }
