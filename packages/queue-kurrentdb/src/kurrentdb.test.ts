@@ -1,7 +1,7 @@
 import {after, before, describe, test, TestContext} from "node:test"
 import {KurrentDbContainer, StartedKurrentDbContainer} from "@testcontainers/kurrentdb"
 import {createQueue, RivrInvalidStreamInfixError} from "./kurrentdb";
-import {Message} from "rivr";
+import {advancedFlow, basicFlow, Message} from "rivr";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
 
@@ -153,6 +153,17 @@ describe('kurrentdb', function () {
       new RivrInvalidStreamInfixError("foo-bar")
     )
   })
+
+  const makeQueue = () => createQueue({
+    connectionString: kurrentdb.getConnectionString(),
+    streamInfix: randomInfix(),
+    createSubscriptionOpts: {
+      groupName: randomUUID(),
+    },
+  })
+
+  basicFlow({ createQueue: makeQueue })
+  advancedFlow({ createQueue: makeQueue })
 })
 
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {
