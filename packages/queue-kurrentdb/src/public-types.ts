@@ -1,6 +1,8 @@
 import {Message} from "rivr";
 import {UNBOUNDED} from "@kurrent/kurrentdb-client/dist/constants";
 import type {ConsumerStrategy} from "@kurrent/kurrentdb-client/dist/types";
+import {SubscribeToPersistentSubscriptionToStreamOptions} from "@kurrent/kurrentdb-client";
+import {DuplexOptions} from "node:stream";
 
 export type CreateQueueOpts = {
   connectionString: string
@@ -17,6 +19,9 @@ export type CreateQueueOpts = {
   streamInfix: string
 
   createSubscriptionOpts?: CreatePersistentSubscriptionOpts
+  subscribeOpts?: SubscribeToPersistentSubscriptionToStreamOptions
+  subscribeDuplexOpts?: DuplexOptions
+
   /**
    * Build the stream name from a message.
    * This function allows to shard the queue in multiple streams.

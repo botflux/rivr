@@ -4,15 +4,18 @@ import {
   KurrentDBClient,
   PersistentSubscriptionExistsError,
   PersistentSubscriptionToStream,
-  PersistentSubscriptionToStreamSettings
+  PersistentSubscriptionToStreamSettings, SubscribeToPersistentSubscriptionToStreamOptions
 } from "@kurrent/kurrentdb-client"
 import {JSONEventData} from "@kurrent/kurrentdb-client/dist/types/events";
 import {CreateQueueOpts} from "./public-types";
+import {DuplexOptions} from "node:stream";
 
 type KurrentDBQueueOpts = {
   connectionString: string
   groupName: string
   persistentSubscriptionCreationOpts: PersistentSubscriptionToStreamSettings
+  subscribeOpts?: SubscribeToPersistentSubscriptionToStreamOptions
+  duplexOpts?: DuplexOptions
   partitionStream: (msg: Message) => string
   streamInfix: string
 }
@@ -81,9 +84,8 @@ class PersistentSubscriptionConsumption implements Consumption {
       const subscription = client.subscribeToPersistentSubscriptionToStream<MessageEvent>(
         `$ce-${streamPrefix}${this.#opts.streamInfix}`,
         this.#opts.groupName,
-        {
-          bufferSize: 100,
-        },
+        this.#opts.subscribeOpts,
+        this.#opts.duplexOpts
       )
 
       this.#subscription = subscription
