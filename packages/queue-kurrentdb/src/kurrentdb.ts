@@ -1,16 +1,17 @@
 import {ConsumeOpts, Consumption, Message, Queue} from "rivr";
 import {
   JSONEventType,
-  KurrentDBClient, PersistentSubscriptionExistsError,
-  PersistentSubscriptionToStream,
-  PersistentSubscriptionToStreamSettings
+  KurrentDBClient,
+  PersistentSubscriptionExistsError,
+  PersistentSubscriptionToStream
 } from "@kurrent/kurrentdb-client"
 import {JSONEventData} from "@kurrent/kurrentdb-client/dist/types/events";
+import {CreatePersistentSubscriptionOpts, CreateQueueOpts} from "./public-types";
 
 type KurrentDBQueueOpts = {
   connectionString: string
   createPersistentSubscriptionOpts: CreatePersistentSubscriptionOpts
-  streamNameFromMessage: (msg: Message) => string
+  partitionStream: (msg: Message) => string
 }
 
 const eventType = "rivr-message" as const
@@ -159,7 +160,7 @@ class KurrentDBQueue implements Queue<never> {
   #groupMessagesByStream(messages: Message[]): Map<string, Message[]> {
     return messages.reduce(
       (map, message) => {
-        const streamName = this.#opts.streamNameFromMessage(message)
+        const streamName = this.#opts.partitionStream(message)
         const existing = map.get(streamName) ?? []
 
         return map.set(streamName, [ ...existing, message ])
@@ -169,37 +170,15 @@ class KurrentDBQueue implements Queue<never> {
   }
 }
 
-export type CreateQueueOpts = {
-  connectionString: string
-  createPersistentSubscriptionOpts: CreatePersistentSubscriptionOpts
-  /**
-   * Build the stream name from a message.
-   * This function allows to shard the queue in multiple streams.
-   * Sharding the queue enables you to delete old stream easily.
-   *
-   * By default, the queue is sharded by hour.
-   *
-   * Depending on your workload, you may want to select another
-   * suffix, such as a stream per minute, or a stream per day.
-   *
-   * @param msg
-   */
-  streamNameFromMessage?: (msg: Message) => string
-}
-
-export type CreatePersistentSubscriptionOpts = {
-  groupName?: string
-} & PersistentSubscriptionToStreamSettings
-
 export function createQueue(opts: CreateQueueOpts): Queue<never> {
   const {
-    streamNameFromMessage = shardQueueByHour,
+    partitionStream = shardQueueByHour,
     ...rest
   } = opts
 
   return new KurrentDBQueue({
     ...rest,
-    streamNameFromMessage
+    partitionStream: partitionStream
   })
 }
 
