@@ -99,3 +99,9 @@ export type CreatePersistentSubscriptionOpts = {
    */
   consumerStrategyName?: ConsumerStrategy | string;
 }
+
+export class RivrInvalidStreamInfixError extends Error {
+  constructor(invalidInfix: string) {
+    super(`Cannot use '${invalidInfix}' as an infix because it contains '-'. This limitation is due to the consumption implementation that is based on category stream ('$ce-')`);
+  }
+}

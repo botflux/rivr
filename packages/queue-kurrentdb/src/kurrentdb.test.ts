@@ -1,9 +1,11 @@
 import {after, before, describe, test, TestContext} from "node:test"
 import {KurrentDbContainer, StartedKurrentDbContainer} from "@testcontainers/kurrentdb"
-import {createQueue, createStorage, RivrInvalidStreamInfixError} from "./kurrentdb";
+import {createQueue} from "./kurrentdb";
 import {advancedFlow, basicFlow, Message, WorkflowState} from "rivr";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
+import {createStorage} from "./storage";
+import {RivrInvalidStreamInfixError} from "./public-types";
 
 describe('kurrentdb', function () {
   let kurrentdb!: StartedKurrentDbContainer
