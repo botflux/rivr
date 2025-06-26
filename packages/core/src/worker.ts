@@ -3,7 +3,7 @@ import {updateWorkflowState, WorkflowState} from "./workflow/state/state";
 import {ReadyWorkflow, Step, StepResult, Workflow} from "./workflow/types";
 import {randomUUID} from "crypto";
 import {isOutboxState} from "./outbox/handler";
-import {OutboxState} from "./outbox/types";
+import {OutboxMessage, OutboxState} from "./outbox/types";
 
 export type OnError = (error: unknown) => void
 
@@ -27,68 +27,39 @@ export interface Worker {
   addHook(hook: "error", fn: OnError): void
 }
 
-class DefaultWorker implements Worker {
-  #opts: CreateWorkerOpts
-  #consumptions: Consumption[] = []
-  #onErrorHooks: OnError[] = []
+export interface MessageHandler<T> {
+  support(message: Message): message is Message & { payload: T }
+  handle(message: Message & { payload: T }): Promise<Message[]>
+}
 
-  constructor(opts: CreateWorkerOpts) {
-    this.#opts = opts;
+class WorkflowMessageHandler implements MessageHandler<WorkflowState<unknown>> {
+  #workflows: Workflow<any, any, Record<string, never>, Record<never, never>>[]
+
+  constructor(workflows: Workflow<any, any, Record<string, never>, Record<never, never>>[]) {
+    this.#workflows = workflows;
   }
 
-  async start(): Promise<void> {
-    await Promise.all(this.#opts.workflows.map(w => w.ready()))
+  support(message: Message): message is Message & { payload: WorkflowState<unknown> } {
+    const { payload } = message
 
-    const { primary, secondaries = [] } = this.#opts
-    const queues = [ primary, ...secondaries ]
-
-    this.#consumptions = queues.map(queue => queue.consume({
-      onMessage: async msg => {
-        const { payload } = msg
-
-        if (this.#isWorkflowState(payload)) {
-          await this.#handleWorkflow(payload)
-        } else if (isOutboxState(payload)) {
-          await this.#handleOutbox(payload)
-        } else {
-          console.warn("unknown message", msg)
-        }
-
-      }
-    }))
-
-    await Promise.all(
-      this.#consumptions.map(c => c.start())
-    )
-  }
-
-  async stop(): Promise<void> {
-    await Promise.all(this.#consumptions.map(c => c.stop()))
-  }
-
-  addHook(hook: "error", fn: OnError): this {
-    this.#onErrorHooks.push(fn)
-    return this
-  }
-
-  #isWorkflowState(payload: unknown): payload is WorkflowState<unknown> {
     return typeof payload === "object" && payload !== null
       && "name" in payload && typeof payload.name === "string"
   }
 
-  async #handleWorkflow(state: WorkflowState<unknown>) {
-    const mWorkflow = this.#opts.workflows.find(w => w.name === state.name)
+  async handle(message: Message & { payload: WorkflowState<unknown> }): Promise<Message[]> {
+    const { payload: state } = message
+    const mWorkflow = this.#workflows.find(w => w.name === state.name)
 
     if (!mWorkflow) {
       console.warn(`State '${state.id}' references to workflow '${state.name}' which was not passed to the worker`)
-      return
+      return []
     }
 
     const mStepAndExecutionContext = mWorkflow.getStepByName(state.toExecute.step)
 
     if (!mStepAndExecutionContext) {
       console.warn(`State '${state.id}' references to an unknown step '${state.toExecute.step}'`)
-      return
+      return []
     }
 
     const { item: step, context } = mStepAndExecutionContext
@@ -119,7 +90,7 @@ class DefaultWorker implements Worker {
     }
 
     if (newState.status === "in_progress") {
-      await this.#produce([
+      return [
         {
           id: randomUUID(),
           type: "workflow",
@@ -127,10 +98,12 @@ class DefaultWorker implements Worker {
           ...newState.toExecute.pickAfter !== undefined && { pickAfter: newState.toExecute.pickAfter },
           createdAt: new Date()
         }
-      ])
+      ]
     }
+
+    return []
   }
-  
+
   async #executeHandler(
     step: Step,
     context: ReadyWorkflow<unknown, unknown, Record<string, never>, Record<never, never>>,
@@ -160,9 +133,58 @@ class DefaultWorker implements Worker {
       && "type" in value && typeof value.type === "string"
       && [ "stopped", "success", "failure", "skipped" ].includes(value.type)
   }
+}
 
-  async #handleOutbox(state: OutboxState) {
-    await this.#produce([ state.payload ])
+class OutboxMessageHandler implements MessageHandler<OutboxMessage> {
+    support(message: Message): message is Message & { payload: OutboxMessage; } {
+      return isOutboxState(message.payload)
+    }
+    async handle(message: Message & { payload: OutboxMessage; }): Promise<Message[]> {
+        return [ message ]
+    }
+}
+
+class DefaultWorker implements Worker {
+  #opts: CreateWorkerOpts
+  #handlers: MessageHandler<unknown>[]
+  #consumptions: Consumption[] = []
+  #onErrorHooks: OnError[] = []
+
+  constructor(opts: CreateWorkerOpts, handlers: MessageHandler<unknown>[]) {
+    this.#opts = opts;
+    this.#handlers = handlers;
+  }
+
+  async start(): Promise<void> {
+    await Promise.all(this.#opts.workflows.map(w => w.ready()))
+
+    const { primary, secondaries = [] } = this.#opts
+    const queues = [ primary, ...secondaries ]
+
+    this.#consumptions = queues.map(queue => queue.consume({
+      onMessage: async msg => {
+        for (const handler of this.#handlers) {
+          if (handler.support(msg)) {
+            const messages = await handler.handle(msg)
+
+            await this.#produce(messages)
+          }
+        }
+      }
+    }))
+
+    await Promise.all(
+      this.#consumptions.map(c => c.start())
+    )
+  }
+
+  async stop(): Promise<void> {
+    await Promise.all(this.#consumptions.map(c => c.stop()))
+  }
+
+  addHook(hook: "error", fn: OnError): this {
+    this.#onErrorHooks.push(fn)
+    return this
   }
 
   async #produce(messages: Message[]) {
@@ -201,8 +223,18 @@ export type CreateWorkerOpts = {
    * The workflows the worker must execute.
    */
   workflows: Workflow<any, any, Record<string, never>, Record<never, never>>[]
+
+  /**
+   * Custom handlers allow you to execute your own logic based on the
+   * message produced in the queue.
+   */
+  customHandlers?: MessageHandler<unknown>[]
 }
 
 export function createWorker (opts: CreateWorkerOpts): Worker {
-  return new DefaultWorker(opts)
+  const workflowHandler = new WorkflowMessageHandler(opts.workflows)
+  const outboxHandler = new OutboxMessageHandler()
+  const handlers = [ workflowHandler, outboxHandler, ...opts.customHandlers ?? [] ]
+
+  return new DefaultWorker(opts, handlers)
 }

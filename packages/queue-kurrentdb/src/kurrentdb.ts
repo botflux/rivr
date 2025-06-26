@@ -348,3 +348,7 @@ export function createStorage(opts: CreateStorageOpts): WorkflowStateStorage {
   
   return new KurrentDBWorkflowStateStorage(opts)
 }
+
+export function triggerWorkflowFromPersistentSubscription() {
+
+}
