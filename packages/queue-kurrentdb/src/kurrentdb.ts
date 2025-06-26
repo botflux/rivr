@@ -5,10 +5,13 @@ import {
   KurrentDBClient,
   PersistentSubscriptionExistsError,
   PersistentSubscriptionToStream,
-  PersistentSubscriptionToStreamSettings, SubscribeToPersistentSubscriptionToStreamOptions, UnavailableError
+  PersistentSubscriptionToStreamSettings, RecordedEvent,
+  RecordedEventToEventType,
+  SubscribeToPersistentSubscriptionToStreamOptions,
+  UnavailableError
 } from "@kurrent/kurrentdb-client"
 import {JSONEventData} from "@kurrent/kurrentdb-client/dist/types/events";
-import {CreateQueueOpts} from "./public-types";
+import {CreatePersistentSubscriptionOpts, CreateQueueOpts} from "./public-types";
 import {DuplexOptions} from "node:stream";
 import { setTimeout } from "node:timers/promises"
 
@@ -37,15 +40,23 @@ type MessageEvent = JSONEventData<JSONEventType<
 
 class PersistentSubscriptionConsumption<T extends JSONEventType> implements Consumption {
   #getClient: () => KurrentDBClient
-  #opts: KurrentDBQueueOpts
-  #handler: (event: EventTypeToRecordedEvent<T>) => Promise<void>
+  #streamToSubscribe: string
+  #groupName: string
+  #persistentSubscriptionCreationOpts: PersistentSubscriptionToStreamSettings
+  #subscribeOpts?: SubscribeToPersistentSubscriptionToStreamOptions
+  #duplexOpts?: DuplexOptions
+  #handler: (event: RecordedEvent<T>) => Promise<void>
   #subscription?: PersistentSubscriptionToStream<T>
   #stopReconnecting = false
 
-  constructor(getClient: () => KurrentDBClient, opts: KurrentDBQueueOpts, handler: (event: EventTypeToRecordedEvent<T>) => Promise<void>) {
+  constructor(getClient: () => KurrentDBClient, streamToSubscribe: string, groupName: string, persistentSubscriptionCreationOpts: PersistentSubscriptionToStreamSettings, subscribeOpts: SubscribeToPersistentSubscriptionToStreamOptions, duplexOpts: DuplexOptions, handler: (event: RecordedEvent<T>) => Promise<void>) {
     this.#getClient = getClient;
-    this.#opts = opts;
-    this.#handler = handler
+    this.#streamToSubscribe = streamToSubscribe;
+    this.#groupName = groupName;
+    this.#persistentSubscriptionCreationOpts = persistentSubscriptionCreationOpts;
+    this.#subscribeOpts = subscribeOpts;
+    this.#duplexOpts = duplexOpts;
+    this.#handler = handler;
   }
 
   async start(): Promise<void> {
@@ -65,16 +76,12 @@ class PersistentSubscriptionConsumption<T extends JSONEventType> implements Cons
 
   async #ensurePersistentSubscriptionCreated() {
     const client = this.#getClient()
-    const {
-      persistentSubscriptionCreationOpts,
-      groupName
-    } = this.#opts
 
     try {
       await client.createPersistentSubscriptionToStream(
-        `$ce-${streamPrefix}${this.#opts.streamInfix}`,
-        groupName,
-        persistentSubscriptionCreationOpts
+        this.#streamToSubscribe,
+        this.#groupName,
+        this.#persistentSubscriptionCreationOpts
       )
     } catch (error: unknown) {
       if (!(error instanceof PersistentSubscriptionExistsError)) {
@@ -89,10 +96,10 @@ class PersistentSubscriptionConsumption<T extends JSONEventType> implements Cons
         const client = this.#getClient()
 
         const subscription = client.subscribeToPersistentSubscriptionToStream<T>(
-          this.#opts.streamToSubscribe,
-          this.#opts.groupName,
-          this.#opts.subscribeOpts,
-          this.#opts.duplexOpts
+          this.#streamToSubscribe,
+          this.#groupName,
+          this.#subscribeOpts,
+          this.#duplexOpts
         )
 
         this.#subscription = subscription
@@ -106,14 +113,6 @@ class PersistentSubscriptionConsumption<T extends JSONEventType> implements Cons
               continue
             }
 
-            // const { data } = e
-            // const { pickAfter, createdAt, ...rest } = data
-            //
-            // await this.#consumeOpts.onMessage({
-            //   ...rest,
-            //   ...pickAfter !== undefined && { pickAfter: new Date(pickAfter) },
-            //   createdAt: new Date(createdAt)
-            // })
             await this.#handler(e)
             await subscription.ack(event)
           } catch (error: unknown) {
@@ -172,7 +171,11 @@ class KurrentDBQueue implements Queue<never> {
   consume(opts: ConsumeOpts): Consumption {
     return new PersistentSubscriptionConsumption<MessageEvent>(
       () => this.#getClient(),
-      this.#opts,
+      this.#opts.streamToSubscribe,
+      this.#opts.groupName,
+      this.#opts.persistentSubscriptionCreationOpts,
+      this.#opts.subscribeOpts ?? {},
+      this.#opts.duplexOpts ?? {},
       async e => {
         const { data } = e
         const { pickAfter, createdAt, ...rest } = data
@@ -264,6 +267,66 @@ export function createQueue(opts: CreateQueueOpts): Queue<never> {
 
 function shardQueueByHour (msg: Message): string {
   return msg.createdAt.toISOString().substring(0, 13)
+}
+
+export type ConsumeCustomSubscriptionOpts<T extends JSONEventType> = {
+  connectionString: string
+  createSubscriptionOpts?: Omit<CreatePersistentSubscriptionOpts, "groupName">
+  subscribeOpts?: SubscribeToPersistentSubscriptionToStreamOptions
+  subscribeDuplexOpts?: DuplexOptions
+  streamName: string
+  groupName: string
+  handler: (event: RecordedEvent<T>) => Promise<void>
+}
+
+export function consumeCustomSubscription<T extends JSONEventType>(opts: ConsumeCustomSubscriptionOpts<T>): Consumption {
+  const {
+    connectionString,
+    groupName,
+    streamName,
+    handler,
+    createSubscriptionOpts: {
+      messageTimeout = 30_000,
+      checkPointAfter = 2_000,
+      checkPointLowerBound = 10,
+      checkPointUpperBound = 1_000,
+      consumerStrategyName = "RoundRobin",
+      extraStatistics = false,
+      historyBufferSize = 500,
+      liveBufferSize = 500,
+      maxRetryCount = 10,
+      maxSubscriberCount = "unbounded",
+      readBatchSize = 20,
+    } = {},
+    subscribeDuplexOpts = {},
+    subscribeOpts = {}
+  } = opts
+
+  return new PersistentSubscriptionConsumption<T>(
+    () => KurrentDBClient.connectionString(connectionString),
+    streamName,
+    groupName,
+    {
+      extraStatistics,
+      maxRetryCount,
+      startFrom: "start",
+      checkPointAfter,
+      checkPointLowerBound,
+      checkPointUpperBound,
+      readBatchSize,
+      liveBufferSize,
+      historyBufferSize,
+      consumerStrategyName,
+      maxSubscriberCount,
+      messageTimeout,
+      resolveLinkTos: true,
+    },
+    subscribeOpts,
+    subscribeDuplexOpts,
+    async (event) => {
+      await handler(event)
+    }
+  )
 }
 
 type CreateStorageOpts = {

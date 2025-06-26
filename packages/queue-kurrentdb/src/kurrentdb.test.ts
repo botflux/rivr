@@ -1,9 +1,17 @@
 import {after, before, describe, test, TestContext} from "node:test"
 import {KurrentDbContainer, StartedKurrentDbContainer} from "@testcontainers/kurrentdb"
-import {createQueue, createStorage, RivrInvalidStreamInfixError} from "./kurrentdb";
-import {advancedFlow, basicFlow, createWorker, Message, rivr, WorkflowState} from "rivr";
+import {consumeCustomSubscription, createQueue, createStorage, RivrInvalidStreamInfixError} from "./kurrentdb";
+import {advancedFlow, basicFlow, createWorker, Message, rivr, trigger, WorkflowState} from "rivr";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
+import {
+  jsonEvent,
+  JSONEventType,
+  JSONRecordedEvent,
+  KurrentDBClient,
+  RecordedEvent,
+  RecordedEventToEventType
+} from "@kurrent/kurrentdb-client";
 
 describe('kurrentdb', function () {
   let kurrentdb!: StartedKurrentDbContainer
@@ -223,12 +231,45 @@ describe('kurrentdb', function () {
     })
   })
 
-  describe('trigger workflow from persistent susbscription', function () {
-    test("should be able to trigger workflow from a persistent subscription", {skip: true}, (t) => {
+  describe('trigger workflow from persistent subscription', function () {
+    test("should be able to consume a custom subscription", async (t: TestContext) => {
       // Given
+      const infix = randomInfix()
+      let eventPayload: unknown
+
+      type MyEvent = JSONEventType<"record_created", { value: number }>
+
+      const customConsumption = consumeCustomSubscription<MyEvent>({
+        streamName: `$ce-Record${infix}`,
+        groupName: randomUUID(),
+        connectionString: kurrentdb.getConnectionString(),
+        handler: async event => {
+          eventPayload = event.data
+        }
+      })
+
+      t.after(async () => {
+        await customConsumption.stop()
+      })
+
+      await customConsumption.start()
+
+      // When
+      await KurrentDBClient
+        .connectionString(kurrentdb.getConnectionString())
+        .appendToStream(`Record${infix}-${randomUUID()}`, [ jsonEvent<MyEvent>({ type: "record_created", data: { value: 2 } }) ])
+
+      // Then
+      await waitForPredicate(() => eventPayload !== undefined)
+      t.assert.deepStrictEqual(eventPayload, { value: 2 })
+    })
+
+    test("should be able to trigger workflow from a persistent subscription", async (t: TestContext) => {
+      // Given
+      const infix = randomInfix()
       const queue = createQueue({
         connectionString: kurrentdb.getConnectionString(),
-        streamInfix: randomInfix(),
+        streamInfix: infix,
         createSubscriptionOpts: {
           groupName: randomUUID(),
         }
@@ -260,9 +301,37 @@ describe('kurrentdb', function () {
         await worker.stop()
       })
 
+      await worker.start()
+
+      type MyEvent = JSONEventType<"record_created", { value: number }>
+
+      const customConsumption = consumeCustomSubscription<MyEvent>({
+        streamName: `$ce-Record${infix}`,
+        groupName: randomUUID(),
+        connectionString: kurrentdb.getConnectionString(),
+        handler: async event => {
+          await trigger(
+            queue,
+            workflow,
+            event.data.value
+          )
+        }
+      })
+
+      t.after(async () => {
+        await customConsumption.stop()
+      })
+
+      await customConsumption.start()
+
       // When
+      await KurrentDBClient
+        .connectionString(kurrentdb.getConnectionString())
+        .appendToStream(`Record${infix}-${randomUUID()}`, [ jsonEvent<MyEvent>({ type: "record_created", data: { value: 2 } }) ])
 
       // Then
+      await waitForPredicate(() => handled === true)
+      t.assert.strictEqual(handled, true)
     })
   })
 })
