@@ -298,18 +298,26 @@ class KurrentDBWorkflowStateStorage implements WorkflowStateStorage {
     const client = this.#getClient()
     const streamName = `${workflowStateStreamPrefix}${this.#opts.streamInfix}-${id}`
     
-    const events = client.readStream<WorkflowStateEvent<State>>(streamName, {
-      direction: "backwards",
-      fromRevision: "end"
-    })
+    try {
+      const events = client.readStream<WorkflowStateEvent<State>>(streamName, {
+        direction: "backwards",
+        fromRevision: "end"
+      })
 
-    for await (const event of events) {
-      if (event.event?.data) {
-        return this.#deserializeWorkflowState(event.event.data)
+      for await (const event of events) {
+        if (event.event?.data) {
+          return this.#deserializeWorkflowState(event.event.data)
+        }
       }
-    }
 
-    return undefined
+      return undefined
+    } catch (error: unknown) {
+      // If the stream doesn't exist, return undefined
+      if (typeof error === 'object' && error !== null && 'type' in error && error.type === 'stream-not-found') {
+        return undefined
+      }
+      throw error
+    }
   }
 
   #getClient(): KurrentDBClient {

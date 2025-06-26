@@ -204,6 +204,18 @@ describe('kurrentdb', function () {
     // Then
     t.assert.deepStrictEqual(await storage.get(state.id), state)
   })
+
+  test("should be able to return undefined if no workflow exists for the given id", async (t: TestContext) => {
+    // Given
+    const storage = createStorage({
+      connectionString: kurrentdb.getConnectionString(),
+      streamInfix: randomInfix()
+    })
+
+    // When
+    // Then
+    t.assert.strictEqual(await storage.get(randomUUID()), undefined)
+  })
 })
 
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {
