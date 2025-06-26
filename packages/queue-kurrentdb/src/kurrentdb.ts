@@ -275,49 +275,51 @@ class KurrentDBWorkflowStateStorage implements WorkflowStateStorage {
 
   async upsert<State>(states: WorkflowState<State>[]): Promise<void> {
     const client = this.#getClient()
-    const streamName = `${workflowStateStreamPrefix}${this.#opts.streamInfix}`
     
-    const events = states.map(state => ({
-      type: "workflow_state_changed",
-      id: state.id,
-      contentType: "application/json",
-      data: state,
-      metadata: {}
-    } as WorkflowStateEvent<State>))
+    const eventsByStream = states.map(state => {
+      const streamName = `${workflowStateStreamPrefix}${this.#opts.streamInfix}-${state.id}`
+      const event = {
+        type: "workflow_state_changed",
+        id: state.id,
+        contentType: "application/json",
+        data: state,
+        metadata: {}
+      } as WorkflowStateEvent<State>
+      
+      return [streamName, event] as const
+    })
 
-    await client.appendToStream(streamName, events)
+    await Promise.all(eventsByStream.map(([streamName, event]) =>
+      client.appendToStream(streamName, [event])
+    ))
   }
 
   async get<State>(id: string): Promise<WorkflowState<State> | undefined> {
     const client = this.#getClient()
-    const streamName = `${workflowStateStreamPrefix}${this.#opts.streamInfix}`
+    const streamName = `${workflowStateStreamPrefix}${this.#opts.streamInfix}-${id}`
     
-    try {
-      const events = client.readStream<WorkflowStateEvent<State>>(streamName, {
-        direction: "backwards",
-        fromRevision: "end"
-      })
+    const events = client.readStream<WorkflowStateEvent<State>>(streamName, {
+      direction: "backwards",
+      fromRevision: "end"
+    })
 
-      for await (const event of events) {
-        if (event.event?.data.id === id) {
-          return this.#deserializeWorkflowState(event.event.data)
-        }
+    for await (const event of events) {
+      if (event.event?.data) {
+        return this.#deserializeWorkflowState(event.event.data)
       }
-      
-      return undefined
-    } catch (error) {
-      return undefined
     }
+
+    return undefined
   }
 
   async list<State>(opts?: ListWorkflowStateOpts): Promise<ListWorkflowStateResult<State>> {
     const client = this.#getClient()
-    const streamName = `${workflowStateStreamPrefix}${this.#opts.streamInfix}`
+    const categoryStreamName = `$ce-${workflowStateStreamPrefix}${this.#opts.streamInfix}`
     const page = opts?.page ?? 1
     const limit = opts?.limit ?? 10
     
     try {
-      const events = client.readStream<WorkflowStateEvent<State>>(streamName, {
+      const events = client.readStream<WorkflowStateEvent<State>>(categoryStreamName, {
         direction: "backwards",
         fromRevision: "end"
       })
@@ -361,12 +363,12 @@ class KurrentDBWorkflowStateStorage implements WorkflowStateStorage {
     return {
       ...data,
       lastModified: new Date(data.lastModified),
-      ...(data.toExecute?.pickAfter && {
-        toExecute: {
-          ...data.toExecute,
+      toExecute: {
+        ...data.toExecute,
+        ...data.toExecute?.pickAfter !== undefined && {
           pickAfter: new Date(data.toExecute.pickAfter)
         }
-      })
+      },
     }
   }
 }
