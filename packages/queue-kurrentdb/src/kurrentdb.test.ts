@@ -1,7 +1,7 @@
 import {after, before, describe, test, TestContext} from "node:test"
 import {KurrentDbContainer, StartedKurrentDbContainer} from "@testcontainers/kurrentdb"
 import {createQueue, RivrInvalidStreamInfixError} from "./kurrentdb";
-import {advancedFlow, basicFlow, Message} from "rivr";
+import {advancedFlow, basicFlow, Message, WorkflowState} from "rivr";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
 
@@ -164,6 +164,46 @@ describe('kurrentdb', function () {
 
   basicFlow({ createQueue: makeQueue })
   advancedFlow({ createQueue: makeQueue })
+
+  test("should be able to store workflow states", async (t: TestContext) => {
+    // Given
+    const storage = createStorage({
+      connectionString: kurrentdb.getConnectionString(),
+      streamInfix: randomInfix()
+    })
+
+    // When
+    const state: WorkflowState<number> = {
+      status: "successful",
+      id: randomUUID(),
+      name: "workflow",
+      lastModified: new Date(),
+      toExecute: {
+        status: "done",
+        pickAfter: new Date(),
+        attempt: 1,
+        state: 5,
+        step: "foo",
+        areRetryExhausted: false
+      },
+      result: 1,
+      steps: [
+        {
+          name: "foo",
+          attempts: [
+            {
+              id: 1,
+              status: "successful"
+            }
+          ]
+        }
+      ]
+    }
+    await storage.upsert([ state ])
+
+    // Then
+    t.assert.deepStrictEqual(await storage.get(state.id), [ state ])
+  })
 })
 
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {
