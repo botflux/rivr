@@ -312,46 +312,6 @@ class KurrentDBWorkflowStateStorage implements WorkflowStateStorage {
     return undefined
   }
 
-  async list<State>(opts?: ListWorkflowStateOpts): Promise<ListWorkflowStateResult<State>> {
-    const client = this.#getClient()
-    const categoryStreamName = `$ce-${workflowStateStreamPrefix}${this.#opts.streamInfix}`
-    const page = opts?.page ?? 1
-    const limit = opts?.limit ?? 10
-    
-    try {
-      const events = client.readStream<WorkflowStateEvent<State>>(categoryStreamName, {
-        direction: "backwards",
-        fromRevision: "end"
-      })
-
-      const stateMap = new Map<string, WorkflowState<State>>()
-      
-      for await (const event of events) {
-        if (event.event?.data.id && !stateMap.has(event.event.data.id)) {
-          stateMap.set(event.event.data.id, this.#deserializeWorkflowState(event.event.data))
-        }
-      }
-
-      const allStates = Array.from(stateMap.values())
-      const totalCount = allStates.length
-      const startIndex = (page - 1) * limit
-      const endIndex = startIndex + limit
-      const results = allStates.slice(startIndex, endIndex)
-
-      return {
-        results,
-        totalCount,
-        ...(page > 1 && { previousPage: page - 1 }),
-        ...(endIndex < totalCount && { nextPage: page + 1 })
-      }
-    } catch (error) {
-      return {
-        results: [],
-        totalCount: 0
-      }
-    }
-  }
-
   #getClient(): KurrentDBClient {
     if (this.#client === undefined) {
       this.#client = KurrentDBClient.connectionString(this.#opts.connectionString)

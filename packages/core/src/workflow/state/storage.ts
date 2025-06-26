@@ -26,13 +26,6 @@ export interface WorkflowStateStorage {
    * @param id
    */
   get<State>(id: string): Promise<WorkflowState<State> | undefined>
-
-  /**
-   * List workflow state page by page.
-   *
-   * @param opts
-   */
-  list<State>(opts?: ListWorkflowStateOpts): Promise<ListWorkflowStateResult<State>>
 }
 
 export type SearchWorkflowStateOpts = {
