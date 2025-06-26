@@ -1,5 +1,6 @@
 import {ConsumeOpts, Consumption, Message, Queue, WorkflowState, WorkflowStateStorage, ListWorkflowStateOpts, ListWorkflowStateResult} from "rivr";
 import {
+  EventTypeToRecordedEvent,
   JSONEventType,
   KurrentDBClient,
   PersistentSubscriptionExistsError,
@@ -13,6 +14,7 @@ import { setTimeout } from "node:timers/promises"
 
 type KurrentDBQueueOpts = {
   connectionString: string
+  streamToSubscribe: string
   groupName: string
   persistentSubscriptionCreationOpts: PersistentSubscriptionToStreamSettings
   subscribeOpts?: SubscribeToPersistentSubscriptionToStreamOptions
@@ -33,17 +35,17 @@ type MessageEvent = JSONEventData<JSONEventType<
   RawMessage
 >>
 
-class PersistentSubscriptionConsumption implements Consumption {
+class PersistentSubscriptionConsumption<T extends JSONEventType> implements Consumption {
   #getClient: () => KurrentDBClient
   #opts: KurrentDBQueueOpts
-  #consumeOpts: ConsumeOpts
-  #subscription?: PersistentSubscriptionToStream<MessageEvent>
+  #handler: (event: EventTypeToRecordedEvent<T>) => Promise<void>
+  #subscription?: PersistentSubscriptionToStream<T>
   #stopReconnecting = false
 
-  constructor(getClient: () => KurrentDBClient, opts: KurrentDBQueueOpts, consumeOpts: ConsumeOpts) {
+  constructor(getClient: () => KurrentDBClient, opts: KurrentDBQueueOpts, handler: (event: EventTypeToRecordedEvent<T>) => Promise<void>) {
     this.#getClient = getClient;
     this.#opts = opts;
-    this.#consumeOpts = consumeOpts;
+    this.#handler = handler
   }
 
   async start(): Promise<void> {
@@ -86,8 +88,8 @@ class PersistentSubscriptionConsumption implements Consumption {
       try {
         const client = this.#getClient()
 
-        const subscription = client.subscribeToPersistentSubscriptionToStream<MessageEvent>(
-          `$ce-${streamPrefix}${this.#opts.streamInfix}`,
+        const subscription = client.subscribeToPersistentSubscriptionToStream<T>(
+          this.#opts.streamToSubscribe,
           this.#opts.groupName,
           this.#opts.subscribeOpts,
           this.#opts.duplexOpts
@@ -104,14 +106,15 @@ class PersistentSubscriptionConsumption implements Consumption {
               continue
             }
 
-            const { data } = e
-            const { pickAfter, createdAt, ...rest } = data
-
-            await this.#consumeOpts.onMessage({
-              ...rest,
-              ...pickAfter !== undefined && { pickAfter: new Date(pickAfter) },
-              createdAt: new Date(createdAt)
-            })
+            // const { data } = e
+            // const { pickAfter, createdAt, ...rest } = data
+            //
+            // await this.#consumeOpts.onMessage({
+            //   ...rest,
+            //   ...pickAfter !== undefined && { pickAfter: new Date(pickAfter) },
+            //   createdAt: new Date(createdAt)
+            // })
+            await this.#handler(e)
             await subscription.ack(event)
           } catch (error: unknown) {
             await subscription.nack("retry", "failed to process event", event)
@@ -167,10 +170,19 @@ class KurrentDBQueue implements Queue<never> {
   }
 
   consume(opts: ConsumeOpts): Consumption {
-    return new PersistentSubscriptionConsumption(
+    return new PersistentSubscriptionConsumption<MessageEvent>(
       () => this.#getClient(),
       this.#opts,
-      opts
+      async e => {
+        const { data } = e
+        const { pickAfter, createdAt, ...rest } = data
+
+        await opts.onMessage({
+          ...rest,
+          ...pickAfter !== undefined && { pickAfter: new Date(pickAfter) },
+          createdAt: new Date(createdAt)
+        })
+      }
     )
   }
 
@@ -229,6 +241,7 @@ export function createQueue(opts: CreateQueueOpts): Queue<never> {
   return new KurrentDBQueue({
     ...rest,
     streamInfix,
+    streamToSubscribe: `$ce-${streamPrefix}${streamInfix}`,
     partitionStream: partitionStream,
     groupName,
     persistentSubscriptionCreationOpts: {
@@ -347,8 +360,4 @@ export function createStorage(opts: CreateStorageOpts): WorkflowStateStorage {
   }
   
   return new KurrentDBWorkflowStateStorage(opts)
-}
-
-export function triggerWorkflowFromPersistentSubscription() {
-
 }
