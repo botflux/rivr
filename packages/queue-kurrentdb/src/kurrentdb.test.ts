@@ -1,6 +1,6 @@
 import {after, before, describe, test, TestContext} from "node:test"
 import {KurrentDbContainer, StartedKurrentDbContainer} from "@testcontainers/kurrentdb"
-import {createQueue, RivrInvalidStreamInfixError} from "./kurrentdb";
+import {createQueue, createStorage, RivrInvalidStreamInfixError} from "./kurrentdb";
 import {advancedFlow, basicFlow, Message, WorkflowState} from "rivr";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
@@ -202,7 +202,7 @@ describe('kurrentdb', function () {
     await storage.upsert([ state ])
 
     // Then
-    t.assert.deepStrictEqual(await storage.get(state.id), [ state ])
+    t.assert.deepStrictEqual(await storage.get(state.id), state)
   })
 })
 

@@ -1,4 +1,4 @@
-import {ConsumeOpts, Consumption, Message, Queue} from "rivr";
+import {ConsumeOpts, Consumption, Message, Queue, WorkflowState, WorkflowStateStorage, ListWorkflowStateOpts, ListWorkflowStateResult} from "rivr";
 import {
   JSONEventType,
   KurrentDBClient,
@@ -251,4 +251,130 @@ export function createQueue(opts: CreateQueueOpts): Queue<never> {
 
 function shardQueueByHour (msg: Message): string {
   return msg.createdAt.toISOString().substring(0, 13)
+}
+
+type CreateStorageOpts = {
+  connectionString: string
+  streamInfix: string
+}
+
+type WorkflowStateEvent<State> = JSONEventData<JSONEventType<
+  "workflow_state_changed",
+  WorkflowState<State>
+>>
+
+const workflowStateStreamPrefix = "RivrWorkflowStates"
+
+class KurrentDBWorkflowStateStorage implements WorkflowStateStorage {
+  #opts: CreateStorageOpts
+  #client: KurrentDBClient | undefined
+
+  constructor(opts: CreateStorageOpts) {
+    this.#opts = opts
+  }
+
+  async upsert<State>(states: WorkflowState<State>[]): Promise<void> {
+    const client = this.#getClient()
+    const streamName = `${workflowStateStreamPrefix}${this.#opts.streamInfix}`
+    
+    const events = states.map(state => ({
+      type: "workflow_state_changed",
+      id: state.id,
+      contentType: "application/json",
+      data: state,
+      metadata: {}
+    } as WorkflowStateEvent<State>))
+
+    await client.appendToStream(streamName, events)
+  }
+
+  async get<State>(id: string): Promise<WorkflowState<State> | undefined> {
+    const client = this.#getClient()
+    const streamName = `${workflowStateStreamPrefix}${this.#opts.streamInfix}`
+    
+    try {
+      const events = client.readStream<WorkflowStateEvent<State>>(streamName, {
+        direction: "backwards",
+        fromRevision: "end"
+      })
+
+      for await (const event of events) {
+        if (event.event?.data.id === id) {
+          return this.#deserializeWorkflowState(event.event.data)
+        }
+      }
+      
+      return undefined
+    } catch (error) {
+      return undefined
+    }
+  }
+
+  async list<State>(opts?: ListWorkflowStateOpts): Promise<ListWorkflowStateResult<State>> {
+    const client = this.#getClient()
+    const streamName = `${workflowStateStreamPrefix}${this.#opts.streamInfix}`
+    const page = opts?.page ?? 1
+    const limit = opts?.limit ?? 10
+    
+    try {
+      const events = client.readStream<WorkflowStateEvent<State>>(streamName, {
+        direction: "backwards",
+        fromRevision: "end"
+      })
+
+      const stateMap = new Map<string, WorkflowState<State>>()
+      
+      for await (const event of events) {
+        if (event.event?.data.id && !stateMap.has(event.event.data.id)) {
+          stateMap.set(event.event.data.id, this.#deserializeWorkflowState(event.event.data))
+        }
+      }
+
+      const allStates = Array.from(stateMap.values())
+      const totalCount = allStates.length
+      const startIndex = (page - 1) * limit
+      const endIndex = startIndex + limit
+      const results = allStates.slice(startIndex, endIndex)
+
+      return {
+        results,
+        totalCount,
+        ...(page > 1 && { previousPage: page - 1 }),
+        ...(endIndex < totalCount && { nextPage: page + 1 })
+      }
+    } catch (error) {
+      return {
+        results: [],
+        totalCount: 0
+      }
+    }
+  }
+
+  #getClient(): KurrentDBClient {
+    if (this.#client === undefined) {
+      this.#client = KurrentDBClient.connectionString(this.#opts.connectionString)
+    }
+    return this.#client
+  }
+
+  #deserializeWorkflowState<State>(data: WorkflowState<State>): WorkflowState<State> {
+    return {
+      ...data,
+      lastModified: new Date(data.lastModified),
+      ...(data.toExecute?.pickAfter && {
+        toExecute: {
+          ...data.toExecute,
+          pickAfter: new Date(data.toExecute.pickAfter)
+        }
+      })
+    }
+  }
+}
+
+export function createStorage(opts: CreateStorageOpts): WorkflowStateStorage {
+  if (opts.streamInfix.includes("-")) {
+    throw new RivrInvalidStreamInfixError(opts.streamInfix)
+  }
+  
+  return new KurrentDBWorkflowStateStorage(opts)
 }
