@@ -267,6 +267,26 @@ describe('kurrentdb', function () {
     test("should be able to trigger workflow from a persistent subscription", async (t: TestContext) => {
       // Given
       const infix = randomInfix()
+
+      type MyEvent = JSONEventType<"record_created", { value: number }>
+
+      const customConsumption = consumeCustomSubscription<MyEvent>({
+        streamName: `$ce-Record${infix}`,
+        groupName: randomUUID(),
+        connectionString: kurrentdb.getConnectionString(),
+        handler: async event => {
+          await trigger(
+            queue,
+            workflow,
+            event.data.value
+          )
+        }
+      })
+
+      t.after(async () => {
+        await customConsumption.stop()
+      })
+
       const queue = createQueue({
         connectionString: kurrentdb.getConnectionString(),
         streamInfix: infix,
@@ -292,7 +312,8 @@ describe('kurrentdb', function () {
 
       const worker = createWorker({
         primary: queue,
-        workflows: [ workflow ]
+        workflows: [ workflow ],
+        customConsumptions: [ customConsumption ]
       })
 
       worker.addHook("error", (err) => console.log(err))
@@ -302,27 +323,6 @@ describe('kurrentdb', function () {
       })
 
       await worker.start()
-
-      type MyEvent = JSONEventType<"record_created", { value: number }>
-
-      const customConsumption = consumeCustomSubscription<MyEvent>({
-        streamName: `$ce-Record${infix}`,
-        groupName: randomUUID(),
-        connectionString: kurrentdb.getConnectionString(),
-        handler: async event => {
-          await trigger(
-            queue,
-            workflow,
-            event.data.value
-          )
-        }
-      })
-
-      t.after(async () => {
-        await customConsumption.stop()
-      })
-
-      await customConsumption.start()
 
       // When
       await KurrentDBClient

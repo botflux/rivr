@@ -158,20 +158,23 @@ class DefaultWorker implements Worker {
   async start(): Promise<void> {
     await Promise.all(this.#opts.workflows.map(w => w.ready()))
 
-    const { primary, secondaries = [] } = this.#opts
+    const { primary, secondaries = [], customConsumptions = [] } = this.#opts
     const queues = [ primary, ...secondaries ]
 
-    this.#consumptions = queues.map(queue => queue.consume({
-      onMessage: async msg => {
-        for (const handler of this.#handlers) {
-          if (handler.support(msg)) {
-            const messages = await handler.handle(msg)
+    this.#consumptions = [
+      ...queues.map(queue => queue.consume({
+        onMessage: async msg => {
+          for (const handler of this.#handlers) {
+            if (handler.support(msg)) {
+              const messages = await handler.handle(msg)
 
-            await this.#produce(messages)
+              await this.#produce(messages)
+            }
           }
         }
-      }
-    }))
+      })),
+      ...customConsumptions
+    ]
 
     await Promise.all(
       this.#consumptions.map(c => c.start())
@@ -229,6 +232,11 @@ export type CreateWorkerOpts = {
    * message produced in the queue.
    */
   customHandlers?: MessageHandler<unknown>[]
+
+  /**
+   * Pass custom consumptions that the worker will start and stop.
+   */
+  customConsumptions?: Consumption[]
 }
 
 export function createWorker (opts: CreateWorkerOpts): Worker {
