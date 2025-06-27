@@ -1,6 +1,12 @@
 import {after, before, describe, test, TestContext} from "node:test"
 import {KurrentDbContainer, StartedKurrentDbContainer} from "@testcontainers/kurrentdb"
-import {consumeCustomSubscription, createQueue, createStorage, RivrInvalidStreamInfixError} from "./kurrentdb";
+import {
+  consumeCustomSubscription,
+  consumeWorkflowStateChanges,
+  createQueue,
+  createStorage,
+  RivrInvalidStreamInfixError
+} from "./kurrentdb";
 import {advancedFlow, basicFlow, createWorker, Message, rivr, trigger, WorkflowState} from "rivr";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
@@ -228,6 +234,67 @@ describe('kurrentdb', function () {
       // When
       // Then
       t.assert.strictEqual(await storage.get(randomUUID()), undefined)
+    })
+    
+    test("should be able to subscribe to workflow state changes", async (t: TestContext) => {
+      // Given
+      const infix = randomInfix()
+
+      const storage = createStorage({
+        connectionString: kurrentdb.getConnectionString(),
+        streamInfix: infix
+      })
+
+      let event: unknown
+
+      const consumption = consumeWorkflowStateChanges({
+        streamInfix: infix,
+        groupName: `test-${randomUUID()}`,
+        connectionString: kurrentdb.getConnectionString(),
+        handler: async e => {
+          event = e?.data
+        }
+      })
+
+      t.after(async () => {
+        await consumption.stop()
+      })
+
+      await consumption.start()
+
+      const state: WorkflowState<number> = {
+        status: "successful",
+        id: randomUUID(),
+        name: "workflow",
+        lastModified: new Date(),
+        toExecute: {
+          status: "done",
+          pickAfter: new Date(),
+          attempt: 1,
+          state: 5,
+          step: "foo",
+          areRetryExhausted: false
+        },
+        result: 1,
+        steps: [
+          {
+            name: "foo",
+            attempts: [
+              {
+                id: 1,
+                status: "successful"
+              }
+            ]
+          }
+        ]
+      }
+
+      // When
+      await storage.upsert([ state ])
+
+      // Then
+      await waitForPredicate(() => event !== undefined)
+      t.assert.deepStrictEqual(event, state)
     })
   })
 

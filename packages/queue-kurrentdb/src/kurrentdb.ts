@@ -334,7 +334,7 @@ type CreateStorageOpts = {
   streamInfix: string
 }
 
-type WorkflowStateEvent<State> = JSONEventData<JSONEventType<
+export type WorkflowStateEvent<State> = JSONEventData<JSONEventType<
   "workflow_state_changed",
   WorkflowState<State>
 >>
@@ -382,7 +382,7 @@ class KurrentDBWorkflowStateStorage implements WorkflowStateStorage {
 
       for await (const event of events) {
         if (event.event?.data) {
-          return this.#deserializeWorkflowState(event.event.data)
+          return deserializeWorkflowState(event.event.data)
         }
       }
 
@@ -402,18 +402,18 @@ class KurrentDBWorkflowStateStorage implements WorkflowStateStorage {
     }
     return this.#client
   }
+}
 
-  #deserializeWorkflowState<State>(data: WorkflowState<State>): WorkflowState<State> {
-    return {
-      ...data,
-      lastModified: new Date(data.lastModified),
-      toExecute: {
-        ...data.toExecute,
-        ...data.toExecute?.pickAfter !== undefined && {
-          pickAfter: new Date(data.toExecute.pickAfter)
-        }
-      },
-    }
+function deserializeWorkflowState<State>(data: WorkflowState<State>): WorkflowState<State> {
+  return {
+    ...data,
+    lastModified: new Date(data.lastModified),
+    toExecute: {
+      ...data.toExecute,
+      ...data.toExecute?.pickAfter !== undefined && {
+        pickAfter: new Date(data.toExecute.pickAfter)
+      }
+    },
   }
 }
 
@@ -423,4 +423,63 @@ export function createStorage(opts: CreateStorageOpts): WorkflowStateStorage {
   }
   
   return new KurrentDBWorkflowStateStorage(opts)
+}
+
+export type ConsumeWorkflowStateChangesOpts = Omit<ConsumeCustomSubscriptionOpts<WorkflowStateEvent<unknown>>, "streamName"> & {
+  streamInfix: string
+}
+
+export function consumeWorkflowStateChanges(opts: ConsumeWorkflowStateChangesOpts): Consumption {
+  const {
+    connectionString,
+    groupName,
+    handler,
+    streamInfix,
+    createSubscriptionOpts: {
+      messageTimeout = 30_000,
+      checkPointAfter = 2_000,
+      checkPointLowerBound = 10,
+      checkPointUpperBound = 1_000,
+      consumerStrategyName = "RoundRobin",
+      extraStatistics = false,
+      historyBufferSize = 500,
+      liveBufferSize = 500,
+      maxRetryCount = 10,
+      maxSubscriberCount = "unbounded",
+      readBatchSize = 20,
+    } = {},
+    subscribeDuplexOpts = {},
+    subscribeOpts = {}
+  } = opts
+
+  return new PersistentSubscriptionConsumption<WorkflowStateEvent<unknown>>(
+    () => KurrentDBClient.connectionString(connectionString),
+    `$ce-${workflowStateStreamPrefix}${streamInfix}`,
+    groupName,
+    {
+      extraStatistics,
+      maxRetryCount,
+      startFrom: "start",
+      checkPointAfter,
+      checkPointLowerBound,
+      checkPointUpperBound,
+      readBatchSize,
+      liveBufferSize,
+      historyBufferSize,
+      consumerStrategyName,
+      maxSubscriberCount,
+      messageTimeout,
+      resolveLinkTos: true,
+    },
+    subscribeOpts,
+    subscribeDuplexOpts,
+    async (event) => {
+      const { data, ...rest } = event
+
+      await handler({
+        ...rest,
+        data: deserializeWorkflowState(data)
+      })
+    }
+  )
 }
