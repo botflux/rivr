@@ -5,6 +5,7 @@
   "main": "dist/rabbitmq.js",
   "devDependencies": {
     "@testcontainers/rabbitmq": "^11.0.3",
+    "@testcontainers/toxiproxy": "^11.0.3",
     "@types/amqplib": "^0.10.7",
     "@types/node": "^22.15.28",
     "borp": "^0.20.0",
@@ -15,6 +16,7 @@
   "scripts": {
     "test": "borp --timeout 60000 *.spec.ts",
     "test:only": "borp --only --timeout 120000 *.spec.ts",
+    "test:manual": "ts-node ./src/manual-test.ts",
     "sandbox": "ts-node ./src/sandbox.ts"
   },
   "repository": {
@@ -34,6 +36,7 @@
   },
   "homepage": "https://github.com/botflux/rivr#readme",
   "dependencies": {
+    "amqp-connection-manager": "^4.1.14",
     "amqplib": "^0.10.8"
   }
 }

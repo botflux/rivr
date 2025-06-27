@@ -1,89 +1,72 @@
 import {ConsumeOpts, Consumption, Message, Queue} from "rivr";
 import {SocketOptions} from "node:dgram";
-import {Channel, ChannelModel, ConfirmChannel, connect} from "amqplib";
+import {Channel, ChannelModel, ConfirmChannel} from "amqplib";
+import { setTimeout } from "node:timers/promises"
+import {AmqpConnectionManager, AmqpConnectionManagerOptions, ChannelWrapper, connect} from "amqp-connection-manager";
 
 class RabbitMQConsumption implements Consumption {
-  #getConnection: () => Promise<ChannelModel>
+  #channelWrapper: ChannelWrapper
   #opts: RabbitMQQueueOpts
   #consumeOpts: ConsumeOpts
 
-  #consumingChannel: ConfirmChannel | undefined
-  #consumerTag: string | undefined
-
-  constructor(getConnection: () => Promise<ChannelModel>, opts: RabbitMQQueueOpts, consumeOpts: ConsumeOpts) {
-    this.#getConnection = getConnection;
+  constructor(channelManager: AmqpConnectionManager, opts: RabbitMQQueueOpts, consumeOpts: ConsumeOpts) {
     this.#opts = opts;
     this.#consumeOpts = consumeOpts;
+    this.#channelWrapper = channelManager.createChannel({
+      name: "consuming",
+      setup: async (channel: ConfirmChannel) => {
+        await ensureQueuesExists(channel, opts)
+      }
+    })
   }
 
   async start(): Promise<void> {
-    const consumingChannel = await this.#getConsumingChannel()
-    await ensureQueuesExists(consumingChannel, this.#opts)
-
-    this.#startConsuming(consumingChannel)
+    this.#startConsuming()
   }
 
-  async #startConsuming(consumingChannel: ConfirmChannel) {
-    try {
-      const { consumerTag } = await consumingChannel.consume(
-        this.#opts.queue,
-        async msg => {
-          if (msg === null) {
-            console.warn("message is null")
-            return
-          }
+  async #startConsuming() {
+    await this.#channelWrapper.consume(
+      this.#opts.queue,
+      async msg => {
+        if (msg === null) {
+          console.warn("message is null")
+          return
+        }
 
-          try {
-            const { content, properties } = msg
-            const stringified = content.toString("utf8")
-            const payload = JSON.parse(stringified)
+        try {
+          const { content, properties } = msg
+          const stringified = content.toString("utf8")
+          const payload = JSON.parse(stringified)
 
-            const { type, messageId, headers: { createdAt, pickAfter, "x-delay": xDelay } = {} } = properties
+          const { type, messageId, headers: { createdAt, pickAfter, "x-delay": xDelay } = {} } = properties
 
-            const message: Message = {
-              payload,
-              createdAt: new Date(createdAt),
-              id: messageId,
-              type,
-              ...pickAfter !== undefined && {
-                pickAfter: new Date(pickAfter),
-              }
+          const message: Message = {
+            payload,
+            createdAt: new Date(createdAt),
+            id: messageId,
+            type,
+            ...pickAfter !== undefined && {
+              pickAfter: new Date(pickAfter),
             }
-
-            await this.#consumeOpts.onMessage(message)
-            consumingChannel.ack(msg, false)
-          } catch(error: unknown) {
-            consumingChannel.nack(msg, false, true)
           }
-        },
-      )
 
-      this.#consumerTag = consumerTag
-    } catch (error: unknown) {
-      console.warn("error while consuming a rabbitmq queue", error)
-    }
+          await this.#consumeOpts.onMessage(message)
+          this.#channelWrapper.ack(msg, false)
+        } catch(error: unknown) {
+          this.#channelWrapper.nack(msg, false, true)
+        }
+      }
+    )
   }
 
   async stop(): Promise<void> {
-    if (this.#consumerTag) {
-      await this.#consumingChannel?.cancel(this.#consumerTag)
-    }
-
-    await this.#consumingChannel?.close()
-  }
-
-  async #getConsumingChannel(): Promise<ConfirmChannel> {
-    if (this.#consumingChannel === undefined) {
-      this.#consumingChannel = await (await this.#getConnection()).createConfirmChannel()
-    }
-
-    return this.#consumingChannel
+    await this.#channelWrapper.close()
   }
 }
 
 type RabbitMQQueueOpts = {
   url: string
-  socketOpts?: SocketOptions
+  connectionManagerOpts?: AmqpConnectionManagerOptions
   exchange: string
   delayedExchange: string
   queue: string
@@ -92,30 +75,32 @@ type RabbitMQQueueOpts = {
 
 class RabbitMQQueue implements Queue<never> {
   #opts: RabbitMQQueueOpts
-  #connection: ChannelModel | undefined
-  #publishChannel: ConfirmChannel | undefined
+  #channelManager: AmqpConnectionManager
 
   constructor(opts: RabbitMQQueueOpts) {
     this.#opts = opts;
+    this.#channelManager = connect(opts.url, opts.connectionManagerOpts)
   }
 
   async produce(messages: Message[], opts?: undefined): Promise<void> {
-    const channel = await this.#getPublishChannel()
-    await ensureQueuesExists(channel, this.#opts)
+    const channel = this.#channelManager.createChannel({
+      setup: async (ch: ConfirmChannel) => {
+        await ensureQueuesExists(ch, this.#opts)
+      }
+    })
+
 
     for (const message of messages) {
       if (message.pickAfter === undefined) {
-        this.#publishMessage(channel, this.#opts.exchange, message)
+        await this.#publishMessage(channel, this.#opts.exchange, message)
       } else {
         if (!this.#opts.enableDelayedMessageExchange) {
           throw new Error("Cannot publish a delayed message in the RabbitMQ queue without `enabledDelayedMessageExchange` set to `true`.")
         }
 
-        this.#publishMessage(channel, this.#opts.delayedExchange, message)
+        await this.#publishMessage(channel, this.#opts.delayedExchange, message)
       }
     }
-
-    await channel.waitForConfirms()
   }
 
   supportsDelayedMessages(): boolean {
@@ -124,17 +109,9 @@ class RabbitMQQueue implements Queue<never> {
 
   async disconnect(): Promise<void> {
     try {
-      await this.#publishChannel?.close()
+      await this.#channelManager.close()
     } catch (e: unknown) {
-      if (!this.#isUnexpectedCloseError(e)) {
-        throw e
-      }
-    }
-
-    try {
-      await this.#connection?.close()
-    } catch (e: unknown) {
-      if (!this.#isUnexpectedCloseError(e)) {
+      if (!isUnexpectedCloseError(e)) {
         throw e
       }
     }
@@ -142,31 +119,14 @@ class RabbitMQQueue implements Queue<never> {
 
   consume(opts: ConsumeOpts): Consumption {
     return new RabbitMQConsumption(
-      () => this.#getConnection(),
+      this.#channelManager,
       this.#opts,
       opts
     )
   }
 
-  async #getConnection(): Promise<ChannelModel> {
-    if (this.#connection === undefined) {
-      this.#connection = await connect(this.#opts.url, this.#opts.socketOpts)
-      this.#connection.on("error", () => {})
-    }
-
-    return this.#connection
-  }
-
-  async #getPublishChannel(): Promise<ConfirmChannel> {
-    if (this.#publishChannel === undefined) {
-      this.#publishChannel = await (await this.#getConnection()).createConfirmChannel()
-    }
-
-    return this.#publishChannel
-  }
-
-  #publishMessage(channel: Channel, exchange: string, message: Message): void {
-    channel.publish(
+  async #publishMessage(channel: ChannelWrapper, exchange: string, message: Message): Promise<void> {
+    await channel.publish(
       exchange,
       "",
       Buffer.from(JSON.stringify(message.payload)),
@@ -188,20 +148,6 @@ class RabbitMQQueue implements Queue<never> {
 
   #calculateDelay(pickAfter: Date, now: Date = new Date()): number {
     return pickAfter.getTime() - now.getTime();
-  }
-
-  #isUnexpectedCloseError(error: unknown): boolean {
-    if (!isError(error)) {
-      return false
-    }
-
-    const possibilities = [
-      "Unexpected close",
-      "Channel closed",
-      /Connection closed/
-    ]
-
-    return possibilities.some(element => (error.message as string).match(element))
   }
 }
 
@@ -228,16 +174,15 @@ async function ensureQueuesExists(channel: Channel, opts: RabbitMQQueueOpts) {
 }
 
 export type CreateRabbitMQQueueOpts = {
-
   /**
    * The URL to connect to RabbitMQ.
    */
   url: string
 
   /**
-   * The option passed as second argument of `require("amqplib").connect`.
+   * The option passed as second argument of `require("amqp-connection-manager").connect`.
    */
-  socketOpts?: SocketOptions
+  connectionManagerOpts?: AmqpConnectionManagerOptions
 
   /**
    * The exchange used for publishing non-delayed messages.
@@ -283,7 +228,6 @@ export function createQueue(opts: CreateRabbitMQQueueOpts): Queue<never> {
     delayedExchange = "rivr-delayed-exchange",
     exchange = "rivr-exchange",
     queue = "rivr-messages",
-    socketOpts,
     enableDelayedMessageExchange = false,
     ...rest
   } = opts
@@ -293,12 +237,27 @@ export function createQueue(opts: CreateRabbitMQQueueOpts): Queue<never> {
     delayedExchange,
     exchange,
     queue,
-    socketOpts,
-    enableDelayedMessageExchange
+    enableDelayedMessageExchange,
   })
 }
 
 function isError(error: unknown): error is Error {
   return typeof error === "object" && error !== null
     && "message" in error && typeof error.message === "string"
+}
+
+function isUnexpectedCloseError(error: unknown): boolean {
+  if (!isError(error)) {
+    return false
+  }
+
+  const possibilities = [
+    "Unexpected close",
+    "Channel closed",
+    "Channel ended",
+    "Socket closed abruptly",
+    /Connection closed/
+  ]
+
+  return possibilities.some(element => (error.message as string).match(element))
 }
