@@ -2,7 +2,7 @@
   "name": "@rivr/queue-kurrentdb",
   "version": "1.0.0",
   "description": "KurrentDB module for rivr",
-  "main": "dist/kurrentdb.js",
+  "main": "dist/index.js",
   "dependencies": {
     "@kurrent/kurrentdb-client": "^1.0.3",
     "@testcontainers/kurrentdb": "^11.0.3",
