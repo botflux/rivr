@@ -84,9 +84,15 @@ class PersistentSubscriptionConsumption<T extends JSONEventType> implements Cons
   }
 
   async stop(): Promise<void> {
+    const alreadyStopped = this.#stopReconnecting
+
     this.#stopReconnecting = true
     await this.#subscription?.unsubscribe()
-    this.#hooks.executeHook("onStop", [ "manually_stopped" ])
+    this.#subscription = undefined
+
+    if (!alreadyStopped) {
+      this.#hooks.executeHook("onStop", [ "manually_stopped" ])
+    }
   }
 
   addHook(hook: "onError", handler: (error: unknown) => void): this

@@ -170,6 +170,127 @@ describe('kurrentdb', function () {
     })
   })
 
+  describe('consumption hooks', function () {
+    test("should be able to call the start hook", async (t: TestContext) => {
+      // Given
+      const queue = createQueue({
+        connectionString: kurrentdb.getConnectionString(),
+        streamInfix: randomInfix(),
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const consumption = queue.consume({
+        onMessage: async msg => {}
+      })
+
+      let called = false
+
+      consumption.addHook("onStart", () => called = true)
+
+      t.after(async () => {
+        await consumption.stop()
+      })
+
+      // When
+      await consumption.start()
+
+      // Then
+      t.assert.strictEqual(called, true)
+    })
+
+    test("should be able to call the start hook once", async (t: TestContext) => {
+      // Given
+      const queue = createQueue({
+        connectionString: kurrentdb.getConnectionString(),
+        streamInfix: randomInfix(),
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const consumption = queue.consume({
+        onMessage: async msg => {}
+      })
+
+      let calls = 0
+
+      consumption.addHook("onStart", () => calls++)
+
+      t.after(async () => {
+        await consumption.stop()
+      })
+
+      // When
+      await consumption.start()
+      await consumption.start()
+
+      // Then
+      t.assert.strictEqual(calls, 1)
+    })
+
+    test("should be able to call the stop hook", async (t: TestContext) => {
+      // Given
+      const queue = createQueue({
+        connectionString: kurrentdb.getConnectionString(),
+        streamInfix: randomInfix(),
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const consumption = queue.consume({
+        onMessage: async msg => {}
+      })
+
+      let params: unknown[] = []
+
+      consumption.addHook("onStop", (...params1) => params = params1)
+
+      await consumption.start()
+
+      // When
+      await consumption.stop()
+
+      // Then
+      t.assert.deepStrictEqual(params, [ "manually_stopped" ])
+    })
+
+    test("should be able to call the stop hook once", async (t: TestContext) => {
+      // Given
+      const queue = createQueue({
+        connectionString: kurrentdb.getConnectionString(),
+        streamInfix: randomInfix(),
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const consumption = queue.consume({
+        onMessage: async msg => {}
+      })
+
+      let calls: unknown[] = []
+
+      consumption.addHook("onStop", (...params) => {
+        calls.push(params)
+      })
+
+      // When
+      await consumption.start()
+      await consumption.stop()
+      await consumption.stop()
+
+      // Then
+      t.assert.deepStrictEqual(calls, [ [ "manually_stopped" ] ])
+    })
+  })
+  
   describe('workflow', function () {
     const makeQueue = () => createQueue({
       connectionString: kurrentdb.getConnectionString(),
