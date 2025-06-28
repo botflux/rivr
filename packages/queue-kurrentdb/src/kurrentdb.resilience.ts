@@ -144,6 +144,59 @@ describe('kurrentdb resilience', function () {
     t.assert.strictEqual(receivedMessages.length, 2)
     t.assert.deepStrictEqual(receivedMessages, [ firstMessage, secondMessage ])
   })
+
+  test("should be able to trigger onError hook when connection is lost during consumption", async (t: TestContext) => {
+    // Given
+    const proxy = await toxiproxy.createProxy({
+      enabled: true,
+      name: `kurrentdb-${randomUUID()}`,
+      upstream: `kurrentdb:2113`
+    })
+
+    t.after(async () => {
+      await proxy.instance.remove()
+    })
+
+    const groupName = randomUUID();
+    const streamInfix = randomInfix();
+
+    const unstable = createQueue({
+      connectionString: `kurrentdb://${proxy.host}:${proxy.port}?tls=false`,
+      createSubscriptionOpts: {
+        groupName
+      },
+      streamInfix
+    })
+
+    t.after(async () => {
+      await unstable.disconnect()
+    })
+
+    const errorEvents: unknown[] = []
+    const consumption = unstable.consume({
+      onMessage: async (msg) => {}
+    })
+
+    consumption.addHook("onError", (error) => {
+      errorEvents.push(error)
+    })
+
+    t.after(async () => {
+      await consumption.stop()
+    })
+
+    await consumption.start()
+
+    // When
+    await proxy.setEnabled(false)
+
+    // Then
+    await waitForPredicate(() => errorEvents.length > 0, 5_000)
+    await proxy.setEnabled(true)
+
+    // Then
+    t.assert.ok(errorEvents.length > 0, "onError hook should have been triggered")
+  })
 })
 
 async function waitForPredicate(fn: () => boolean, ms = 5_000) {
