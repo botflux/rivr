@@ -1,3 +1,5 @@
+export type StopReason = "unrecoverable_error" | "manually_stopped"
+
 export interface Consumption {
   /**
    * Start the consumption
@@ -8,6 +10,16 @@ export interface Consumption {
    * Stop the consumption
    */
   stop(): Promise<void>
+
+  addHook(hook: "onStart", handler: () => void): this
+  addHook(hook: "onStop", handler: (reason: StopReason, error?: unknown) => void): this
+  addHook(hook: "onError", handler: (error: unknown) => void): this
+}
+
+export type ConsumptionHooks = {
+  onStart: () => void
+  onStop: (reason: StopReason, error?: unknown) => void
+  onError: (error: unknown) => void
 }
 
 export interface Message {

@@ -1,5 +1,5 @@
 import {describe, test, TestContext} from "node:test";
-import {ConsumeOpts, Consumption, Message, Queue} from "../../queue";
+import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Queue, StopReason} from "../../queue";
 import {EventEmitter, on} from "node:events"
 import {ListWorkflowStateOpts, ListWorkflowStateResult, WorkflowStateStorage} from "../../workflow/state/storage";
 import {WorkflowState} from "../../workflow/state/state";
@@ -9,11 +9,13 @@ import {createWorker} from "../../worker";
 import {trigger} from "../../workflow/trigger";
 import {setTimeout} from "node:timers/promises";
 import {omit} from "../../utils/omit";
+import {Hooks} from "../../hooks/hooks";
 
 class MemoryConsumption implements Consumption {
   readonly #emitter: EventEmitter
   readonly #consumeOpts: ConsumeOpts
   readonly #controller = new AbortController()
+  readonly #hooks = new Hooks<ConsumptionHooks>()
 
   constructor(emitter: EventEmitter, consumeOpts: ConsumeOpts) {
     this.#emitter = emitter;
@@ -26,6 +28,14 @@ class MemoryConsumption implements Consumption {
 
   async stop(): Promise<void> {
     this.#controller.abort()
+  }
+
+  addHook(hook: "onError", handler: (error: unknown) => void): this
+  addHook(hook: "onStart", handler: () => void): this
+  addHook(hook: "onStop", handler: (reason: StopReason, error?: unknown) => void): this
+  addHook(hook: string, handler: (...params: any[]) => void): this {
+    this.#hooks.addHook(hook as keyof ConsumptionHooks, handler)
+    return this
   }
 
   async #startConsuming() {

@@ -1,4 +1,14 @@
-import {ConsumeOpts, Consumption, Message, Queue, WorkflowState, WorkflowStateStorage, ListWorkflowStateOpts, ListWorkflowStateResult} from "rivr";
+import {
+  ConsumeOpts,
+  Consumption,
+  Message,
+  Queue,
+  WorkflowState,
+  WorkflowStateStorage,
+  ListWorkflowStateOpts,
+  ListWorkflowStateResult,
+  ConsumptionHooks, StopReason
+} from "rivr";
 import {
   EventTypeToRecordedEvent,
   JSONEventType,
@@ -14,6 +24,7 @@ import {JSONEventData} from "@kurrent/kurrentdb-client/dist/types/events";
 import {CreatePersistentSubscriptionOpts, CreateQueueOpts} from "./public-types";
 import {DuplexOptions} from "node:stream";
 import { setTimeout } from "node:timers/promises"
+import {Hooks} from "rivr/dist/hooks/hooks";
 
 type KurrentDBQueueOpts = {
   connectionString: string
@@ -42,18 +53,20 @@ class PersistentSubscriptionConsumption<T extends JSONEventType> implements Cons
   #getClient: () => KurrentDBClient
   #streamToSubscribe: string
   #groupName: string
-  #persistentSubscriptionCreationOpts: PersistentSubscriptionToStreamSettings
+  #subscriptionCreationOpts: PersistentSubscriptionToStreamSettings
   #subscribeOpts?: SubscribeToPersistentSubscriptionToStreamOptions
   #duplexOpts?: DuplexOptions
   #handler: (event: RecordedEvent<T>) => Promise<void>
+
   #subscription?: PersistentSubscriptionToStream<T>
   #stopReconnecting = false
+  #hooks = new Hooks<ConsumptionHooks>()
 
   constructor(getClient: () => KurrentDBClient, streamToSubscribe: string, groupName: string, persistentSubscriptionCreationOpts: PersistentSubscriptionToStreamSettings, subscribeOpts: SubscribeToPersistentSubscriptionToStreamOptions, duplexOpts: DuplexOptions, handler: (event: RecordedEvent<T>) => Promise<void>) {
     this.#getClient = getClient;
     this.#streamToSubscribe = streamToSubscribe;
     this.#groupName = groupName;
-    this.#persistentSubscriptionCreationOpts = persistentSubscriptionCreationOpts;
+    this.#subscriptionCreationOpts = persistentSubscriptionCreationOpts;
     this.#subscribeOpts = subscribeOpts;
     this.#duplexOpts = duplexOpts;
     this.#handler = handler;
@@ -67,11 +80,21 @@ class PersistentSubscriptionConsumption<T extends JSONEventType> implements Cons
     await this.#ensurePersistentSubscriptionCreated()
     this.#stopReconnecting = false
     this.#startConsuming()
+    this.#hooks.executeHook("onStart", [])
   }
 
   async stop(): Promise<void> {
     this.#stopReconnecting = true
     await this.#subscription?.unsubscribe()
+    this.#hooks.executeHook("onStop", [ "manually_stopped" ])
+  }
+
+  addHook(hook: "onError", handler: (error: unknown) => void): this
+  addHook(hook: "onStart", handler: () => void): this
+  addHook(hook: "onStop", handler: (reason: StopReason, error?: unknown) => void): this
+  addHook(hook: string, handler: (...params: any[]) => void): this {
+    this.#hooks.addHook(hook as keyof ConsumptionHooks, handler)
+    return this
   }
 
   async #ensurePersistentSubscriptionCreated() {
@@ -81,7 +104,7 @@ class PersistentSubscriptionConsumption<T extends JSONEventType> implements Cons
       await client.createPersistentSubscriptionToStream(
         this.#streamToSubscribe,
         this.#groupName,
-        this.#persistentSubscriptionCreationOpts
+        this.#subscriptionCreationOpts
       )
     } catch (error: unknown) {
       if (!(error instanceof PersistentSubscriptionExistsError)) {
@@ -120,10 +143,12 @@ class PersistentSubscriptionConsumption<T extends JSONEventType> implements Cons
           }
         }
       } catch (e: unknown) {
+        this.#hooks.executeHook("onError", [ e ])
         if (!(e instanceof UnavailableError)) {
-          throw e
+          this.#hooks.executeHook("onStop", [ "unrecoverable_error", e ])
+          return
         }
-        console.log("error consuming the subscription from kurrentdb", e)
+
         await setTimeout(500)
       }
     }

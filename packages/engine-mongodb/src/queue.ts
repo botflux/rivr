@@ -1,4 +1,4 @@
-import {ConsumeOpts, Consumption, Message, Queue} from "rivr";
+import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Queue, StopReason} from "rivr";
 import {
   ChangeStream,
   ChangeStreamDocument,
@@ -9,6 +9,7 @@ import {
   MongoClientOptions
 } from "mongodb";
 import { setTimeout } from "node:timers/promises"
+import {Hooks} from "rivr/dist/hooks/hooks";
 
 class InfiniteLoop {
   #stopped = false;
@@ -38,6 +39,13 @@ class CompoundConsumption implements Consumption {
   async stop(): Promise<void> {
     await Promise.all(this.#consumptions.map(c => c.stop()))
   }
+
+  addHook(hook: "onError", handler: (error: unknown) => void): this
+  addHook(hook: "onStart", handler: () => void): this
+  addHook(hook: "onStop", handler: (reason: StopReason, error?: unknown) => void): this
+  addHook(hook: string, handler: (...params: any[]) => void): this {
+    return this
+  }
 }
 
 class PollingConsumption implements Consumption {
@@ -48,6 +56,7 @@ class PollingConsumption implements Consumption {
 
   #abort = new AbortController()
   #infiniteLoop = new InfiniteLoop()
+  #hooks = new Hooks<ConsumptionHooks>()
 
   constructor(consumeOpts: ConsumeOpts, getCollection: () => Collection<MongoMessage>, opts: MongoDBQueueOpts, onlyModifiedBefore?: () => Date) {
     this.#consumeOpts = consumeOpts;
@@ -116,17 +125,24 @@ class PollingConsumption implements Consumption {
       throw error
     }
   }
+
+  addHook(hook: "onError", handler: (error: unknown) => void): this
+  addHook(hook: "onStart", handler: () => void): this
+  addHook(hook: "onStop", handler: (reason: StopReason, error?: unknown) => void): this
+  addHook(hook: string, handler: (...params: any[]) => void): this {
+    this.#hooks.addHook(hook as keyof ConsumptionHooks, handler)
+    return this
+  }
 }
 
 class ChangeStreamConsumption implements Consumption {
   #consumeOpts: ConsumeOpts
-  #opts: MongoDBQueueOpts
   #getCollection: () => Collection<MongoMessage>
   #changeStream: ChangeStream<MongoMessage, ChangeStreamDocument<MongoMessage>> | undefined
+  #hooks = new Hooks<ConsumptionHooks>()
 
-  constructor(consumeOpts: ConsumeOpts, opts: MongoDBQueueOpts, getCollection: () => Collection<MongoMessage>) {
+  constructor(consumeOpts: ConsumeOpts, getCollection: () => Collection<MongoMessage>) {
     this.#consumeOpts = consumeOpts;
-    this.#opts = opts;
     this.#getCollection = getCollection;
   }
 
@@ -136,6 +152,14 @@ class ChangeStreamConsumption implements Consumption {
 
   async stop(): Promise<void> {
     await this.#changeStream?.close()
+  }
+
+  addHook(hook: "onError", handler: (error: unknown) => void): this
+  addHook(hook: "onStart", handler: () => void): this
+  addHook(hook: "onStop", handler: (reason: StopReason, error?: unknown) => void): this
+  addHook(hook: string, handler: (...params: any[]) => void): this {
+    this.#hooks.addHook(hook as keyof ConsumptionHooks, handler)
+    return this
   }
 
   async #startConsuming() {
@@ -219,7 +243,6 @@ class MongoDBQueue implements Queue<MongoDBWriteOpts> {
           await opts.onMessage(msg)
         }
       },
-      this.#opts,
       () => this.#getCollection()
     )
 

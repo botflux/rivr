@@ -1,13 +1,15 @@
-import {ConsumeOpts, Consumption, Message, Queue} from "rivr";
+import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Queue, StopReason} from "rivr";
 import {SocketOptions} from "node:dgram";
 import {Channel, ChannelModel, ConfirmChannel} from "amqplib";
 import { setTimeout } from "node:timers/promises"
 import {AmqpConnectionManager, AmqpConnectionManagerOptions, ChannelWrapper, connect} from "amqp-connection-manager";
+import {Hooks} from "rivr/dist/hooks/hooks";
 
 class RabbitMQConsumption implements Consumption {
   #channelWrapper: ChannelWrapper
   #opts: RabbitMQQueueOpts
   #consumeOpts: ConsumeOpts
+  #hooks = new Hooks<ConsumptionHooks>()
 
   constructor(channelManager: AmqpConnectionManager, opts: RabbitMQQueueOpts, consumeOpts: ConsumeOpts) {
     this.#opts = opts;
@@ -18,6 +20,14 @@ class RabbitMQConsumption implements Consumption {
         await ensureQueuesExists(channel, opts)
       }
     })
+  }
+
+  addHook(hook: "onError", handler: (error: unknown) => void): this
+  addHook(hook: "onStart", handler: () => void): this
+  addHook(hook: "onStop", handler: (reason: StopReason, error?: unknown) => void): this
+  addHook(hook: string, handler: (...params: any[]) => void): this {
+    this.#hooks.addHook(hook as keyof ConsumptionHooks, handler)
+    return this
   }
 
   async start(): Promise<void> {

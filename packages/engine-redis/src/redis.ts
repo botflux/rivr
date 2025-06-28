@@ -1,4 +1,4 @@
-import {ConsumeOpts, Consumption, Message, Queue} from "rivr/dist/queue";
+import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Queue, Hooks, StopReason} from "rivr";
 import {createClient, RedisClientOptions} from "redis";
 import {randomUUID} from "node:crypto";
 
@@ -38,6 +38,7 @@ class RedisConsumption implements Consumption {
   #consumptionId = randomUUID()
 
   #stopped = false
+  #hooks = new Hooks<ConsumptionHooks>()
 
   constructor(getClient: () => Promise<ReturnType<typeof createClient>>, consumeOpts: ConsumeOpts, queueOpts: RedisQueueConstructorOpts) {
     this.#getClient = getClient;
@@ -54,6 +55,14 @@ class RedisConsumption implements Consumption {
 
   async stop(): Promise<void> {
     this.#stopped = true
+  }
+
+  addHook(hook: "onError", handler: (error: unknown) => void): this
+  addHook(hook: "onStart", handler: () => void): this
+  addHook(hook: "onStop", handler: (reason: StopReason, error?: unknown) => void): this
+  addHook(hook: string, handler: (...params: any[]) => void): this {
+    this.#hooks.addHook(hook as keyof ConsumptionHooks, handler)
+    return this
   }
 
   async #startConsuming() {
