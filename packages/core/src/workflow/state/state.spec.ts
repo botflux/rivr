@@ -167,7 +167,7 @@ describe('state', function () {
     const state = createWorkflowState(workflow, "add-1", 1, id, now)
     const newState = updateWorkflowState(state, step, {
       type: "skipped",
-    })
+    }, now)
 
     // Then
     t.assert.deepStrictEqual(newState, {
