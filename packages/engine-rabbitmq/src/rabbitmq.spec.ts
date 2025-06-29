@@ -2,7 +2,7 @@ import {after, before, describe} from "node:test";
 import {advancedFlow, basicFlow, installUnhandledRejectionHook, timeBasedFlow} from "rivr";
 import {GenericContainerBuilder, Wait} from "testcontainers";
 import {RabbitMQContainer, StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
-import { join } from "node:path";
+import {join} from "node:path";
 import {randomUUID} from "node:crypto";
 import {createQueue as createRabbitMQQueue} from "./rabbitmq";
 

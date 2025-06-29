@@ -1,4 +1,4 @@
-import {Message, Producer, Queue} from "../queue";
+import {Message, Producer} from "../queue";
 
 export const kOutbox = Symbol("kOutbox");
 

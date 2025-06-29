@@ -1,6 +1,6 @@
 import {MongoDBContainer, StartedMongoDBContainer} from "@testcontainers/mongodb";
 import {advancedFlow, basicFlow, installUnhandledRejectionHook, timeBasedFlow} from "rivr";
-import { createQueue as createMongoQueue } from "./queue"
+import {createQueue as createMongoQueue} from "./queue"
 import {after, before, describe} from "node:test";
 import {randomUUID} from "node:crypto";
 

@@ -10,14 +10,7 @@ import {
 import {advancedFlow, basicFlow, createWorker, Message, rivr, trigger, WorkflowState} from "rivr";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
-import {
-  jsonEvent,
-  JSONEventType,
-  JSONRecordedEvent,
-  KurrentDBClient,
-  RecordedEvent,
-  RecordedEventToEventType
-} from "@kurrent/kurrentdb-client";
+import {jsonEvent, JSONEventType, KurrentDBClient} from "@kurrent/kurrentdb-client";
 
 describe('kurrentdb', function () {
   let kurrentdb!: StartedKurrentDbContainer

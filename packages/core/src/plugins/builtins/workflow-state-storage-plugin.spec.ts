@@ -1,5 +1,5 @@
 import {describe, test, TestContext} from "node:test";
-import {ConsumerOpts, Consumer, ConsumptionHooks, Message, Producer, Queue, StopReason} from "../../queue";
+import {Consumer, ConsumerOpts, ConsumptionHooks, Message, Producer, Queue, StopReason} from "../../queue";
 import {EventEmitter, on} from "node:events"
 import {ListWorkflowStateOpts, ListWorkflowStateResult, WorkflowStateStorage} from "../../workflow/state/storage";
 import {WorkflowState} from "../../workflow/state/state";

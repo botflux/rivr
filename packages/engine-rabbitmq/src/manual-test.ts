@@ -3,7 +3,7 @@ import {randomUUID} from "node:crypto";
 import {RabbitMQContainer} from "@testcontainers/rabbitmq";
 import {Network} from "testcontainers";
 import {ToxiProxyContainer} from "@testcontainers/toxiproxy";
-import { setTimeout } from "node:timers/promises"
+import {setTimeout} from "node:timers/promises"
 
 export async function manualTest() {
   const network = await new Network().start()

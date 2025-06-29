@@ -1,7 +1,7 @@
 import {consumeCustomSubscription, createQueue} from "./kurrentdb";
 import {createWorker, Message, rivr, trigger} from "rivr";
 import {randomUUID} from "node:crypto";
-import {jsonEvent, JSONEventType, KurrentDBClient, RecordedEvent} from "@kurrent/kurrentdb-client";
+import {jsonEvent, JSONEventType, KurrentDBClient} from "@kurrent/kurrentdb-client";
 
 async function sandbox(): Promise<void> {
   type MyEvent = JSONEventType<"record_created", { value: number }>

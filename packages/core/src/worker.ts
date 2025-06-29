@@ -3,7 +3,7 @@ import {updateWorkflowState, WorkflowState} from "./workflow/state/state";
 import {ReadyWorkflow, Step, StepResult, Workflow} from "./workflow/types";
 import {randomUUID} from "crypto";
 import {isOutboxState} from "./outbox/handler";
-import {OutboxMessage, OutboxState} from "./outbox/types";
+import {OutboxMessage} from "./outbox/types";
 
 export type OnError = (error: unknown) => void
 

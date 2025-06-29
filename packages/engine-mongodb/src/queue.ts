@@ -1,4 +1,4 @@
-import {ConsumerOpts, Consumer, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
+import {Consumer, ConsumerOpts, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
 import {
   ChangeStream,
   ChangeStreamDocument,
@@ -8,7 +8,7 @@ import {
   MongoClient,
   MongoClientOptions
 } from "mongodb";
-import { setTimeout } from "node:timers/promises"
+import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
 
 class InfiniteLoop {

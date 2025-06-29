@@ -1,6 +1,6 @@
 import {Queue} from "../queue";
 import {describe, test, TestContext} from "node:test";
-import { setTimeout } from "node:timers/promises"
+import {setTimeout} from "node:timers/promises"
 import {createWorker} from "../worker";
 import {rivr} from "../workflow/workflow";
 import {trigger, triggerFrom} from "../workflow/trigger";

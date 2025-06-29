@@ -1,5 +1,5 @@
-import {ConsumerOpts, Consumer, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
-import {Channel, ChannelModel, ConfirmChannel} from "amqplib";
+import {Consumer, ConsumerOpts, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
+import {Channel, ConfirmChannel} from "amqplib";
 import {AmqpConnectionManager, AmqpConnectionManagerOptions, ChannelWrapper, connect} from "amqp-connection-manager";
 import {Hooks} from "rivr/dist/hooks/hooks";
 

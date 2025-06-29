@@ -1,29 +1,28 @@
 import {
-  ConsumerOpts,
   Consumer,
+  ConsumerOpts,
+  ConsumptionHooks,
   Message,
+  Producer,
   Queue,
+  StopReason,
   WorkflowState,
-  WorkflowStateStorage,
-  ListWorkflowStateOpts,
-  ListWorkflowStateResult,
-  ConsumptionHooks, StopReason, Producer
+  WorkflowStateStorage
 } from "rivr";
 import {
-  EventTypeToRecordedEvent,
   JSONEventType,
   KurrentDBClient,
   PersistentSubscriptionExistsError,
   PersistentSubscriptionToStream,
-  PersistentSubscriptionToStreamSettings, RecordedEvent,
-  RecordedEventToEventType,
+  PersistentSubscriptionToStreamSettings,
+  RecordedEvent,
   SubscribeToPersistentSubscriptionToStreamOptions,
   UnavailableError
 } from "@kurrent/kurrentdb-client"
 import {JSONEventData} from "@kurrent/kurrentdb-client/dist/types/events";
 import {CreatePersistentSubscriptionOpts, CreateQueueOpts} from "./public-types";
 import {DuplexOptions} from "node:stream";
-import { setTimeout } from "node:timers/promises"
+import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
 
 type KurrentDBQueueOpts = {
