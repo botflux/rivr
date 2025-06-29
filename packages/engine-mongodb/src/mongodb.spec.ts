@@ -17,7 +17,6 @@ after(async () => {
 })
 
 describe("mongodb queue", function () {
-
   describe('producer/consumer', function () {
     test("should be able to produce in a queue", async (t: TestContext) => {
       // Given
@@ -288,6 +287,95 @@ describe("mongodb queue", function () {
       await waitForPredicate(() => pickedBySucceedingConsumer.length > 0)
       t.assert.deepStrictEqual(pickedByFailingConsumer, [ producedMessage ])
       t.assert.deepStrictEqual(pickedBySucceedingConsumer, [producedMessage])
+    })
+  })
+
+  describe('hooks', function () {
+    test("onStart is not triggered if the consumer is not started", (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: container.getConnectionString(),
+        clientOpts: {
+          directConnection: true,
+        },
+        dbName: randomUUID()
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      // When
+      const [ consumer ] = queue.createConsumers({
+        onMessage: async msg => {}
+      })
+
+      let called = false
+      consumer.addHook("onStart", () => called = true)
+
+      // Then
+      t.assert.strictEqual(called, false)
+    })
+
+    test("should be able to trigger the onStart hook", async (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: container.getConnectionString(),
+        clientOpts: {
+          directConnection: true,
+        },
+        dbName: randomUUID()
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const [ consumer ] = queue.createConsumers({
+        onMessage: async msg => {}
+      })
+
+      let called = false
+      consumer.addHook("onStart", () => called = true)
+
+      t.after(async () => {
+        await consumer.stop()
+      })
+
+      // When
+      await consumer.start()
+
+      // Then
+      t.assert.strictEqual(called, true)
+    })
+    
+    test("should be able to trigger the onStop hook", async (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: container.getConnectionString(),
+        clientOpts: {
+          directConnection: true,
+        },
+        dbName: randomUUID()
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const [ consumer ] = queue.createConsumers({
+        onMessage: async msg => {}
+      })
+
+      let reason: unknown
+      consumer.addHook("onStop", (r) => reason = r)
+      await consumer.start()
+
+      // When
+      await consumer.stop()
+
+      // Then
+      t.assert.strictEqual(reason, "manually_stopped")
     })
   })
 

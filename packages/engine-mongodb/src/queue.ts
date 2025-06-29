@@ -36,11 +36,13 @@ class PollingConsumer implements Consumer {
 
   async start(): Promise<void> {
     this.#startConsuming()
+    this.#hooks.executeHook("onStart", [])
   }
 
   async stop(): Promise<void> {
     this.#infiniteLoop.stop()
     this.#abort.abort()
+    this.#hooks.executeHook("onStop", [ "manually_stopped" ])
   }
 
   async #startConsuming() {
