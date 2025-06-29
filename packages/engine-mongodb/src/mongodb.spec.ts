@@ -4,16 +4,29 @@ import {createQueue, createQueue as createMongoQueue} from "./queue"
 import test, {after, before, describe, TestContext} from "node:test";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
+import {Network, StartedNetwork} from "testcontainers";
+import {StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
 
-let container!: StartedMongoDBContainer
+let network!: StartedNetwork
+let mongodb!: StartedMongoDBContainer
+let toxiproxy!: StartedToxiProxyContainer
 
 installUnhandledRejectionHook()
 before(async () => {
-  container = await new MongoDBContainer("mongo:8").start()
+  network = await new Network().start()
+  mongodb = await new MongoDBContainer("mongo:8")
+    .withNetwork(network)
+    .withNetworkAliases("mongo")
+    .start()
+  toxiproxy = await new ToxiProxyContainer("ghcr.io/shopify/toxiproxy:2.12.0")
+    .withNetwork(network)
+    .start()
 })
 
 after(async () => {
-  await container?.stop()
+  await toxiproxy?.stop()
+  await mongodb?.stop()
+  await network?.stop()
 })
 
 describe("mongodb queue", function () {
@@ -21,7 +34,7 @@ describe("mongodb queue", function () {
     test("should be able to produce in a queue", async (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
-        url: container.getConnectionString(),
+        url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true
@@ -55,7 +68,7 @@ describe("mongodb queue", function () {
     test("should be able to consume a message", async (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
-        url: container.getConnectionString(),
+        url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true
@@ -106,7 +119,7 @@ describe("mongodb queue", function () {
     test("should be able to consume from multiple consumptions", async (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
-        url: container.getConnectionString(),
+        url: mongodb.getConnectionString(),
         delayBetweenEmptyPolls: 100,
         clientOpts: {
           directConnection: true
@@ -168,7 +181,7 @@ describe("mongodb queue", function () {
     test("should be able to retry nack messages", async (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
-        url: container.getConnectionString(),
+        url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true,
@@ -227,7 +240,7 @@ describe("mongodb queue", function () {
     test("should be able to take another consumer's messages if not handled in time", async (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
-        url: container.getConnectionString(),
+        url: mongodb.getConnectionString(),
         delayBetweenEmptyPolls: 100,
         clientOpts: {
           directConnection: true,
@@ -294,7 +307,7 @@ describe("mongodb queue", function () {
     test("should be able to ignore if already disconnected", async (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
-        url: container.getConnectionString(),
+        url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true,
@@ -320,7 +333,7 @@ describe("mongodb queue", function () {
     test("onStart is not triggered if the consumer is not started", (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
-        url: container.getConnectionString(),
+        url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
         },
@@ -346,7 +359,7 @@ describe("mongodb queue", function () {
     test("should be able to trigger the onStart hook", async (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
-        url: container.getConnectionString(),
+        url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
         },
@@ -378,7 +391,7 @@ describe("mongodb queue", function () {
     test("should be able to trigger the onStop hook", async (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
-        url: container.getConnectionString(),
+        url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
         },
@@ -407,7 +420,7 @@ describe("mongodb queue", function () {
     test("should be able to ignore duplicate calls to start", async (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
-        url: container.getConnectionString(),
+        url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
         },
@@ -440,7 +453,7 @@ describe("mongodb queue", function () {
     test("should be able to ignore duplicate calls to stop", async (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
-        url: container.getConnectionString(),
+        url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
         },
@@ -470,7 +483,7 @@ describe("mongodb queue", function () {
 
   describe('workflows', function () {
     const createQueue = () => createMongoQueue({
-      url: container.getConnectionString(),
+      url: mongodb.getConnectionString(),
       clientOpts: { directConnection: true },
       dbName: randomUUID(),
       delayBetweenEmptyPolls: 100,
