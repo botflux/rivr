@@ -122,9 +122,6 @@
       "path": "./packages/engine-rabbitmq/tsconfig.json",
     },
     {
-      "path": "./packages/engine-redis/tsconfig.json",
-    },
-    {
       "path": "./packages/queue-kurrentdb/tsconfig.json"
     },
     {

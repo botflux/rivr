@@ -28,7 +28,6 @@
     "packages/engine-mongodb",
     "packages/fastify",
     "packages/engine-rabbitmq",
-    "packages/engine-redis",
     "packages/queue-kurrentdb"
   ]
 }
