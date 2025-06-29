@@ -1,5 +1,5 @@
 import {Consumer, ConsumerOpts, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
-import {ClientSession, Collection, Filter, MongoClient, MongoClientOptions} from "mongodb";
+import {ClientSession, Collection, Filter, MongoClient, MongoClientOptions, WithId} from "mongodb";
 import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
 import {randomUUID} from "node:crypto";
@@ -18,7 +18,7 @@ class InfiniteLoop {
   }
 }
 
-class PollingConsumption implements Consumer {
+class PollingConsumer implements Consumer {
   #consumeOpts: ConsumerOpts
   #getCollection: () => Collection<MongoMessage>
   #opts: MongoDBQueueOpts
@@ -49,14 +49,21 @@ class PollingConsumption implements Consumer {
         const messages = await this.#pullMessages(this.#opts.countPerPoll)
 
         for (const message of messages) {
+          const { _id, status, consideredDeadAfter, pulledAt, pulledBy, version, ...rest } = message
           try {
-            await this.#consumeOpts.onMessage(message)
-            await this.#getCollection().updateOne({ id: message.id }, { $set: { status: "done" } })
+            await this.#consumeOpts.onMessage(rest)
+            await this.#getCollection().findOneAndUpdate({
+              id: message.id,
+              version
+            }, {
+              $set: { status: "done", version: version + 1 }
+            })
           } catch (error: unknown) {
             await this.#getCollection().updateOne({
-              id: message.id
+              id: message.id,
+              version
             }, {
-              $set: { status: "todo" },
+              $set: { status: "todo", version: version + 1 },
               $unset: { pulledAt: "", pulledBy: "", consideredDeadAfter: "" }
             })
             console.error("error while executing the onMessage callback", error)
@@ -73,7 +80,7 @@ class PollingConsumption implements Consumer {
   }
 
   async #pullMessages(limit: number) {
-    let messages: Message[] = []
+    const messages: WithId<MongoMessage>[] = []
 
     do {
       const mMessage = await this.#getCollection().findOneAndUpdate({
@@ -115,9 +122,7 @@ class PollingConsumption implements Consumer {
         return messages
       }
 
-      const { _id, status, pulledAt, pulledBy, consideredDeadAfter, ...rest } = mMessage
-
-      messages.push(rest)
+      messages.push(mMessage)
     } while(limit)
 
     return messages
@@ -147,7 +152,13 @@ export type MongoDBWriteOpts = {
   session?: ClientSession
 }
 
-type MongoMessage = Message & { status: "todo" | "doing" | "done", pulledBy?: string, pulledAt?: Date, consideredDeadAfter?: Date }
+type MongoMessage = Message & {
+  status: "todo" | "doing" | "done",
+  pulledBy?: string,
+  pulledAt?: Date,
+  consideredDeadAfter?: Date
+  version: number
+}
 
 class MongoDBProducer implements Producer<MongoDBWriteOpts> {
   #collection: Collection<MongoMessage>
@@ -159,7 +170,7 @@ class MongoDBProducer implements Producer<MongoDBWriteOpts> {
   async produce(messages: Message[], opts: MongoDBWriteOpts = {}): Promise<void> {
     const { session } = opts
 
-    await this.#collection.insertMany(messages.map(message => ({ ...message, status: "todo" })), { session })
+    await this.#collection.insertMany(messages.map(message => ({ ...message, status: "todo", version: 1 })), { session })
   }
 
   supportsDelayedMessages(): boolean {
@@ -177,12 +188,6 @@ class MongoDBQueue implements Queue<MongoDBWriteOpts> {
     this.#opts = opts;
   }
 
-  async produce(messages: Message[], opts: MongoDBWriteOpts = {}): Promise<void> {
-    const { session } = opts
-
-    await this.#getCollection().insertMany(messages.map(message => ({ ...message, status: "todo" })), { session })
-  }
-
   createProducer(): Producer<MongoDBWriteOpts> {
     return new MongoDBProducer(
       this.#getCollection()
@@ -194,7 +199,7 @@ class MongoDBQueue implements Queue<MongoDBWriteOpts> {
   }
 
   createConsumers(opts: ConsumerOpts): Consumer[] {
-    const polling = new PollingConsumption(
+    const polling = new PollingConsumer(
       opts,
       () => this.#getCollection(),
       this.#opts,
