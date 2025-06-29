@@ -131,17 +131,17 @@ describe('kurrentdb resilience', function () {
     })
 
     const receivedMessages: Message[] = []
-    const consumption = unstable.createConsumers({
+    const [consumer] = unstable.createConsumers({
       onMessage: async (msg) => {
         receivedMessages.push(msg)
       }
     })
 
     t.after(async () => {
-      await consumption.stop()
+      await consumer.stop()
     })
 
-    await consumption.start()
+    await consumer.start()
 
     const firstMessage = randomMessage()
     await producer.produce([firstMessage])
@@ -189,19 +189,19 @@ describe('kurrentdb resilience', function () {
     })
 
     const errorEvents: unknown[] = []
-    const consumption = unstable.createConsumers({
+    const [consumer] = unstable.createConsumers({
       onMessage: async (msg) => {}
     })
 
-    consumption.addHook("onError", (error) => {
+    consumer.addHook("onError", (error) => {
       errorEvents.push(error)
     })
 
     t.after(async () => {
-      await consumption.stop()
+      await consumer.stop()
     })
 
-    await consumption.start()
+    await consumer.start()
 
     // When
     await proxy.setEnabled(false)

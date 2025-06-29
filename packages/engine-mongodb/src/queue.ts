@@ -252,7 +252,7 @@ class MongoDBQueue implements Queue<MongoDBWriteOpts> {
     await this.#mongoClient?.close(true)
   }
 
-  createConsumers(opts: ConsumerOpts): Consumer {
+  createConsumers(opts: ConsumerOpts): Consumer[] {
     let latestChangeStreamMessageCreationDate = new Date()
 
     const polling = new PollingConsumption(
@@ -273,11 +273,8 @@ class MongoDBQueue implements Queue<MongoDBWriteOpts> {
     )
 
     return this.#opts.enableChangeStream
-      ? new CompoundConsumption([
-        polling,
-        changeStream
-      ])
-      : polling
+      ? [ polling, changeStream ]
+      : [ polling ]
   }
 
   #getClient(): MongoClient {

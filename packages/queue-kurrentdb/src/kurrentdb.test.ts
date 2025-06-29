@@ -83,17 +83,17 @@ describe('kurrentdb', function () {
       const randomMsg = randomMessage()
       let msg!: unknown
 
-      const consumption = queue.createConsumers({
+      const [consumer] = queue.createConsumers({
         onMessage: async msg1 => {
           msg = msg1
         }
       })
 
       t.after(async () => {
-        await consumption.stop()
+        await consumer.stop()
       })
 
-      await consumption.start()
+      await consumer.start()
 
       // When
       await producer.produce([ randomMsg ])
@@ -117,19 +117,19 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption = queue.createConsumers({
+      const [consumer] = queue.createConsumers({
         onMessage: async msg => {}
       })
 
       t.after(async () => {
-        await consumption.stop()
+        await consumer.stop()
       })
 
-      await consumption.start()
+      await consumer.start()
 
       // When
       // Then
-      const mError = await consumption.start().catch(e => e)
+      const mError = await consumer.start().catch(e => e)
       t.assert.strictEqual(mError, undefined)
     })
 
@@ -147,27 +147,27 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption1 = queue.createConsumers({
+      const [consumer1] = queue.createConsumers({
         onMessage: async () => {}
       })
 
       t.after(async () => {
-        await consumption1.stop()
+        await consumer1.stop()
       })
 
-      await consumption1.start()
+      await consumer1.start()
 
-      const consumption2 = queue.createConsumers({
+      const [consumer2] = queue.createConsumers({
         onMessage: async () => {}
       })
 
       t.after(async () => {
-        await consumption2.stop()
+        await consumer2.stop()
       })
 
       // When
       // Then
-      const mError = await consumption2.start().catch(e => e)
+      const mError = await consumer2.start().catch(e => e)
       t.assert.strictEqual(mError, undefined)
     })
 
@@ -194,20 +194,20 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption = queue.createConsumers({
+      const [consumer] = queue.createConsumers({
         onMessage: async msg => {}
       })
 
       let called = false
 
-      consumption.addHook("onStart", () => called = true)
+      consumer.addHook("onStart", () => called = true)
 
       t.after(async () => {
-        await consumption.stop()
+        await consumer.stop()
       })
 
       // When
-      await consumption.start()
+      await consumer.start()
 
       // Then
       t.assert.strictEqual(called, true)
@@ -224,21 +224,21 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption = queue.createConsumers({
+      const [consumer] = queue.createConsumers({
         onMessage: async msg => {}
       })
 
       let calls = 0
 
-      consumption.addHook("onStart", () => calls++)
+      consumer.addHook("onStart", () => calls++)
 
       t.after(async () => {
-        await consumption.stop()
+        await consumer.stop()
       })
 
       // When
-      await consumption.start()
-      await consumption.start()
+      await consumer.start()
+      await consumer.start()
 
       // Then
       t.assert.strictEqual(calls, 1)
@@ -255,18 +255,18 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption = queue.createConsumers({
+      const [consumer] = queue.createConsumers({
         onMessage: async msg => {}
       })
 
       let params: unknown[] = []
 
-      consumption.addHook("onStop", (...params1) => params = params1)
+      consumer.addHook("onStop", (...params1) => params = params1)
 
-      await consumption.start()
+      await consumer.start()
 
       // When
-      await consumption.stop()
+      await consumer.stop()
 
       // Then
       t.assert.deepStrictEqual(params, [ "manually_stopped" ])
@@ -283,7 +283,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption = queue.createConsumers({
+      const [consumption] = queue.createConsumers({
         onMessage: async msg => {}
       })
 

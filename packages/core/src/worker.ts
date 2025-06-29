@@ -169,7 +169,7 @@ class DefaultWorker implements Worker {
     const queues = [ primary, ...secondaries ]
 
     this.#consumptions = [
-      ...queues.map(queue => queue.createConsumers({
+      ...queues.flatMap(queue => queue.createConsumers({
         onMessage: async msg => {
           for (const handler of this.#handlers) {
             if (handler.support(msg)) {

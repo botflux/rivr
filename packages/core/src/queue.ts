@@ -75,6 +75,6 @@ export interface Queue<WriteOpts> {
    *
    * @param opts
    */
-  createConsumers(opts: ConsumerOpts): Consumer
+  createConsumers(opts: ConsumerOpts): Consumer[]
   disconnect(): Promise<void>
 }

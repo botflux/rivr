@@ -29,12 +29,12 @@ export async function manualTest() {
     exchange: randomUUID()
   })
 
-  const consumption = queue.createConsumers({
+  const [consumer] = queue.createConsumers({
     onMessage: async (msg) => console.log(msg),
   })
 
   try {
-    await consumption.start()
+    await consumer.start()
     await setTimeout(1000)
 
     await proxy.setEnabled(false)
@@ -52,7 +52,7 @@ export async function manualTest() {
       }
     ])
   } finally {
-    await consumption.stop()
+    await consumer.stop()
     await queue.disconnect()
     await proxy.instance.remove()
     await toxiproxy.stop()
