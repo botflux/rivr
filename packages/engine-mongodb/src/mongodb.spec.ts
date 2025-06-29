@@ -1,6 +1,6 @@
 import {MongoDBContainer, StartedMongoDBContainer} from "@testcontainers/mongodb";
 import {advancedFlow, basicFlow, installUnhandledRejectionHook, Message, timeBasedFlow} from "rivr";
-import {createQueue as createMongoQueue} from "./queue"
+import {createQueue, createQueue as createMongoQueue} from "./queue"
 import test, {after, before, describe, TestContext} from "node:test";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
@@ -287,6 +287,32 @@ describe("mongodb queue", function () {
       await waitForPredicate(() => pickedBySucceedingConsumer.length > 0)
       t.assert.deepStrictEqual(pickedByFailingConsumer, [ producedMessage ])
       t.assert.deepStrictEqual(pickedBySucceedingConsumer, [producedMessage])
+    })
+  })
+
+  describe('disconnect', function () {
+    test("should be able to ignore if already disconnected", async (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        clientOpts: {
+          directConnection: true,
+        },
+      })
+
+      // Produce a message to initialize the MongoClient.
+      await queue
+        .createProducer()
+        .produce([ { createdAt: new Date(), id: randomUUID(), payload: { msg: "hello" }, type: "foo" } ])
+
+      // When
+      const error1 = await queue.disconnect().catch((err) => err)
+      const error2 = await queue.disconnect().catch((err) => err)
+
+      // Then
+      t.assert.strictEqual(error1, undefined)
+      t.assert.strictEqual(error2, undefined)
     })
   })
 
