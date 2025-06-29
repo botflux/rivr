@@ -1,4 +1,4 @@
-import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Queue, StopReason} from "rivr";
+import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
 import {
   ChangeStream,
   ChangeStreamDocument,
@@ -204,6 +204,26 @@ export type MongoDBWriteOpts = {
 
 type MongoMessage = Message & { status: "todo" | "done" }
 
+class MongoDBProducer implements Producer<MongoDBWriteOpts> {
+  #collection: Collection<MongoMessage>
+
+  constructor(collection: Collection<MongoMessage>) {
+    this.#collection = collection;
+  }
+
+  async produce(messages: Message[], opts: MongoDBWriteOpts = {}): Promise<void> {
+    const { session } = opts
+
+    await this.#collection.insertMany(messages.map(message => ({ ...message, status: "todo" })), { session })
+  }
+
+  supportsDelayedMessages(): boolean {
+      return true
+  }
+
+  async disconnect(): Promise<void> {}
+}
+
 class MongoDBQueue implements Queue<MongoDBWriteOpts> {
   readonly #opts: MongoDBQueueOpts
   #mongoClient: MongoClient | undefined
@@ -216,6 +236,12 @@ class MongoDBQueue implements Queue<MongoDBWriteOpts> {
     const { session } = opts
 
     await this.#getCollection().insertMany(messages.map(message => ({ ...message, status: "todo" })), { session })
+  }
+
+  createProducer(): Producer<MongoDBWriteOpts> {
+    return new MongoDBProducer(
+      this.#getCollection()
+    )
   }
 
   supportsDelayedMessages(): boolean {

@@ -7,7 +7,7 @@ import {
   WorkflowStateStorage,
   ListWorkflowStateOpts,
   ListWorkflowStateResult,
-  ConsumptionHooks, StopReason
+  ConsumptionHooks, StopReason, Producer
 } from "rivr";
 import {
   EventTypeToRecordedEvent,
@@ -161,12 +161,64 @@ class PersistentSubscriptionConsumption<T extends JSONEventType> implements Cons
   }
 }
 
+class KurrentDBProducer implements Producer<never> {
+  #client: KurrentDBClient
+  #opts: KurrentDBQueueOpts
+
+  constructor(client: KurrentDBClient, opts: KurrentDBQueueOpts) {
+    this.#client = client;
+    this.#opts = opts;
+  }
+
+  async produce(messages: Message[], opts?: undefined): Promise<void> {
+    const messagesByStream = Array.from(this.#groupMessagesByStream(messages).entries())
+    const eventsByStream = messagesByStream.map(([ stream, messages ]) => [
+      `${streamPrefix}${this.#opts.streamInfix}-${stream}`,
+      messages.map(({ createdAt, pickAfter, ...rest }) => ({
+        type: "rivr_message_created",
+        id: rest.id,
+        contentType: "application/json",
+        data: {
+          ...rest,
+          createdAt: createdAt.toISOString(),
+          ...pickAfter !== undefined && { pickAfter: pickAfter.toISOString() },
+        },
+        metadata: {}
+      } as MessageEvent))
+    ] as const)
+
+    await Promise.all(eventsByStream.map(([ stream, events ]) =>
+      this.#client.appendToStream(stream, events)))
+  }
+  supportsDelayedMessages(): boolean {
+      return false
+  }
+
+  async disconnect(): Promise<void> {}
+
+  #groupMessagesByStream(messages: Message[]): Map<string, Message[]> {
+    return messages.reduce(
+      (map, message) => {
+        const streamName = this.#opts.partitionStream(message)
+        const existing = map.get(streamName) ?? []
+
+        return map.set(streamName, [ ...existing, message ])
+      },
+      new Map<string, Message[]>()
+    )
+  }
+}
+
 class KurrentDBQueue implements Queue<never> {
   #opts: KurrentDBQueueOpts
   #client: KurrentDBClient | undefined
 
   constructor(opts: KurrentDBQueueOpts) {
     this.#opts = opts;
+  }
+
+  createProducer(): Producer<never> {
+    return new KurrentDBProducer(this.#getClient(), this.#opts)
   }
 
   async produce(messages: Message[], opts?: undefined): Promise<void> {

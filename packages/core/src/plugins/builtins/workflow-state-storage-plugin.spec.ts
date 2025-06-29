@@ -1,5 +1,5 @@
 import {describe, test, TestContext} from "node:test";
-import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Queue, StopReason} from "../../queue";
+import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Producer, Queue, StopReason} from "../../queue";
 import {EventEmitter, on} from "node:events"
 import {ListWorkflowStateOpts, ListWorkflowStateResult, WorkflowStateStorage} from "../../workflow/state/storage";
 import {WorkflowState} from "../../workflow/state/state";
@@ -55,6 +55,26 @@ class MemoryConsumption implements Consumption {
   }
 }
 
+class MemoryProducer implements Producer<never> {
+  readonly #emitter: EventEmitter
+
+  constructor(emitter: EventEmitter) {
+    this.#emitter = emitter;
+  }
+
+  async produce(messages: Message[], opts?: undefined): Promise<void> {
+    for (const message of messages) {
+      this.#emitter.emit("message", message)
+    }
+  }
+
+  supportsDelayedMessages(): boolean {
+    return false
+  }
+  async disconnect(): Promise<void> {}
+
+}
+
 class MemoryQueue implements Queue<never> {
   readonly #emitter = new EventEmitter()
 
@@ -62,6 +82,10 @@ class MemoryQueue implements Queue<never> {
     for (const message of messages) {
       this.#emitter.emit("message", message)
     }
+  }
+
+  createProducer(): Producer<never> {
+    return new MemoryProducer(this.#emitter)
   }
 
   supportsDelayedMessages(): boolean {

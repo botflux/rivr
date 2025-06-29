@@ -79,5 +79,5 @@ export interface Consumer {
 }
 
 export interface Queue<WriteOpts> extends Producer<WriteOpts>, Consumer {
-
+  createProducer(): Producer<WriteOpts>
 }

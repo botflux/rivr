@@ -1,7 +1,5 @@
-import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Queue, StopReason} from "rivr";
-import {SocketOptions} from "node:dgram";
+import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
 import {Channel, ChannelModel, ConfirmChannel} from "amqplib";
-import { setTimeout } from "node:timers/promises"
 import {AmqpConnectionManager, AmqpConnectionManagerOptions, ChannelWrapper, connect} from "amqp-connection-manager";
 import {Hooks} from "rivr/dist/hooks/hooks";
 
@@ -83,6 +81,79 @@ type RabbitMQQueueOpts = {
   enableDelayedMessageExchange: boolean
 }
 
+class RabbitMQProducer implements Producer<never> {
+  #connection: AmqpConnectionManager
+  #opts: RabbitMQQueueOpts
+  #channel: ChannelWrapper | undefined
+
+  constructor(connection: AmqpConnectionManager, opts: RabbitMQQueueOpts) {
+    this.#connection = connection;
+    this.#opts = opts;
+  }
+
+  async produce(messages: Message[], opts?: undefined): Promise<void> {
+    const channel = this.#getChannel()
+
+    for (const message of messages) {
+      if (message.pickAfter === undefined) {
+        await this.#publishMessage(channel, this.#opts.exchange, message)
+      } else {
+        if (!this.#opts.enableDelayedMessageExchange) {
+          throw new Error("Cannot publish a delayed message in the RabbitMQ queue without `enabledDelayedMessageExchange` set to `true`.")
+        }
+
+        await this.#publishMessage(channel, this.#opts.delayedExchange, message)
+      }
+    }
+  }
+
+  supportsDelayedMessages(): boolean {
+    return this.#opts.enableDelayedMessageExchange
+  }
+
+  async disconnect(): Promise<void> {
+    await this.#channel?.close()
+  }
+
+  #getChannel(): ChannelWrapper {
+    if (this.#channel === undefined) {
+      this.#channel = this.#connection.createChannel({
+        setup: async (ch: ConfirmChannel) => {
+          await ensureQueuesExists(ch, this.#opts)
+        }
+      })
+    }
+
+    return this.#channel
+  }
+
+  async #publishMessage(channel: ChannelWrapper, exchange: string, message: Message): Promise<void> {
+    await channel.publish(
+      exchange,
+      "",
+      Buffer.from(JSON.stringify(message.payload)),
+      {
+        messageId: message.id,
+        type: message.type,
+        contentType: "application/json",
+        persistent: true,
+        headers: {
+          createdAt: message.createdAt.toISOString(),
+          ...message.pickAfter !== undefined && {
+            "x-delay": this.#calculateDelay(message.pickAfter),
+            pickAfter: message.pickAfter.toISOString()
+          },
+        }
+      }
+    )
+  }
+
+  #calculateDelay(pickAfter: Date, now: Date = new Date()): number {
+    return pickAfter.getTime() - now.getTime();
+  }
+
+}
+
 class RabbitMQQueue implements Queue<never> {
   #opts: RabbitMQQueueOpts
   #channelManager: AmqpConnectionManager
@@ -90,6 +161,10 @@ class RabbitMQQueue implements Queue<never> {
   constructor(opts: RabbitMQQueueOpts) {
     this.#opts = opts;
     this.#channelManager = connect(opts.url, opts.connectionManagerOpts)
+  }
+
+  createProducer(): Producer<never> {
+    return new RabbitMQProducer(this.#channelManager, this.#opts)
   }
 
   async produce(messages: Message[], opts?: undefined): Promise<void> {

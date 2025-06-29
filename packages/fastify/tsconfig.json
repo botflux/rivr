@@ -116,9 +116,6 @@
     },
     {
       "path": "../engine-mongodb/tsconfig.json"
-    },
-    {
-      "path": "../engine-redis/tsconfig.json"
     }
   ],
   "exclude": ["node_modules", "dist"]
