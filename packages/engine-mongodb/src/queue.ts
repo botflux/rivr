@@ -1,7 +1,5 @@
 import {Consumer, ConsumerOpts, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
 import {
-  ChangeStream,
-  ChangeStreamDocument,
   ClientSession,
   Collection,
   Filter,
@@ -200,54 +198,22 @@ export type CreateMongoDBQueueOpts = {
    * @default {100}
    */
   countPerPoll?: number
-
-  /**
-   * Enable a change stream consumption.
-   *
-   * Note that this option does not disable the poller.
-   * The change stream will pick most of the messages, but
-   * not the failed messages nor the delayed messages.
-   *
-   * The poller is consuming messages older that the `latestChangeStreamMessageCreationDate - pollOffsetMs`
-   * when the change stream is enabled to not handle the message twice.
-   *
-   * Note that the offset is not applied when the change stream is disabled.
-   * In this configuration, the poller polls all the messages.
-   *
-   * @default {true}
-   */
-  enableChangeStream?: boolean
-
-  /**
-   * Filter the message created before `latestChangeStreamMessageCreationDate - pollOffsetMs`.
-   * This option is used when `enableChangeStream` is `true`.
-   *
-   * When `enableChangeStream` is `false`, the poller will
-   * ignore this option, and it will pull all the messages.
-   *
-   * @default {300_000}
-   */
-  pollOffsetMs?: number
 }
 
 export function createQueue (opts: CreateMongoDBQueueOpts): Queue<never> {
   const {
     collectionName = "rivr-messages",
-    enableChangeStream = true,
     delayBetweenEmptyPolls = 5_000,
     countPerPoll = 100,
     clientOpts = {},
-    pollOffsetMs = 300_000,
     ...rest
   } = opts
 
   return new MongoDBQueue({
     ...rest,
     collectionName,
-    enableChangeStream,
     delayBetweenEmptyPolls,
     clientOpts,
     countPerPoll,
-    pollOffsetMs
   })
 }

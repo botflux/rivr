@@ -1,8 +1,9 @@
 import {MongoDBContainer, StartedMongoDBContainer} from "@testcontainers/mongodb";
-import {advancedFlow, basicFlow, installUnhandledRejectionHook, timeBasedFlow} from "rivr";
+import {advancedFlow, basicFlow, installUnhandledRejectionHook, Message, timeBasedFlow} from "rivr";
 import {createQueue as createMongoQueue} from "./queue"
-import {after, before, describe} from "node:test";
+import test, {after, before, describe, TestContext} from "node:test";
 import {randomUUID} from "node:crypto";
+import {setTimeout} from "node:timers/promises";
 
 let container!: StartedMongoDBContainer
 
@@ -16,18 +17,114 @@ after(async () => {
 })
 
 describe("mongodb queue", function () {
-  const createQueue = () => createMongoQueue({
-    url: container.getConnectionString(),
-    clientOpts: { directConnection: true },
-    dbName: randomUUID(),
-    delayBetweenEmptyPolls: 100,
-    enableChangeStream: true
+
+  describe('producer/consumer', function () {
+    test("should be able to produce in a queue", async (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        clientOpts: {
+          directConnection: true
+        }
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
+      // When
+      const error = await producer.produce([
+        {
+          type: "msg",
+          id: randomUUID(),
+          createdAt: new Date(),
+          payload: { msg: "hello world" },
+        }
+      ]).catch(e => e)
+
+      // Then
+      t.assert.strictEqual(error, undefined)
+    })
+
+    test("should be able to consume a message", async (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        clientOpts: {
+          directConnection: true
+        },
+        delayBetweenEmptyPolls: 100
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
+      let message: unknown
+
+      const [ consumer ] = queue.createConsumers({
+        onMessage: async msg => {
+          message = msg
+        }
+      })
+
+      t.after(async () => {
+        await consumer.stop()
+      })
+
+      await consumer.start()
+
+      // When
+      const producedMessage: Message = {
+        type: "msg",
+        id: randomUUID(),
+        createdAt: new Date(),
+        payload: { msg: "hello world" },
+      }
+      await producer.produce([
+        producedMessage
+      ])
+
+      // Then
+      await waitForPredicate(() => message !== undefined)
+      t.assert.deepStrictEqual(message, producedMessage)
+    })
   })
-  
-  basicFlow({ createQueue })
-  advancedFlow({ createQueue })
-  timeBasedFlow({ createQueue })
+
+  describe('workflows', function () {
+    const createQueue = () => createMongoQueue({
+      url: container.getConnectionString(),
+      clientOpts: { directConnection: true },
+      dbName: randomUUID(),
+      delayBetweenEmptyPolls: 100,
+    })
+
+    basicFlow({ createQueue })
+    advancedFlow({ createQueue })
+    timeBasedFlow({ createQueue })
+  })
 })
+
+async function waitForPredicate(fn: () => boolean | Promise<boolean>, ms = 5_000) {
+  let now = new Date().getTime()
+  while (!await fn() && new Date().getTime() - now < ms) {
+    await setTimeout(20)
+  }
+}
 
 //
 // describe('mongodb', function () {
