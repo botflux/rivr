@@ -242,10 +242,6 @@ class KurrentDBQueue implements Queue<never> {
       client.appendToStream(stream, events)))
   }
 
-  supportsDelayedMessages(): boolean {
-    return false
-  }
-
   async disconnect(): Promise<void> {
 
   }
