@@ -54,22 +54,28 @@ describe('kurrentdb resilience', function () {
       await queue.disconnect()
     })
 
+    const producer = queue.createProducer()
+
+    t.after(async () => {
+      await producer.disconnect()
+    })
+
     const initialMessage = randomMessage()
-    const initialError = await queue.produce([initialMessage])
+    const initialError = await producer.produce([initialMessage])
       .then(() => undefined)
       .catch(e => e)
 
     // When
     await proxy.setEnabled(false)
     const messagesDuringOutage = [randomMessage(), randomMessage()]
-    const outageError = await queue.produce(messagesDuringOutage)
+    const outageError = await producer.produce(messagesDuringOutage)
       .then(() => undefined)
       .catch(e => e)
 
     await proxy.setEnabled(true)
 
     const recoveryMessages = [randomMessage(), randomMessage(), randomMessage()]
-    const recoveryError = await queue.produce(recoveryMessages)
+    const recoveryError = await producer.produce(recoveryMessages)
       .then(() => undefined)
       .catch(e => e)
 
@@ -114,6 +120,16 @@ describe('kurrentdb resilience', function () {
       streamInfix
     })
 
+    t.after(async () => {
+      await stable.disconnect()
+    })
+
+    const producer = stable.createProducer()
+
+    t.after(async () => {
+      await producer.disconnect()
+    })
+
     const receivedMessages: Message[] = []
     const consumption = unstable.consume({
       onMessage: async (msg) => {
@@ -128,18 +144,18 @@ describe('kurrentdb resilience', function () {
     await consumption.start()
 
     const firstMessage = randomMessage()
-    await stable.produce([firstMessage])
+    await producer.produce([firstMessage])
 
     await waitForPredicate(() => receivedMessages.length === 1, 5_000)
 
     // When
     await proxy.setEnabled(false)
     const secondMessage = randomMessage()
-    await stable.produce([secondMessage])
+    await producer.produce([secondMessage])
 
     await proxy.setEnabled(true)
 
-    // Then - should be able to receive messages after reconnection
+    // Then
     await waitForPredicate(() => receivedMessages.length === 2, 5_000)
     t.assert.strictEqual(receivedMessages.length, 2)
     t.assert.deepStrictEqual(receivedMessages, [ firstMessage, secondMessage ])

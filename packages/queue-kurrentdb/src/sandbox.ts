@@ -29,6 +29,8 @@ async function sandbox(): Promise<void> {
   await worker.start()
   worker.addHook("error", console.error)
 
+  const producer = queue.createProducer()
+
   const consumption = consumeCustomSubscription<MyEvent>({
     connectionString: "esdb://localhost:2113?tls=false",
     streamName: `$ce-Record${infix}`,
@@ -36,7 +38,7 @@ async function sandbox(): Promise<void> {
     handler: async (event) => {
       console.log(event)
       await trigger(
-        queue,
+        producer,
         workflow,
         2
       )

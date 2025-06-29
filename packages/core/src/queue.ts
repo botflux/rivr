@@ -78,6 +78,6 @@ export interface Consumer {
   disconnect(): Promise<void>
 }
 
-export interface Queue<WriteOpts> extends Producer<WriteOpts>, Consumer {
+export interface Queue<WriteOpts> extends Consumer {
   createProducer(): Producer<WriteOpts>
 }

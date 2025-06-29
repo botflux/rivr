@@ -45,8 +45,14 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
-      const mError = await queue.produce([
+      const mError = await producer.produce([
         randomMessage()
       ]).then(() => {}).catch(e => e)
 
@@ -68,6 +74,12 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       const randomMsg = randomMessage()
       let msg!: unknown
 
@@ -84,7 +96,7 @@ describe('kurrentdb', function () {
       await consumption.start()
 
       // When
-      await queue.produce([ randomMsg ])
+      await producer.produce([ randomMsg ])
 
       // Then
       await waitForPredicate(() => msg !== undefined, 15_000)
@@ -456,25 +468,6 @@ describe('kurrentdb', function () {
       // Given
       const infix = randomInfix()
 
-      type MyEvent = JSONEventType<"record_created", { value: number }>
-
-      const customConsumption = consumeCustomSubscription<MyEvent>({
-        streamName: `$ce-Record${infix}`,
-        groupName: randomUUID(),
-        connectionString: kurrentdb.getConnectionString(),
-        handler: async event => {
-          await trigger(
-            queue,
-            workflow,
-            event.data.value
-          )
-        }
-      })
-
-      t.after(async () => {
-        await customConsumption.stop()
-      })
-
       const queue = createQueue({
         connectionString: kurrentdb.getConnectionString(),
         streamInfix: infix,
@@ -486,6 +479,32 @@ describe('kurrentdb', function () {
       t.after(async () => {
         await queue.disconnect()
       })
+
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
+      type MyEvent = JSONEventType<"record_created", { value: number }>
+
+      const customConsumption = consumeCustomSubscription<MyEvent>({
+        streamName: `$ce-Record${infix}`,
+        groupName: randomUUID(),
+        connectionString: kurrentdb.getConnectionString(),
+        handler: async event => {
+          await trigger(
+            producer,
+            workflow,
+            event.data.value
+          )
+        }
+      })
+
+      t.after(async () => {
+        await customConsumption.stop()
+      })
+
 
       let handled: unknown
 

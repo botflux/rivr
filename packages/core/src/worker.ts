@@ -1,4 +1,4 @@
-import {Consumption, Message, Queue} from "./queue";
+import {Consumption, Message, Producer, Queue} from "./queue";
 import {updateWorkflowState, WorkflowState} from "./workflow/state/state";
 import {ReadyWorkflow, Step, StepResult, Workflow} from "./workflow/types";
 import {randomUUID} from "crypto";
@@ -148,11 +148,18 @@ class DefaultWorker implements Worker {
   #opts: CreateWorkerOpts
   #handlers: MessageHandler<unknown>[]
   #consumptions: Consumption[] = []
+  #producers: Producer<never>[]
+  #primaryProducer: Producer<never>
   #onErrorHooks: OnError[] = []
 
   constructor(opts: CreateWorkerOpts, handlers: MessageHandler<unknown>[]) {
     this.#opts = opts;
     this.#handlers = handlers;
+    this.#primaryProducer = opts.primary.createProducer()
+    this.#producers = [
+      this.#primaryProducer,
+      ...(opts.secondaries ?? []).map(q => q.createProducer())
+    ]
   }
 
   async start(): Promise<void> {
@@ -182,7 +189,10 @@ class DefaultWorker implements Worker {
   }
 
   async stop(): Promise<void> {
-    await Promise.all(this.#consumptions.map(c => c.stop()))
+    await Promise.all([
+      ...this.#consumptions.map(c => c.stop()),
+      ...this.#producers.map(p => p.disconnect())
+    ])
   }
 
   addHook(hook: "error", fn: OnError): this {
@@ -194,7 +204,7 @@ class DefaultWorker implements Worker {
     const delayedMessages = messages.filter(message => message.pickAfter !== undefined)
     const notDelayedMessages = messages.filter(message => message.pickAfter === undefined)
 
-    const delayedProducer = [ this.#opts.primary, ...this.#opts.secondaries ?? [] ]
+    const delayedProducer = this.#producers
       .find(p => p.supportsDelayedMessages())
 
     if (delayedProducer === undefined && delayedMessages.length !== 0) {
@@ -206,7 +216,7 @@ class DefaultWorker implements Worker {
     }
 
     if (notDelayedMessages.length > 0) {
-      await this.#opts.primary.produce(notDelayedMessages)
+      await this.#primaryProducer.produce(notDelayedMessages)
     }
   }
 }

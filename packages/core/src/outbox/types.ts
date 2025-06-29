@@ -36,24 +36,24 @@ export type OutboxState = {
 
 class DefaultOutbox<WriteOpts> implements Outbox<WriteOpts> {
   [kOutbox]: true = true
-  #queue: Queue<WriteOpts>
+  #producer: Producer<WriteOpts>
 
-  constructor(queue: Queue<WriteOpts>) {
-    this.#queue = queue;
+  constructor(producer: Producer<WriteOpts>) {
+    this.#producer = producer;
   }
 
   async produce(messages: OutboxMessage[], opts?: WriteOpts): Promise<void> {
-    await this.#queue.produce(
+    await this.#producer.produce(
       messages,
       opts
     )
   }
 
   disconnect(): Promise<void> {
-    return this.#queue.disconnect()
+    return this.#producer.disconnect()
   }
 }
 
-export function createOutbox<WriteOpts>(queue: Queue<WriteOpts>): Outbox<WriteOpts> {
-  return new DefaultOutbox(queue)
+export function createOutbox<WriteOpts>(producer: Producer<WriteOpts>): Outbox<WriteOpts> {
+  return new DefaultOutbox(producer)
 }

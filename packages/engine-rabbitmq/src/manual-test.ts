@@ -41,7 +41,9 @@ export async function manualTest() {
     await setTimeout(5_000)
     await proxy.setEnabled(true)
 
-    await queue.produce([
+    const producer = queue.createProducer()
+
+    await producer.produce([
       {
         type: "hello",
         id: randomUUID(),

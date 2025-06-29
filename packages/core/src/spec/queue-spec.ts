@@ -41,9 +41,15 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
 
       await worker.start()
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
       await trigger(
-        queue,
+        producer,
         workflow,
         10
       )
@@ -80,9 +86,15 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
 
       await worker.start()
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
       await trigger(
-        queue,
+        producer,
         workflow,
         10
       )
@@ -117,9 +129,15 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
 
       await worker.start()
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
       await trigger(
-        queue,
+        producer,
         workflow,
         10
       )
@@ -156,9 +174,15 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
 
       await worker.start()
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
       await trigger(
-        queue,
+        producer,
         workflow,
         10
       )
@@ -195,9 +219,15 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
 
       await worker.start()
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
       await triggerFrom(
-        queue,
+        producer,
         workflow,
         "formatting",
         10
@@ -239,9 +269,15 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
 
       await worker.start()
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
       await trigger(
-        queue,
+        producer,
         workflow,
         1
       )
@@ -288,9 +324,15 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
 
       await worker.start()
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
       await trigger(
-        queue,
+        producer,
         workflow,
         10
       )
@@ -325,9 +367,15 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
 
       await worker.start()
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
       await trigger(
-        queue,
+        producer,
         workflow,
         10
       )
@@ -390,9 +438,15 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
 
       await worker.start()
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
       await trigger(
-        queue,
+        producer,
         workflow,
         10
       )
@@ -435,10 +489,16 @@ export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
 
       await worker.start()
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
       const start = new Date().getTime()
       await trigger(
-        queue,
+        producer,
         workflow,
         10
       )
@@ -500,10 +560,16 @@ export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
 
       await worker.start()
 
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
       // When
       const start = new Date().getTime()
       await trigger(
-        queue,
+        producer,
         workflow,
         10
       )
