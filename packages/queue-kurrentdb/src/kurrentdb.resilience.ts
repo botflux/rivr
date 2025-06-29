@@ -131,7 +131,7 @@ describe('kurrentdb resilience', function () {
     })
 
     const receivedMessages: Message[] = []
-    const consumption = unstable.consume({
+    const consumption = unstable.createConsumers({
       onMessage: async (msg) => {
         receivedMessages.push(msg)
       }
@@ -189,7 +189,7 @@ describe('kurrentdb resilience', function () {
     })
 
     const errorEvents: unknown[] = []
-    const consumption = unstable.consume({
+    const consumption = unstable.createConsumers({
       onMessage: async (msg) => {}
     })
 

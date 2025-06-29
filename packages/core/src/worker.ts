@@ -1,4 +1,4 @@
-import {Consumption, Message, Producer, Queue} from "./queue";
+import {Consumer, Message, Producer, Queue} from "./queue";
 import {updateWorkflowState, WorkflowState} from "./workflow/state/state";
 import {ReadyWorkflow, Step, StepResult, Workflow} from "./workflow/types";
 import {randomUUID} from "crypto";
@@ -147,7 +147,7 @@ class OutboxMessageHandler implements MessageHandler<OutboxMessage> {
 class DefaultWorker implements Worker {
   #opts: CreateWorkerOpts
   #handlers: MessageHandler<unknown>[]
-  #consumptions: Consumption[] = []
+  #consumptions: Consumer[] = []
   #producers: Producer<never>[]
   #primaryProducer: Producer<never>
   #onErrorHooks: OnError[] = []
@@ -169,7 +169,7 @@ class DefaultWorker implements Worker {
     const queues = [ primary, ...secondaries ]
 
     this.#consumptions = [
-      ...queues.map(queue => queue.consume({
+      ...queues.map(queue => queue.createConsumers({
         onMessage: async msg => {
           for (const handler of this.#handlers) {
             if (handler.support(msg)) {
@@ -246,7 +246,7 @@ export type CreateWorkerOpts = {
   /**
    * Pass custom consumptions that the worker will start and stop.
    */
-  customConsumptions?: Consumption[]
+  customConsumptions?: Consumer[]
 }
 
 export function createWorker (opts: CreateWorkerOpts): Worker {

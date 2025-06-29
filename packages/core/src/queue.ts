@@ -1,6 +1,6 @@
 export type StopReason = "unrecoverable_error" | "manually_stopped"
 
-export interface Consumption {
+export interface Consumer {
   /**
    * Start the consumption
    */
@@ -47,7 +47,7 @@ export interface OnMessage {
   (msg: Message): Promise<void>
 }
 
-export interface ConsumeOpts {
+export interface ConsumerOpts {
   onMessage: OnMessage
 }
 
@@ -68,16 +68,13 @@ export interface Producer<WriteOpts> {
   disconnect(): Promise<void>
 }
 
-export interface Consumer {
+export interface Queue<WriteOpts> {
+  createProducer(): Producer<WriteOpts>
   /**
    * Create a new consumption.
    *
    * @param opts
    */
-  consume(opts: ConsumeOpts): Consumption
+  createConsumers(opts: ConsumerOpts): Consumer
   disconnect(): Promise<void>
-}
-
-export interface Queue<WriteOpts> extends Consumer {
-  createProducer(): Producer<WriteOpts>
 }

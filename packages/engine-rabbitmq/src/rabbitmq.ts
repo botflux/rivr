@@ -1,15 +1,15 @@
-import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
+import {ConsumerOpts, Consumer, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
 import {Channel, ChannelModel, ConfirmChannel} from "amqplib";
 import {AmqpConnectionManager, AmqpConnectionManagerOptions, ChannelWrapper, connect} from "amqp-connection-manager";
 import {Hooks} from "rivr/dist/hooks/hooks";
 
-class RabbitMQConsumption implements Consumption {
+class RabbitMQConsumption implements Consumer {
   #channelWrapper: ChannelWrapper
   #opts: RabbitMQQueueOpts
-  #consumeOpts: ConsumeOpts
+  #consumeOpts: ConsumerOpts
   #hooks = new Hooks<ConsumptionHooks>()
 
-  constructor(channelManager: AmqpConnectionManager, opts: RabbitMQQueueOpts, consumeOpts: ConsumeOpts) {
+  constructor(channelManager: AmqpConnectionManager, opts: RabbitMQQueueOpts, consumeOpts: ConsumerOpts) {
     this.#opts = opts;
     this.#consumeOpts = consumeOpts;
     this.#channelWrapper = channelManager.createChannel({
@@ -202,7 +202,7 @@ class RabbitMQQueue implements Queue<never> {
     }
   }
 
-  consume(opts: ConsumeOpts): Consumption {
+  createConsumers(opts: ConsumerOpts): Consumer {
     return new RabbitMQConsumption(
       this.#channelManager,
       this.#opts,

@@ -1,6 +1,6 @@
 import {
-  ConsumeOpts,
-  Consumption,
+  ConsumerOpts,
+  Consumer,
   Message,
   Queue,
   WorkflowState,
@@ -49,7 +49,7 @@ type MessageEvent = JSONEventData<JSONEventType<
   RawMessage
 >>
 
-class PersistentSubscriptionConsumption<T extends JSONEventType> implements Consumption {
+class PersistentSubscriptionConsumption<T extends JSONEventType> implements Consumer {
   #getClient: () => KurrentDBClient
   #streamToSubscribe: string
   #groupName: string
@@ -251,7 +251,7 @@ class KurrentDBQueue implements Queue<never> {
 
   }
 
-  consume(opts: ConsumeOpts): Consumption {
+  createConsumers(opts: ConsumerOpts): Consumer {
     return new PersistentSubscriptionConsumption<MessageEvent>(
       () => this.#getClient(),
       this.#opts.streamToSubscribe,
@@ -362,7 +362,7 @@ export type ConsumeCustomSubscriptionOpts<T extends JSONEventType> = {
   handler: (event: RecordedEvent<T>) => Promise<void>
 }
 
-export function consumeCustomSubscription<T extends JSONEventType>(opts: ConsumeCustomSubscriptionOpts<T>): Consumption {
+export function consumeCustomSubscription<T extends JSONEventType>(opts: ConsumeCustomSubscriptionOpts<T>): Consumer {
   const {
     connectionString,
     groupName,
@@ -512,7 +512,7 @@ export type ConsumeWorkflowStateChangesOpts = Omit<ConsumeCustomSubscriptionOpts
   streamInfix: string
 }
 
-export function consumeWorkflowStateChanges(opts: ConsumeWorkflowStateChangesOpts): Consumption {
+export function consumeWorkflowStateChanges(opts: ConsumeWorkflowStateChangesOpts): Consumer {
   const {
     connectionString,
     groupName,

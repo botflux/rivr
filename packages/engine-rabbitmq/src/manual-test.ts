@@ -29,7 +29,7 @@ export async function manualTest() {
     exchange: randomUUID()
   })
 
-  const consumption = queue.consume({
+  const consumption = queue.createConsumers({
     onMessage: async (msg) => console.log(msg),
   })
 

@@ -83,7 +83,7 @@ describe('kurrentdb', function () {
       const randomMsg = randomMessage()
       let msg!: unknown
 
-      const consumption = queue.consume({
+      const consumption = queue.createConsumers({
         onMessage: async msg1 => {
           msg = msg1
         }
@@ -117,7 +117,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption = queue.consume({
+      const consumption = queue.createConsumers({
         onMessage: async msg => {}
       })
 
@@ -147,7 +147,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption1 = queue.consume({
+      const consumption1 = queue.createConsumers({
         onMessage: async () => {}
       })
 
@@ -157,7 +157,7 @@ describe('kurrentdb', function () {
 
       await consumption1.start()
 
-      const consumption2 = queue.consume({
+      const consumption2 = queue.createConsumers({
         onMessage: async () => {}
       })
 
@@ -194,7 +194,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption = queue.consume({
+      const consumption = queue.createConsumers({
         onMessage: async msg => {}
       })
 
@@ -224,7 +224,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption = queue.consume({
+      const consumption = queue.createConsumers({
         onMessage: async msg => {}
       })
 
@@ -255,7 +255,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption = queue.consume({
+      const consumption = queue.createConsumers({
         onMessage: async msg => {}
       })
 
@@ -283,7 +283,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const consumption = queue.consume({
+      const consumption = queue.createConsumers({
         onMessage: async msg => {}
       })
 

@@ -1,4 +1,4 @@
-import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
+import {ConsumerOpts, Consumer, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
 import {
   ChangeStream,
   ChangeStreamDocument,
@@ -25,10 +25,10 @@ class InfiniteLoop {
   }
 }
 
-class CompoundConsumption implements Consumption {
-  #consumptions: Consumption[]
+class CompoundConsumption implements Consumer {
+  #consumptions: Consumer[]
 
-  constructor(consumptions: Consumption[]) {
+  constructor(consumptions: Consumer[]) {
     this.#consumptions = consumptions;
   }
 
@@ -48,8 +48,8 @@ class CompoundConsumption implements Consumption {
   }
 }
 
-class PollingConsumption implements Consumption {
-  #consumeOpts: ConsumeOpts
+class PollingConsumption implements Consumer {
+  #consumeOpts: ConsumerOpts
   #getCollection: () => Collection<MongoMessage>
   #opts: MongoDBQueueOpts
   #onlyModifiedBefore?: () => Date
@@ -58,7 +58,7 @@ class PollingConsumption implements Consumption {
   #infiniteLoop = new InfiniteLoop()
   #hooks = new Hooks<ConsumptionHooks>()
 
-  constructor(consumeOpts: ConsumeOpts, getCollection: () => Collection<MongoMessage>, opts: MongoDBQueueOpts, onlyModifiedBefore?: () => Date) {
+  constructor(consumeOpts: ConsumerOpts, getCollection: () => Collection<MongoMessage>, opts: MongoDBQueueOpts, onlyModifiedBefore?: () => Date) {
     this.#consumeOpts = consumeOpts;
     this.#getCollection = getCollection;
     this.#opts = opts;
@@ -135,13 +135,13 @@ class PollingConsumption implements Consumption {
   }
 }
 
-class ChangeStreamConsumption implements Consumption {
-  #consumeOpts: ConsumeOpts
+class ChangeStreamConsumption implements Consumer {
+  #consumeOpts: ConsumerOpts
   #getCollection: () => Collection<MongoMessage>
   #changeStream: ChangeStream<MongoMessage, ChangeStreamDocument<MongoMessage>> | undefined
   #hooks = new Hooks<ConsumptionHooks>()
 
-  constructor(consumeOpts: ConsumeOpts, getCollection: () => Collection<MongoMessage>) {
+  constructor(consumeOpts: ConsumerOpts, getCollection: () => Collection<MongoMessage>) {
     this.#consumeOpts = consumeOpts;
     this.#getCollection = getCollection;
   }
@@ -252,7 +252,7 @@ class MongoDBQueue implements Queue<MongoDBWriteOpts> {
     await this.#mongoClient?.close(true)
   }
 
-  consume(opts: ConsumeOpts): Consumption {
+  createConsumers(opts: ConsumerOpts): Consumer {
     let latestChangeStreamMessageCreationDate = new Date()
 
     const polling = new PollingConsumption(

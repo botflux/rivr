@@ -1,5 +1,5 @@
 import {describe, test, TestContext} from "node:test";
-import {ConsumeOpts, Consumption, ConsumptionHooks, Message, Producer, Queue, StopReason} from "../../queue";
+import {ConsumerOpts, Consumer, ConsumptionHooks, Message, Producer, Queue, StopReason} from "../../queue";
 import {EventEmitter, on} from "node:events"
 import {ListWorkflowStateOpts, ListWorkflowStateResult, WorkflowStateStorage} from "../../workflow/state/storage";
 import {WorkflowState} from "../../workflow/state/state";
@@ -11,13 +11,13 @@ import {setTimeout} from "node:timers/promises";
 import {omit} from "../../utils/omit";
 import {Hooks} from "../../hooks/hooks";
 
-class MemoryConsumption implements Consumption {
+class MemoryConsumption implements Consumer {
   readonly #emitter: EventEmitter
-  readonly #consumeOpts: ConsumeOpts
+  readonly #consumeOpts: ConsumerOpts
   readonly #controller = new AbortController()
   readonly #hooks = new Hooks<ConsumptionHooks>()
 
-  constructor(emitter: EventEmitter, consumeOpts: ConsumeOpts) {
+  constructor(emitter: EventEmitter, consumeOpts: ConsumerOpts) {
     this.#emitter = emitter;
     this.#consumeOpts = consumeOpts;
   }
@@ -95,7 +95,7 @@ class MemoryQueue implements Queue<never> {
   async disconnect(): Promise<void> {
   }
 
-  consume(opts: ConsumeOpts): Consumption {
+  createConsumers(opts: ConsumerOpts): Consumer {
     return new MemoryConsumption(this.#emitter, opts)
   }
 }
