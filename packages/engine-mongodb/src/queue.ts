@@ -25,44 +25,19 @@ class InfiniteLoop {
   }
 }
 
-class CompoundConsumption implements Consumer {
-  #consumptions: Consumer[]
-
-  constructor(consumptions: Consumer[]) {
-    this.#consumptions = consumptions;
-  }
-
-  async start(): Promise<void> {
-    await Promise.all(this.#consumptions.map(c => c.start()))
-  }
-
-  async stop(): Promise<void> {
-    await Promise.all(this.#consumptions.map(c => c.stop()))
-  }
-
-  addHook(hook: "onError", handler: (error: unknown) => void): this
-  addHook(hook: "onStart", handler: () => void): this
-  addHook(hook: "onStop", handler: (reason: StopReason, error?: unknown) => void): this
-  addHook(hook: string, handler: (...params: any[]) => void): this {
-    return this
-  }
-}
-
 class PollingConsumption implements Consumer {
   #consumeOpts: ConsumerOpts
   #getCollection: () => Collection<MongoMessage>
   #opts: MongoDBQueueOpts
-  #onlyModifiedBefore?: () => Date
 
   #abort = new AbortController()
   #infiniteLoop = new InfiniteLoop()
   #hooks = new Hooks<ConsumptionHooks>()
 
-  constructor(consumeOpts: ConsumerOpts, getCollection: () => Collection<MongoMessage>, opts: MongoDBQueueOpts, onlyModifiedBefore?: () => Date) {
+  constructor(consumeOpts: ConsumerOpts, getCollection: () => Collection<MongoMessage>, opts: MongoDBQueueOpts) {
     this.#consumeOpts = consumeOpts;
     this.#getCollection = getCollection;
     this.#opts = opts;
-    this.#onlyModifiedBefore = onlyModifiedBefore;
   }
 
   async start(): Promise<void> {
@@ -82,9 +57,6 @@ class PollingConsumption implements Consumer {
           $or: [
             {
               pickAfter: { $exists: false },
-              ...this.#onlyModifiedBefore !== undefined && {
-                createdAt: { $lt: this.#onlyModifiedBefore() }
-              }
             },
             {
               pickAfter: { $lte: new Date() }
@@ -132,67 +104,6 @@ class PollingConsumption implements Consumer {
   addHook(hook: string, handler: (...params: any[]) => void): this {
     this.#hooks.addHook(hook as keyof ConsumptionHooks, handler)
     return this
-  }
-}
-
-class ChangeStreamConsumption implements Consumer {
-  #consumeOpts: ConsumerOpts
-  #getCollection: () => Collection<MongoMessage>
-  #changeStream: ChangeStream<MongoMessage, ChangeStreamDocument<MongoMessage>> | undefined
-  #hooks = new Hooks<ConsumptionHooks>()
-
-  constructor(consumeOpts: ConsumerOpts, getCollection: () => Collection<MongoMessage>) {
-    this.#consumeOpts = consumeOpts;
-    this.#getCollection = getCollection;
-  }
-
-  async start(): Promise<void> {
-    this.#startConsuming()
-  }
-
-  async stop(): Promise<void> {
-    await this.#changeStream?.close()
-  }
-
-  addHook(hook: "onError", handler: (error: unknown) => void): this
-  addHook(hook: "onStart", handler: () => void): this
-  addHook(hook: "onStop", handler: (reason: StopReason, error?: unknown) => void): this
-  addHook(hook: string, handler: (...params: any[]) => void): this {
-    this.#hooks.addHook(hook as keyof ConsumptionHooks, handler)
-    return this
-  }
-
-  async #startConsuming() {
-    const filter: Filter<ChangeStreamDocument<MongoMessage>> = {
-      "fullDocument.status": "todo",
-      "fullDocument.pickAfter": { $exists: false }
-    }
-
-    this.#changeStream = this.#getCollection().watch([ { $match: filter } ])
-
-    try {
-      for await (const change of this.#changeStream) {
-        if (change.operationType === "insert") {
-          const { status, ...rest } = change.fullDocument
-
-          try {
-            await this.#consumeOpts.onMessage(rest)
-            await this.#getCollection().updateOne({ id: rest.id }, { $set: { status: "done" } })
-          } catch (error: unknown) {
-            console.log("error while handling a message with mongodb change stream", error)
-          }
-        }
-      }
-    } catch (error: unknown) {
-      if (!this.#isChangeStreamClosedError(error)) {
-        throw error
-      }
-    }
-  }
-
-  #isChangeStreamClosedError(error: unknown) {
-    return typeof error === "object" && error !== null
-      && "message" in error && error.message === "ChangeStream is closed"
   }
 }
 
@@ -244,37 +155,18 @@ class MongoDBQueue implements Queue<MongoDBWriteOpts> {
     )
   }
 
-  supportsDelayedMessages(): boolean {
-    return true
-  }
-
   async disconnect(): Promise<void> {
     await this.#mongoClient?.close(true)
   }
 
   createConsumers(opts: ConsumerOpts): Consumer[] {
-    let latestChangeStreamMessageCreationDate = new Date()
-
     const polling = new PollingConsumption(
       opts,
       () => this.#getCollection(),
       this.#opts,
-      this.#opts.enableChangeStream ? () => latestChangeStreamMessageCreationDate : undefined
     )
 
-    const changeStream = new ChangeStreamConsumption(
-      {
-        onMessage: async msg => {
-          latestChangeStreamMessageCreationDate = msg.createdAt
-          await opts.onMessage(msg)
-        }
-      },
-      () => this.#getCollection()
-    )
-
-    return this.#opts.enableChangeStream
-      ? [ polling, changeStream ]
-      : [ polling ]
+    return [ polling ]
   }
 
   #getClient(): MongoClient {
