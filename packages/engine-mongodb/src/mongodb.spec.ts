@@ -348,7 +348,7 @@ describe("mongodb queue", function () {
       // Then
       t.assert.strictEqual(called, true)
     })
-    
+
     test("should be able to trigger the onStop hook", async (t: TestContext) => {
       // Given
       const queue = createMongoQueue({
@@ -376,6 +376,69 @@ describe("mongodb queue", function () {
 
       // Then
       t.assert.strictEqual(reason, "manually_stopped")
+    })
+
+    test("should be able to ignore duplicate calls to start", async (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: container.getConnectionString(),
+        clientOpts: {
+          directConnection: true,
+        },
+        dbName: randomUUID()
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const [ consumer ] = queue.createConsumers({
+        onMessage: async msg => {}
+      })
+
+      let calls = 0
+      consumer.addHook("onStart", () => calls ++)
+
+      t.after(async () => {
+        await consumer.stop()
+      })
+
+      // When
+      await consumer.start()
+      await consumer.start()
+
+      // Then
+      t.assert.strictEqual(calls, 1)
+    })
+    
+    test("should be able to ignore duplicate calls to stop", async (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: container.getConnectionString(),
+        clientOpts: {
+          directConnection: true,
+        },
+        dbName: randomUUID()
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const [ consumer ] = queue.createConsumers({
+        onMessage: async msg => {}
+      })
+
+      let calls = 0
+      consumer.addHook("onStop", () => calls ++)
+      await consumer.start()
+
+      // When
+      await consumer.stop()
+      await consumer.stop()
+
+      // Then
+      t.assert.strictEqual(calls, 1)
     })
   })
 

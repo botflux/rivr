@@ -27,6 +27,7 @@ class PollingConsumer implements Consumer {
   #abort = new AbortController()
   #infiniteLoop = new InfiniteLoop()
   #hooks = new Hooks<ConsumptionHooks>()
+  #state: "started" | "stopped" = "stopped"
 
   constructor(consumeOpts: ConsumerOpts, getCollection: () => Collection<MongoMessage>, opts: MongoDBQueueOpts) {
     this.#consumeOpts = consumeOpts;
@@ -35,14 +36,24 @@ class PollingConsumer implements Consumer {
   }
 
   async start(): Promise<void> {
+    if (this.#state === "started") {
+      return
+    }
+
     this.#startConsuming()
     this.#hooks.executeHook("onStart", [])
+    this.#state = "started";
   }
 
   async stop(): Promise<void> {
+    if (this.#state === "stopped") {
+      return
+    }
+
     this.#infiniteLoop.stop()
     this.#abort.abort()
     this.#hooks.executeHook("onStop", [ "manually_stopped" ])
+    this.#state = "stopped"
   }
 
   async #startConsuming() {
