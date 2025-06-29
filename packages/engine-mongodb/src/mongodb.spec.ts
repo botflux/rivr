@@ -224,6 +224,71 @@ describe("mongodb queue", function () {
       t.assert.deepStrictEqual(messages, [ producedMessage ])
       t.assert.deepStrictEqual(failedMessages, [ producedMessage, producedMessage ])
     })
+
+    test("should be able to take another consumer's messages if not handled in time", async (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: container.getConnectionString(),
+        delayBetweenEmptyPolls: 100,
+        clientOpts: {
+          directConnection: true,
+        },
+        dbName: randomUUID(),
+        deadMessageTimeout: 2_000
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const pickedBySucceedingConsumer: Message[] = []
+      const pickedByFailingConsumer: Message[] = []
+
+
+      const [ succeedingConsumer ] = queue.createConsumers({
+        onMessage: async msg => {
+          pickedBySucceedingConsumer.push(msg)
+        }
+      })
+
+      t.after(async () => {
+        await succeedingConsumer.stop()
+      })
+
+      const [ failingConsumer ] = queue.createConsumers({
+        onMessage: async msg => {
+          pickedByFailingConsumer.push(msg)
+          await succeedingConsumer.start()
+          await setTimeout(60_000, 0, { signal: t.signal })
+        }
+      })
+
+      t.after(async () => {
+        await failingConsumer.stop()
+      })
+
+      await failingConsumer.start()
+
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
+      // When
+      const producedMessage: Message = {
+        type: "msg",
+        id: randomUUID(),
+        payload: { msg: "hello" },
+        createdAt: new Date()
+      }
+      await producer.produce([ producedMessage ])
+
+      // Then
+      await waitForPredicate(() => pickedBySucceedingConsumer.length > 0)
+      t.assert.deepStrictEqual(pickedByFailingConsumer, [ producedMessage ])
+      t.assert.deepStrictEqual(pickedBySucceedingConsumer, [producedMessage])
+    })
   })
 
   describe('workflows', function () {

@@ -1,11 +1,5 @@
 import {Consumer, ConsumerOpts, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
-import {
-  ClientSession,
-  Collection,
-  Filter,
-  MongoClient,
-  MongoClientOptions
-} from "mongodb";
+import {ClientSession, Collection, Filter, MongoClient, MongoClientOptions} from "mongodb";
 import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
 import {randomUUID} from "node:crypto";
@@ -59,7 +53,12 @@ class PollingConsumption implements Consumer {
             await this.#consumeOpts.onMessage(message)
             await this.#getCollection().updateOne({ id: message.id }, { $set: { status: "done" } })
           } catch (error: unknown) {
-            await this.#getCollection().updateOne({ id: message.id }, { $set: { status: "todo" }, $unset: { pulledAt: "", pulledBy: "" } })
+            await this.#getCollection().updateOne({
+              id: message.id
+            }, {
+              $set: { status: "todo" },
+              $unset: { pulledAt: "", pulledBy: "", consideredDeadAfter: "" }
+            })
             console.error("error while executing the onMessage callback", error)
           }
         }
@@ -78,19 +77,36 @@ class PollingConsumption implements Consumer {
 
     do {
       const mMessage = await this.#getCollection().findOneAndUpdate({
-        status: "todo",
-        $or: [
+        $and: [
           {
-            pickAfter: { $exists: false },
+            status: {$in: ["doing", "todo"]},
           },
           {
-            pickAfter: { $lte: new Date() }
+            $or: [
+              {
+                consideredDeadAfter: {$exists: false},
+              },
+              {
+                consideredDeadAfter: {$lte: new Date()}
+              }
+            ]
+          },
+          {
+            $or: [
+              {
+                pickAfter: {$exists: false},
+              },
+              {
+                pickAfter: {$lte: new Date()}
+              }
+            ]
           }
         ],
       }, {
         $set: {
           pulledBy: this.#consumptionId,
           pulledAt: new Date(),
+          consideredDeadAfter: new Date(new Date().getTime() + this.#opts.deadMessageTimeout),
           status: "doing"
         }
       })
@@ -99,7 +115,7 @@ class PollingConsumption implements Consumer {
         return messages
       }
 
-      const { _id, status, pulledAt, pulledBy, ...rest } = mMessage
+      const { _id, status, pulledAt, pulledBy, consideredDeadAfter, ...rest } = mMessage
 
       messages.push(rest)
     } while(limit)
@@ -131,7 +147,7 @@ export type MongoDBWriteOpts = {
   session?: ClientSession
 }
 
-type MongoMessage = Message & { status: "todo" | "doing" | "done", pulledBy?: string, pulledAt?: Date }
+type MongoMessage = Message & { status: "todo" | "doing" | "done", pulledBy?: string, pulledAt?: Date, consideredDeadAfter?: Date }
 
 class MongoDBProducer implements Producer<MongoDBWriteOpts> {
   #collection: Collection<MongoMessage>
@@ -218,6 +234,18 @@ export type CreateMongoDBQueueOpts = {
    * @default {100}
    */
   countPerPoll?: number
+
+  /**
+   * This timeout is relevant when you have competing consumers.
+   * This is the time after which a consumer considers a message
+   * handled by another consumer as timed-out.
+   *
+   * In other word, this is the time after which the message is re-routed
+   * to another consumer if the consumer has failed.
+   *
+   * @default {600_000} 10 minutes
+   */
+  deadMessageTimeout?: number
 }
 
 export function createQueue (opts: CreateMongoDBQueueOpts): Queue<never> {
@@ -226,6 +254,7 @@ export function createQueue (opts: CreateMongoDBQueueOpts): Queue<never> {
     delayBetweenEmptyPolls = 5_000,
     countPerPoll = 100,
     clientOpts = {},
+    deadMessageTimeout = 600_000,
     ...rest
   } = opts
 
@@ -235,5 +264,6 @@ export function createQueue (opts: CreateMongoDBQueueOpts): Queue<never> {
     delayBetweenEmptyPolls,
     clientOpts,
     countPerPoll,
+    deadMessageTimeout
   })
 }
