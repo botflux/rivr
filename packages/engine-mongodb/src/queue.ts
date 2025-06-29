@@ -8,6 +8,7 @@ import {
 } from "mongodb";
 import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
+import {randomUUID} from "node:crypto";
 
 class InfiniteLoop {
   #stopped = false;
@@ -28,6 +29,7 @@ class PollingConsumption implements Consumer {
   #getCollection: () => Collection<MongoMessage>
   #opts: MongoDBQueueOpts
 
+  #consumptionId = randomUUID()
   #abort = new AbortController()
   #infiniteLoop = new InfiniteLoop()
   #hooks = new Hooks<ConsumptionHooks>()
@@ -50,30 +52,14 @@ class PollingConsumption implements Consumer {
   async #startConsuming() {
     try {
       for (const _ of this.#infiniteLoop) {
-        const filter: Filter<MongoMessage> = {
-          status: "todo",
-          $or: [
-            {
-              pickAfter: { $exists: false },
-            },
-            {
-              pickAfter: { $lte: new Date() }
-            }
-          ],
-        }
-
-        const records = await this.#getCollection()
-          .find(filter)
-          .limit(this.#opts.countPerPoll)
-          .toArray()
-
-        const messages = records.map(({ _id, pickAfter, status, ...message }) => message)
+        const messages = await this.#pullMessages(this.#opts.countPerPoll)
 
         for (const message of messages) {
           try {
             await this.#consumeOpts.onMessage(message)
             await this.#getCollection().updateOne({ id: message.id }, { $set: { status: "done" } })
           } catch (error: unknown) {
+            await this.#getCollection().updateOne({ id: message.id }, { $set: { status: "todo" }, $unset: { pulledAt: "", pulledBy: "" } })
             console.error("error while executing the onMessage callback", error)
           }
         }
@@ -85,6 +71,40 @@ class PollingConsumption implements Consumer {
     } catch (error: unknown) {
       console.warn("error while consuming mongodb", error)
     }
+  }
+
+  async #pullMessages(limit: number) {
+    let messages: Message[] = []
+
+    do {
+      const mMessage = await this.#getCollection().findOneAndUpdate({
+        status: "todo",
+        $or: [
+          {
+            pickAfter: { $exists: false },
+          },
+          {
+            pickAfter: { $lte: new Date() }
+          }
+        ],
+      }, {
+        $set: {
+          pulledBy: this.#consumptionId,
+          pulledAt: new Date(),
+          status: "doing"
+        }
+      })
+
+      if (mMessage === null) {
+        return messages
+      }
+
+      const { _id, status, pulledAt, pulledBy, ...rest } = mMessage
+
+      messages.push(rest)
+    } while(limit)
+
+    return messages
   }
 
   async #wait(ms: number) {
@@ -111,7 +131,7 @@ export type MongoDBWriteOpts = {
   session?: ClientSession
 }
 
-type MongoMessage = Message & { status: "todo" | "done" }
+type MongoMessage = Message & { status: "todo" | "doing" | "done", pulledBy?: string, pulledAt?: Date }
 
 class MongoDBProducer implements Producer<MongoDBWriteOpts> {
   #collection: Collection<MongoMessage>

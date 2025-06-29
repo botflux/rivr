@@ -103,6 +103,127 @@ describe("mongodb queue", function () {
       await waitForPredicate(() => message !== undefined)
       t.assert.deepStrictEqual(message, producedMessage)
     })
+    
+    test("should be able to consume from multiple consumptions", async (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: container.getConnectionString(),
+        delayBetweenEmptyPolls: 100,
+        clientOpts: {
+          directConnection: true
+        },
+        dbName: randomUUID()
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const messages: Message[] = []
+
+      const [ consumer1 ] = queue.createConsumers({
+        onMessage: async msg => {
+          messages.push(msg)
+        }
+      })
+
+      t.after(async () => {
+        await consumer1.stop()
+      })
+
+      await consumer1.start()
+
+      const [ consumer2 ] = queue.createConsumers({
+        onMessage: async msg => {
+          messages.push(msg)
+        }
+      })
+
+      t.after(async () => {
+        await consumer2.stop()
+      })
+
+      await consumer2.start()
+
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
+      // When
+      const producedMessages: Message[] = new Array(10).fill(0).map(() => ({
+        type: "msg",
+        id: randomUUID(),
+        payload: { msg: "hello world" },
+        createdAt: new Date(),
+      }))
+
+      await producer.produce(producedMessages)
+
+      // Then
+      await waitForPredicate(() => messages.length === 10)
+      t.assert.deepStrictEqual(messages.toSorted(sortMessages), producedMessages.toSorted(sortMessages))
+    })
+    
+    test("should be able to retry nack messages", async (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: container.getConnectionString(),
+        dbName: randomUUID(),
+        clientOpts: {
+          directConnection: true,
+        },
+        delayBetweenEmptyPolls: 100,
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      let i = 0
+
+      const messages: Message[] = []
+      const failedMessages: Message[] = []
+
+      const [ consumer ] = queue.createConsumers({
+        onMessage: async msg => {
+          if (i++ < 2) {
+            failedMessages.push(msg)
+            throw new Error("oops")
+          }
+
+          messages.push(msg)
+        }
+      })
+
+      t.after(async () => {
+        await consumer.stop()
+      })
+
+      await consumer.start()
+
+      const producer = queue.createProducer()
+
+      t.after(async () => {
+        await producer.disconnect()
+      })
+
+      // When
+      const producedMessage: Message = {
+        payload: { msg: "hello" },
+        id: randomUUID(),
+        createdAt: new Date(),
+        type: "hello"
+      }
+
+      await producer.produce([ producedMessage ])
+
+      // Then
+      await waitForPredicate(() => messages.length > 0)
+      t.assert.deepStrictEqual(messages, [ producedMessage ])
+      t.assert.deepStrictEqual(failedMessages, [ producedMessage, producedMessage ])
+    })
   })
 
   describe('workflows', function () {
@@ -118,6 +239,10 @@ describe("mongodb queue", function () {
     timeBasedFlow({ createQueue })
   })
 })
+
+function sortMessages (a: Message, b: Message) {
+  return a.id.localeCompare(b.id)
+}
 
 async function waitForPredicate(fn: () => boolean | Promise<boolean>, ms = 5_000) {
   let now = new Date().getTime()
