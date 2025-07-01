@@ -479,6 +479,64 @@ describe("mongodb queue", function () {
       // Then
       t.assert.strictEqual(calls, 1)
     })
+
+    test("should be able to trigger the onError hook", async (t: TestContext) => {
+      // Given
+      const queue = createMongoQueue({
+        url: mongodb.getConnectionString(),
+        clientOpts: {
+          directConnection: true,
+          timeoutMS: 500,
+          connectTimeoutMS: 1_000,
+          waitQueueTimeoutMS: 1_000,
+          serverSelectionTimeoutMS: 1_000,
+          socketTimeoutMS: 1_000,
+          autoSelectFamilyAttemptTimeout: 1_000
+        },
+        dbName: randomUUID(),
+        delayBetweenEmptyPolls: 100
+      })
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      const [consumer] = queue.createConsumers({
+        onMessage: async msg => {
+          throw new Error("oops")
+        }
+      })
+
+      const errors: unknown[] = []
+
+      consumer.addHook("onError", (err) => {
+        errors.push(err)
+      })
+
+      t.after(async () => {
+        await consumer.stop()
+      })
+
+      await consumer.start()
+
+      // When
+      const p = queue.createProducer()
+      t.after(async () => {
+        await p.disconnect()
+      })
+      await p.produce([
+        {
+          type: "msg",
+          id: randomUUID(),
+          payload: { msg: "hello world" },
+          createdAt: new Date()
+        }
+      ])
+
+      // Then
+      await waitForPredicate(() => errors.length > 0)
+      t.assert.strictEqual(errors.length > 0, true)
+    })
   })
 
   describe('workflows', function () {

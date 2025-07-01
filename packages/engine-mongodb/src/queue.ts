@@ -57,8 +57,8 @@ class PollingConsumer implements Consumer {
   }
 
   async #startConsuming() {
-    try {
-      for (const _ of this.#infiniteLoop) {
+    for (const _ of this.#infiniteLoop) {
+      try {
         const messages = await this.#pullMessages(this.#opts.countPerPoll)
 
         for (const message of messages) {
@@ -79,16 +79,16 @@ class PollingConsumer implements Consumer {
               $set: { status: "todo", version: version + 1 },
               $unset: { pulledAt: "", pulledBy: "", consideredDeadAfter: "" }
             })
-            console.error("error while executing the onMessage callback", error)
+            this.#hooks.executeHook("onError", [ error ])
           }
         }
 
         if (messages.length < this.#opts.countPerPoll) {
           await this.#wait(this.#opts.delayBetweenEmptyPolls)
         }
+      } catch (error: unknown) {
+        this.#hooks.executeHook("onError", [error])
       }
-    } catch (error: unknown) {
-      console.warn("error while consuming mongodb", error)
     }
   }
 
