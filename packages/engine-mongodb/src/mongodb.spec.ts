@@ -486,12 +486,6 @@ describe("mongodb queue", function () {
         url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
-          timeoutMS: 500,
-          connectTimeoutMS: 1_000,
-          waitQueueTimeoutMS: 1_000,
-          serverSelectionTimeoutMS: 1_000,
-          socketTimeoutMS: 1_000,
-          autoSelectFamilyAttemptTimeout: 1_000
         },
         dbName: randomUUID(),
         delayBetweenEmptyPolls: 100
