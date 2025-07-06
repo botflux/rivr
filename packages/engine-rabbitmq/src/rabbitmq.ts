@@ -167,31 +167,6 @@ class RabbitMQQueue implements Queue<never> {
     return new RabbitMQProducer(this.#channelManager, this.#opts)
   }
 
-  async produce(messages: Message[], opts?: undefined): Promise<void> {
-    const channel = this.#channelManager.createChannel({
-      setup: async (ch: ConfirmChannel) => {
-        await ensureQueuesExists(ch, this.#opts)
-      }
-    })
-
-
-    for (const message of messages) {
-      if (message.pickAfter === undefined) {
-        await this.#publishMessage(channel, this.#opts.exchange, message)
-      } else {
-        if (!this.#opts.enableDelayedMessageExchange) {
-          throw new Error("Cannot publish a delayed message in the RabbitMQ queue without `enabledDelayedMessageExchange` set to `true`.")
-        }
-
-        await this.#publishMessage(channel, this.#opts.delayedExchange, message)
-      }
-    }
-  }
-
-  supportsDelayedMessages(): boolean {
-    return this.#opts.enableDelayedMessageExchange
-  }
-
   async disconnect(): Promise<void> {
     try {
       await this.#channelManager.close()
@@ -210,31 +185,6 @@ class RabbitMQQueue implements Queue<never> {
         opts
       )
     ]
-  }
-
-  async #publishMessage(channel: ChannelWrapper, exchange: string, message: Message): Promise<void> {
-    await channel.publish(
-      exchange,
-      "",
-      Buffer.from(JSON.stringify(message.payload)),
-      {
-        messageId: message.id,
-        type: message.type,
-        contentType: "application/json",
-        persistent: true,
-        headers: {
-          createdAt: message.createdAt.toISOString(),
-          ...message.pickAfter !== undefined && {
-            "x-delay": this.#calculateDelay(message.pickAfter),
-            pickAfter: message.pickAfter.toISOString()
-          },
-        }
-      }
-    )
-  }
-
-  #calculateDelay(pickAfter: Date, now: Date = new Date()): number {
-    return pickAfter.getTime() - now.getTime();
   }
 }
 
