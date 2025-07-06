@@ -1,10 +1,11 @@
-import {after, before, describe} from "node:test";
-import {advancedFlow, basicFlow, installUnhandledRejectionHook, timeBasedFlow} from "rivr";
+import test, {after, before, describe, TestContext} from "node:test";
+import {advancedFlow, basicFlow, installUnhandledRejectionHook, Message, timeBasedFlow} from "rivr";
 import {GenericContainerBuilder, Wait} from "testcontainers";
 import {RabbitMQContainer, StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
 import {join} from "node:path";
 import {randomUUID} from "node:crypto";
 import {createQueue as createRabbitMQQueue} from "./rabbitmq";
+import {setTimeout} from "node:timers/promises";
 
 installUnhandledRejectionHook()
 
@@ -24,6 +25,68 @@ describe("rabbitmq engine", () => {
       url: container.getAmqpUrl(),
       exchange: randomUUID(),
       queue: randomUUID(),
+    })
+
+    describe('producer/consumer', function () {
+      test("should be able to produce a message", async (t: TestContext) => {
+        // Given
+        const queue = createQueue()
+
+        t.after(async () => {
+          await queue.disconnect()
+        })
+
+        const producer = queue.createProducer()
+
+        t.after(async () => {
+          await producer.disconnect()
+        })
+
+        // When
+        const error = await producer.produce([ randomMessage() ]).catch(e => e)
+
+        // Then
+        t.assert.strictEqual(error, undefined)
+      })
+      
+      test("should be able to consume a message", async (t: TestContext) => {
+        // Given
+        const queue = createQueue()
+
+        t.after(async () => {
+          await queue.disconnect()
+        })
+
+        const producer = queue.createProducer()
+
+        t.after(async () => {
+          await producer.disconnect()
+        })
+
+        const receivedMessages: Message[] = []
+
+        const [consumer] = queue.createConsumers({
+          async onMessage(msg) {
+            receivedMessages.push(msg)
+          }
+        })
+
+        t.after(async () => {
+          await consumer.stop()
+        })
+
+        await consumer.start()
+
+        const producedMessages = [randomMessage(), randomMessage()]
+
+        // When
+        await producer.produce(producedMessages)
+
+        // Then
+        await waitForPredicate(() => receivedMessages.length === 2, 5_000)
+        t.assert.deepStrictEqual(receivedMessages.toSorted(sortMessages), producedMessages.toSorted(sortMessages))
+      })
+
     })
 
     basicFlow({ createQueue })
@@ -75,3 +138,24 @@ describe("rabbitmq engine", () => {
     timeBasedFlow({ createQueue })
   })
 })
+
+
+function randomMessage(): Message {
+  return {
+    type: "msg",
+    id: randomUUID(),
+    createdAt: new Date(),
+    payload: { msg: "hello world" }
+  }
+}
+
+async function waitForPredicate(fn: () => boolean | Promise<boolean>, ms = 5_000) {
+  let now = new Date().getTime()
+  while (!await fn() && new Date().getTime() - now < ms) {
+    await setTimeout(20)
+  }
+}
+
+function sortMessages (a: Message, b: Message) {
+  return a.id.localeCompare(b.id)
+}
