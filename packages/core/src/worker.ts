@@ -238,12 +238,6 @@ export type CreateWorkerOpts = {
   workflows: Workflow<any, any, Record<string, never>, Record<never, never>>[]
 
   /**
-   * Custom handlers allow you to execute your own logic based on the
-   * message produced in the queue.
-   */
-  customHandlers?: MessageHandler<unknown>[]
-
-  /**
    * Pass custom consumptions that the worker will start and stop.
    */
   customConsumptions?: Consumer[]
@@ -252,7 +246,7 @@ export type CreateWorkerOpts = {
 export function createWorker (opts: CreateWorkerOpts): Worker {
   const workflowHandler = new WorkflowMessageHandler(opts.workflows)
   const outboxHandler = new OutboxMessageHandler()
-  const handlers = [ workflowHandler, outboxHandler, ...opts.customHandlers ?? [] ]
+  const handlers = [ workflowHandler, outboxHandler ]
 
   return new DefaultWorker(opts, handlers)
 }
