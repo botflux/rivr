@@ -177,14 +177,12 @@ class RabbitMQQueue implements Queue<never> {
     }
   }
 
-  createConsumers(opts: ConsumerOpts): Consumer[] {
-    return [
-      new RabbitMQConsumption(
-        this.#channelManager,
-        this.#opts,
-        opts
-      )
-    ]
+  createConsumer(opts: ConsumerOpts): Consumer {
+    return new RabbitMQConsumption(
+      this.#channelManager,
+      this.#opts,
+      opts
+    )
   }
 }
 

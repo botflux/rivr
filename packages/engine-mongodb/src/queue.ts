@@ -211,14 +211,12 @@ class MongoDBQueue implements Queue<MongoDBWriteOpts> {
     await this.#mongoClient?.close(true)
   }
 
-  createConsumers(opts: ConsumerOpts): Consumer[] {
-    const polling = new PollingConsumer(
+  createConsumer(opts: ConsumerOpts): Consumer {
+    return new PollingConsumer(
       opts,
       () => this.#getCollection(),
       this.#opts,
     )
-
-    return [ polling ]
   }
 
   #getClient(): MongoClient {

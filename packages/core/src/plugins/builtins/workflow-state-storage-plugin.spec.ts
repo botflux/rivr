@@ -95,10 +95,8 @@ class MemoryQueue implements Queue<never> {
   async disconnect(): Promise<void> {
   }
 
-  createConsumers(opts: ConsumerOpts): Consumer[] {
-    return [
-      new MemoryConsumption(this.#emitter, opts)
-    ]
+  createConsumer(opts: ConsumerOpts): Consumer {
+    return new MemoryConsumption(this.#emitter, opts)
   }
 }
 

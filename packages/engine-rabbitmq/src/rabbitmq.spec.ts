@@ -65,7 +65,7 @@ describe("rabbitmq engine", () => {
 
         const receivedMessages: Message[] = []
 
-        const [consumer] = queue.createConsumers({
+        const consumer = queue.createConsumer({
           async onMessage(msg) {
             receivedMessages.push(msg)
           }

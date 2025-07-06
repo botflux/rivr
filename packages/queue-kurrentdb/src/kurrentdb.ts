@@ -246,27 +246,25 @@ class KurrentDBQueue implements Queue<never> {
 
   }
 
-  createConsumers(opts: ConsumerOpts): Consumer[] {
-    return [
-      new PersistentSubscriptionConsumption<MessageEvent>(
-        () => this.#getClient(),
-        this.#opts.streamToSubscribe,
-        this.#opts.groupName,
-        this.#opts.persistentSubscriptionCreationOpts,
-        this.#opts.subscribeOpts ?? {},
-        this.#opts.duplexOpts ?? {},
-        async e => {
-          const { data } = e
-          const { pickAfter, createdAt, ...rest } = data
+  createConsumer(opts: ConsumerOpts): Consumer {
+    return new PersistentSubscriptionConsumption<MessageEvent>(
+      () => this.#getClient(),
+      this.#opts.streamToSubscribe,
+      this.#opts.groupName,
+      this.#opts.persistentSubscriptionCreationOpts,
+      this.#opts.subscribeOpts ?? {},
+      this.#opts.duplexOpts ?? {},
+      async e => {
+        const { data } = e
+        const { pickAfter, createdAt, ...rest } = data
 
-          await opts.onMessage({
-            ...rest,
-            ...pickAfter !== undefined && { pickAfter: new Date(pickAfter) },
-            createdAt: new Date(createdAt)
-          })
-        }
-      )
-    ]
+        await opts.onMessage({
+          ...rest,
+          ...pickAfter !== undefined && { pickAfter: new Date(pickAfter) },
+          createdAt: new Date(createdAt)
+        })
+      }
+    )
   }
 
   #getClient(): KurrentDBClient {

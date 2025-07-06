@@ -76,7 +76,7 @@ describe("mongodb queue", function () {
 
       let message: unknown
 
-      const [ consumer ] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {
           message = msg
         }
@@ -121,7 +121,7 @@ describe("mongodb queue", function () {
 
       const messages: Message[] = []
 
-      const [ consumer1 ] = queue.createConsumers({
+      const consumer1 = queue.createConsumer({
         onMessage: async msg => {
           messages.push(msg)
         }
@@ -133,7 +133,7 @@ describe("mongodb queue", function () {
 
       await consumer1.start()
 
-      const [ consumer2 ] = queue.createConsumers({
+      const consumer2 = queue.createConsumer({
         onMessage: async msg => {
           messages.push(msg)
         }
@@ -186,7 +186,7 @@ describe("mongodb queue", function () {
       const messages: Message[] = []
       const failedMessages: Message[] = []
 
-      const [ consumer ] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {
           if (i++ < 2) {
             failedMessages.push(msg)
@@ -245,7 +245,7 @@ describe("mongodb queue", function () {
       const pickedByFailingConsumer: Message[] = []
 
 
-      const [ succeedingConsumer ] = queue.createConsumers({
+      const succeedingConsumer = queue.createConsumer({
         onMessage: async msg => {
           pickedBySucceedingConsumer.push(msg)
         }
@@ -255,7 +255,7 @@ describe("mongodb queue", function () {
         await succeedingConsumer.stop()
       })
 
-      const [ failingConsumer ] = queue.createConsumers({
+      const failingConsumer = queue.createConsumer({
         onMessage: async msg => {
           pickedByFailingConsumer.push(msg)
           await succeedingConsumer.start()
@@ -333,7 +333,7 @@ describe("mongodb queue", function () {
       })
 
       // When
-      const [ consumer ] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {}
       })
 
@@ -358,7 +358,7 @@ describe("mongodb queue", function () {
         await queue.disconnect()
       })
 
-      const [ consumer ] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {}
       })
 
@@ -390,7 +390,7 @@ describe("mongodb queue", function () {
         await queue.disconnect()
       })
 
-      const [ consumer ] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {}
       })
 
@@ -419,7 +419,7 @@ describe("mongodb queue", function () {
         await queue.disconnect()
       })
 
-      const [ consumer ] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {}
       })
 
@@ -452,7 +452,7 @@ describe("mongodb queue", function () {
         await queue.disconnect()
       })
 
-      const [ consumer ] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {}
       })
 
@@ -483,7 +483,7 @@ describe("mongodb queue", function () {
         await queue.disconnect()
       })
 
-      const [consumer] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {
           throw new Error("oops")
         }

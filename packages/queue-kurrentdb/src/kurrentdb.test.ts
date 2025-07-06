@@ -76,7 +76,7 @@ describe('kurrentdb', function () {
       const randomMsg = randomMessage()
       let msg!: unknown
 
-      const [consumer] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg1 => {
           msg = msg1
         }
@@ -110,7 +110,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const [consumer] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {}
       })
 
@@ -140,7 +140,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const [consumer1] = queue.createConsumers({
+      const consumer1 = queue.createConsumer({
         onMessage: async () => {}
       })
 
@@ -150,7 +150,7 @@ describe('kurrentdb', function () {
 
       await consumer1.start()
 
-      const [consumer2] = queue.createConsumers({
+      const consumer2 = queue.createConsumer({
         onMessage: async () => {}
       })
 
@@ -187,7 +187,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const [consumer] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {}
       })
 
@@ -217,7 +217,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const [consumer] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {}
       })
 
@@ -248,7 +248,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const [consumer] = queue.createConsumers({
+      const consumer = queue.createConsumer({
         onMessage: async msg => {}
       })
 
@@ -276,7 +276,7 @@ describe('kurrentdb', function () {
         await queue.disconnect()
       })
 
-      const [consumption] = queue.createConsumers({
+      const consumption = queue.createConsumer({
         onMessage: async msg => {}
       })
 
