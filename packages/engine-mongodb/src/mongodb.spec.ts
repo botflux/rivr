@@ -1,32 +1,20 @@
 import {MongoDBContainer, StartedMongoDBContainer} from "@testcontainers/mongodb";
 import {advancedFlow, basicFlow, installUnhandledRejectionHook, Message, timeBasedFlow} from "rivr";
-import {createQueue, createQueue as createMongoQueue} from "./queue"
+import {createQueue as createMongoQueue} from "./queue"
 import test, {after, before, describe, TestContext} from "node:test";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
-import {Network, StartedNetwork} from "testcontainers";
-import {StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
 
-let network!: StartedNetwork
 let mongodb!: StartedMongoDBContainer
-let toxiproxy!: StartedToxiProxyContainer
 
 installUnhandledRejectionHook()
 before(async () => {
-  network = await new Network().start()
   mongodb = await new MongoDBContainer("mongo:8")
-    .withNetwork(network)
-    .withNetworkAliases("mongo")
-    .start()
-  toxiproxy = await new ToxiProxyContainer("ghcr.io/shopify/toxiproxy:2.12.0")
-    .withNetwork(network)
     .start()
 })
 
 after(async () => {
-  await toxiproxy?.stop()
   await mongodb?.stop()
-  await network?.stop()
 })
 
 describe("mongodb queue", function () {
@@ -555,6 +543,15 @@ async function waitForPredicate(fn: () => boolean | Promise<boolean>, ms = 5_000
   let now = new Date().getTime()
   while (!await fn() && new Date().getTime() - now < ms) {
     await setTimeout(20)
+  }
+}
+
+function randomMessage(): Message {
+  return {
+    type: "msg",
+    id: randomUUID(),
+    createdAt: new Date(),
+    payload: { msg: "hello world" }
   }
 }
 
