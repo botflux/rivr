@@ -4,9 +4,7 @@
   "description": "KurrentDB module for rivr",
   "main": "dist/index.js",
   "dependencies": {
-    "@kurrent/kurrentdb-client": "^1.0.3",
-    "@testcontainers/kurrentdb": "^11.0.3",
-    "testcontainers": "^11.0.3"
+    "@kurrent/kurrentdb-client": "^1.0.3"
   },
   "scripts": {
     "test": "borp --timeout 60000 \"*.test.ts\"",
@@ -29,8 +27,10 @@
   },
   "homepage": "https://github.com/botflux/rivr#readme",
   "devDependencies": {
+    "@testcontainers/kurrentdb": "^11.1.0",
     "@testcontainers/toxiproxy": "^11.0.3",
     "@types/node": "^24.0.4",
+    "testcontainers": "^11.1.0",
     "ts-node": "^10.9.2"
   }
 }
