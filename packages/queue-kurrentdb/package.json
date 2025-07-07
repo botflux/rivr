@@ -28,7 +28,7 @@
   "homepage": "https://github.com/botflux/rivr#readme",
   "devDependencies": {
     "@testcontainers/kurrentdb": "^11.1.0",
-    "@testcontainers/toxiproxy": "^11.0.3",
+    "@testcontainers/toxiproxy": "^11.1.0",
     "@types/node": "^24.0.4",
     "testcontainers": "^11.1.0",
     "ts-node": "^10.9.2"
