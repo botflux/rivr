@@ -25,9 +25,9 @@
   },
   "workspaces": [
     "packages/core",
-    "packages/engine-mongodb",
+    "packages/queue-mongodb",
     "packages/fastify",
-    "packages/engine-rabbitmq",
+    "packages/queue-rabbitmq",
     "packages/queue-kurrentdb"
   ]
 }

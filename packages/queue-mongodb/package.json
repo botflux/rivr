@@ -1,5 +1,5 @@
 {
-  "name": "@rivr/engine-mongodb",
+  "name": "@rivr/queue-mongodb",
   "version": "0.0.0",
   "description": "MongoDB engine that runs Rivr workflows",
   "main": "dist/mongodb.js",

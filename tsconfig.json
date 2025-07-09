@@ -116,10 +116,10 @@
       "path": "./packages/core/tsconfig.json"
     },
     {
-      "path": "./packages/engine-mongodb/tsconfig.json"
+      "path": "./packages/queue-mongodb/tsconfig.json"
     },
     {
-      "path": "./packages/engine-rabbitmq/tsconfig.json",
+      "path": "./packages/queue-rabbitmq/tsconfig.json",
     },
     {
       "path": "./packages/queue-kurrentdb/tsconfig.json"
