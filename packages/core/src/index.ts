@@ -2,9 +2,14 @@ export * from "./workflow/workflow"
 export * from "./workflow/types"
 export * from "./workflow/state/state"
 export * from "./workflow/state/storage"
-export * from "./spec/engine-spec"
 export * from "./queue"
-export * from "./worker"
+export * from "./worker/worker"
 export * from "./workflow/trigger"
 export * from "./spec/queue-spec"
 export * from "./hooks/hooks"
+export {MessageHandler} from "./worker/handlers/message-handler";
+export {WorkflowMessageHandler} from "./worker/handlers/workflow-message-handler";
+export {OutboxMessageHandler} from "./worker/handlers/outbox-message-handler";
+export {DefaultWorker} from "./worker/default-worker";
+export {createWorker} from "./worker/default-worker";
+export {CreateWorkerOpts} from "./worker/default-worker";

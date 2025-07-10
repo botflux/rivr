@@ -5,11 +5,11 @@ import {ListWorkflowStateOpts, ListWorkflowStateResult, WorkflowStateStorage} fr
 import {WorkflowState} from "../../workflow/state/state";
 import {rivr} from "../../workflow/workflow";
 import {workflowStateStoragePlugin} from "./workflow-state-storage-plugin";
-import {createWorker} from "../../worker";
 import {trigger} from "../../workflow/trigger";
 import {setTimeout} from "node:timers/promises";
 import {omit} from "../../utils/omit";
 import {Hooks} from "../../hooks/hooks";
+import {createWorker} from "../../worker/default-worker";
 
 class MemoryConsumption implements Consumer {
   readonly #emitter: EventEmitter
