@@ -3,29 +3,30 @@ import {rivr} from "../workflow";
 import {randomUUID} from "crypto";
 import * as assert from "node:assert";
 import {StepResult, Workflow} from "../types";
+import {AttemptStatus} from "./state";
 
 type WorkflowStatus = "successful" | "failed" | "skipped" | "stopped" | "in_progress" | "not_started_yet"
 
 type StepStatus =  "skipped" | "to_be_retried" | "not_ran_yet" | "in_progress" | "successful" | "failed"
 
-type StepRun = {
-  name: string
+type Attempt = {
+  id: number
   status: StepStatus
   inputState?: unknown
-  outputState?: unknown
+  result?: StepResult<unknown>
 }
 
-type WorkflowRun = {
-  status: WorkflowStatus
-  id: number
-  steps: StepRun[]
+type StepRun = {
+  name: string
+  attempts: Attempt[]
 }
 
 type NormalizedWorkflowState = {
   id: string
   workflowName: string
   lastModified: Date
-  runs: WorkflowRun[]
+  status: WorkflowStatus
+  steps: StepRun[]
 }
 
 class WorkflowState {
@@ -38,7 +39,6 @@ class WorkflowState {
   static fromInitialStep<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName>(
     workflow: Workflow<State, FirstState, StateByStepName, Record<never, never>>,
     name: Name,
-    state: StateByStepName[Name],
     id: string ,
     now: Date
   ): WorkflowState {
@@ -51,15 +51,21 @@ class WorkflowState {
       id,
       workflowName: workflow.name,
       lastModified: now,
-      runs: [
-        {
-          id: 1,
-          status: "not_started_yet",
-          steps: [
-            ...stepsBeforeStartingStep.map(s => ({ name: s.name, status: "skipped" as const })),
-            ...otherSteps.map(s => ({ name: s.name, status: "not_ran_yet" as const })),
+      status: "not_started_yet",
+      steps: [
+        ...stepsBeforeStartingStep.map(step => ({
+          name: step.name,
+          attempts: [
+            {
+              id: 1,
+              status: "skipped" as const,
+            }
           ]
-        }
+        })),
+        ...otherSteps.map(step => ({
+          name: step.name,
+          attempts: []
+        })),
       ]
     })
   }
@@ -68,81 +74,81 @@ class WorkflowState {
     return this.#state
   }
 
-  startProcessing(runId: number, stepName: string, inputState: unknown, now: Date): [newState: WorkflowState, run: WorkflowRun, step: StepRun] {
-    const run = this.#state.runs.find(run => run.id === runId)
-
-    if (!run) {
-      throw new Error(`There is no run matching id '${runId}' in workflow state '${this.#state.id}'`)
-    }
-
-    const step = run.steps.find(step => step.name === stepName)
+  startProcessing(stepName: string, inputState: unknown, now: Date): [newState: WorkflowState, step: StepRun, inProgress: Attempt] {
+    const step = this.#state.steps.find(step => step.name === stepName)
 
     if (!step) {
-      throw new Error(`There is no step '${stepName}' in run '${runId}' of workflow '${this.#state.id}'`)
+      throw new Error(`There is no step '${stepName}' in run '${this.#state.id}'`)
     }
 
-    const newStep: StepRun = {
-      ...step,
+    const attempt: Attempt = {
+      id: 1,
       status: "in_progress",
       inputState
     }
 
-    const newRun: WorkflowRun = {
-      ...run,
-      status: "in_progress",
-      steps: run.steps.map(step => step.name === newStep.name ? newStep : step)
+    const newStep: StepRun = {
+      ...step,
+      attempts: [ attempt ]
     }
 
     const newWorkflow: NormalizedWorkflowState = {
       ...this.#state,
-      runs: this.#state.runs.map(run => run.id === newRun.id ? newRun : run)
+      status: "in_progress",
+      steps: this.#state.steps.map(step => step.name === newStep.name ? newStep : step),
     }
 
     return [
       new WorkflowState(newWorkflow),
-      newRun,
-      newStep
+      newStep,
+      attempt
     ]
   }
 
-  updateRun(runId: number, stepName: string, result: StepResult<unknown>): [ newState: WorkflowState ] {
-    const run = this.#state.runs.find(run => run.id === runId)
-
-    if (!run) {
-      throw new Error(`There is no run matching id '${runId}' in workflow state '${this.#state.id}'`)
-    }
-
-    const step = run.steps.find(step => step.name === stepName)
+  updateRun(stepName: string, attemptId: number, result: StepResult<unknown>): [ newState: WorkflowState ] {
+    const step = this.#state.steps.find(step => step.name === stepName)
 
     if (!step) {
-      throw new Error(`There is no step '${stepName}' in run '${runId}' of workflow '${this.#state.id}'`)
+      throw new Error(`There is no step '${stepName}' of workflow '${this.#state.id}'`)
     }
 
-    if (step.status !== "in_progress") {
+    const attempt = step.attempts.find(a => a.id === attemptId)
+
+    if (!attempt) {
+      throw new Error("Not implemented at line 112 in state2.spec.ts")
+    }
+
+    if (attempt.status !== "in_progress") {
       throw new Error(`Cannot update run '${stepName}' because it is not in progress`)
     }
 
-    if (result.type !== "success") {
-      throw new Error("Not implemented at line 125 in state2.spec.ts")
+    const newAttempt: Attempt = {
+      ...attempt,
+      result,
+      status: this.#stepResultToAttemptStatus(result),
     }
 
     const newStep: StepRun = {
       ...step,
-      status: "successful",
-      outputState: result.state
+      attempts: step.attempts.map(attempt => attempt.id === attemptId ? newAttempt : attempt),
     }
 
-    const newRun: WorkflowRun = {
-      ...run,
-      status: "successful",
-      steps: run.steps.map(step => step.name === newStep.name ? newStep : step)
-    }
     const newWorkflow: NormalizedWorkflowState = {
       ...this.#state,
-      runs: this.#state.runs.map(run => run.id === newRun.id ? newRun : run)
+      status: newAttempt.status === "successful" ? "successful" : "failed",
+      steps: this.#state.steps.map(step => step.name === newStep.name ? newStep : step),
     }
 
     return [new WorkflowState(newWorkflow)]
+  }
+
+  #stepResultToAttemptStatus(result: StepResult<unknown>): StepStatus {
+    switch (result.type) {
+      case "success": return "successful"
+      case "failure": return "failed"
+      case "skipped": return "skipped"
+      case "stopped": return "skipped"
+    }
   }
 }
 
@@ -162,7 +168,6 @@ describe('workflow state', function () {
     const state = WorkflowState.fromInitialStep(
       workflow,
       "add-1",
-      5,
       id,
       now
     )
@@ -172,16 +177,11 @@ describe('workflow state', function () {
       id,
       lastModified: now,
       workflowName: workflow.name,
-      runs: [
+      status: "not_started_yet",
+      steps: [
         {
-          id: 1,
-          status: "not_started_yet",
-          steps: [
-            {
-              name: "add-1",
-              status: "not_ran_yet",
-            }
-          ]
+          name: "add-1",
+          attempts: []
         }
       ]
     })
@@ -210,7 +210,6 @@ describe('workflow state', function () {
     const state = WorkflowState.fromInitialStep(
       workflow,
       "minus-2",
-      5,
       id,
       now
     )
@@ -220,26 +219,26 @@ describe('workflow state', function () {
       id,
       lastModified: now,
       workflowName: workflow.name,
-      runs: [
+      status: "not_started_yet",
+      steps: [
         {
-          id: 1,
-          status: "not_started_yet",
-          steps: [
+          name: "add-1",
+          attempts: [
             {
-              name: "add-1",
-              status: "skipped"
-            },
-            {
-              name: "minus-2",
-              status: "not_ran_yet",
-            },
-            {
-              name: "add-4",
-              status: "not_ran_yet",
+              id: 1,
+              status: "skipped",
             }
           ]
+        },
+        {
+          name: "minus-2",
+          attempts: []
+        },
+        {
+          name: "add-4",
+          attempts: [],
         }
-      ],
+      ]
     })
   })
 
@@ -258,24 +257,23 @@ describe('workflow state', function () {
     const state = WorkflowState.fromInitialStep(
       workflow,
       "add-1",
-      5,
       id,
       now
     )
-    const [ newState ] = state.startProcessing(1, "add-1", 4, now)
+    const [ newState ] = state.startProcessing("add-1", 4, now)
 
     // Then
     assert.deepStrictEqual(newState.normalize(), {
       id,
       lastModified: now,
       workflowName: workflow.name,
-      runs: [
+      status: "in_progress",
+      steps: [
         {
-          id: 1,
-          status: "in_progress",
-          steps: [
+          name: "add-1",
+          attempts: [
             {
-              name: "add-1",
+              id: 1,
               status: "in_progress",
               inputState: 4
             }
@@ -296,32 +294,74 @@ describe('workflow state', function () {
     const id = randomUUID()
     const now = new Date()
 
-    const [state, run, step] = WorkflowState.fromInitialStep(
+    const [state, step, attempt] = WorkflowState.fromInitialStep(
       workflow,
       "add-1",
-      5,
       id,
       now
-    ).startProcessing(1, "add-1", 4, now)
+    ).startProcessing("add-1", 4, now)
 
     // When
-    const [ newState ] = state.updateRun(run.id, step.name, { type: "success", state: 9 })
+    const [ newState ] = state.updateRun(step.name, attempt.id, { type: "success", state: 9 })
 
     // Then
     assert.deepStrictEqual(newState.normalize(), {
       id,
       lastModified: now,
       workflowName: workflow.name,
-      runs: [
+      status: "successful",
+      steps: [
         {
-          id: 1,
-          status: "successful",
-          steps: [
+          name: "add-1",
+          attempts: [
             {
-              name: "add-1",
+              id: 1,
               status: "successful",
               inputState: 4,
-              outputState: 9
+              result: { type: "success", state: 9 }
+            }
+          ]
+        }
+      ]
+    })
+  })
+
+  test("should be able to report a step's failure", (t) => {
+    // Given
+    const workflow = rivr.workflow<number>("calc")
+      .step({
+        name: "add-1",
+        handler: opts => opts.state + 1
+      })
+
+    const id = randomUUID()
+    const now = new Date()
+
+    const [ state, step, attempt ] = WorkflowState.fromInitialStep(
+      workflow,
+      "add-1",
+      id,
+      now
+    ).startProcessing("add-1", 4, now)
+
+    // When
+    const [ newState ] = state.updateRun(step.name, attempt.id, { type: "failure", error: "oops" })
+
+    // Then
+    assert.deepStrictEqual(newState.normalize(), {
+      id,
+      lastModified: now,
+      workflowName: workflow.name,
+      status: "failed",
+      steps: [
+        {
+          name: "add-1",
+          attempts: [
+            {
+              id: 1,
+              status: "failed",
+              inputState: 4,
+              result: { type: "failure", error: "oops" }
             }
           ]
         }
