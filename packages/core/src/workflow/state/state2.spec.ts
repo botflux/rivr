@@ -105,7 +105,7 @@ class WorkflowState {
     ]
   }
 
-  updateRunFromStepResult(runId: number, stepName: string, result: StepResult<unknown>): [ newState: WorkflowState ] {
+  updateRun(runId: number, stepName: string, result: StepResult<unknown>): [ newState: WorkflowState ] {
     const run = this.#state.runs.find(run => run.id === runId)
 
     if (!run) {
@@ -305,7 +305,7 @@ describe('workflow state', function () {
     ).startProcessing(1, "add-1", 4, now)
 
     // When
-    const [ newState ] = state.updateRunFromStepResult(run.id, step.name, { type: "success", state: 9 })
+    const [ newState ] = state.updateRun(run.id, step.name, { type: "success", state: 9 })
 
     // Then
     assert.deepStrictEqual(newState.normalize(), {
