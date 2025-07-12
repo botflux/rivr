@@ -1,5 +1,5 @@
 import {MessageHandler} from "./message-handler";
-import {updateWorkflowState, WorkflowState} from "../../workflow/state/state";
+import {startProcessing, updateFromStepResult, WorkflowState} from "../../workflow/state/state";
 import {ReadyWorkflow, Step, StepResult, Workflow} from "../../workflow/types";
 import {WorkflowStateStorage} from "../../workflow/state/storage";
 import {Message} from "../../queue";
@@ -53,6 +53,8 @@ export class WorkflowMessageHandler implements MessageHandler<WorkflowState<unkn
       return []
     }
 
+    const processingState = startProcessing(state, state.toExecute.step)
+    await this.#stateStorage?.upsert([ processingState ])
     const {item: step, context} = mStepAndExecutionContext
 
     for (const {context, item: hook} of mWorkflow.getHook("preStepHandler")) {
@@ -60,7 +62,7 @@ export class WorkflowMessageHandler implements MessageHandler<WorkflowState<unkn
     }
 
     const result = await this.#executeHandler(step, context, state)
-    const newState = updateWorkflowState(state, step, result)
+    const newState = updateFromStepResult(processingState, step, result)
 
     for (const {context, item: hook} of mWorkflow.getHook("onStepHandled")) {
       await hook(context, step, result, newState)

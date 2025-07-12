@@ -1,7 +1,7 @@
 import {Step, StepResult, Workflow} from "../types";
 import {randomUUID} from "crypto";
 
-export type AttemptStatus = "successful" | "failed" | "skipped" | "stopped"
+export type AttemptStatus = "successful" | "failed" | "skipped" | "stopped" | "in_progress"
 
 export type Attempt = {
   id: number
@@ -34,7 +34,7 @@ export type WorkflowState<State> = {
   lastModified: Date
 }
 
-export function createWorkflowState<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName>(
+export function initializeWorkflowState<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName>(
   workflow: Workflow<State, FirstState, StateByStepName, Record<never, never>>,
   name: Name,
   state: StateByStepName[Name],
@@ -91,7 +91,43 @@ export function createWorkflowState<State, FirstState, StateByStepName extends R
   }
 }
 
-export function updateWorkflowState<State>(
+export function startProcessing<State> (
+  state: WorkflowState<State>,
+  stepName: string,
+  now = new Date()
+): WorkflowState<State> {
+  const hasAlreadyAnInProgressStep = state.steps.find(s => s.attempts.some(attempt => attempt.status === "in_progress"))
+
+  if (hasAlreadyAnInProgressStep) {
+    throw new Error("Not implemented at line 102 in state.ts")
+  }
+
+  const mStep = state.steps.find(s => s.name === stepName)
+
+  if (!mStep) {
+    throw new Error("Not implemented at line 108 in state.ts")
+  }
+
+  const attempt: Attempt = {
+    id: mStep.attempts.length + 1,
+    status: "in_progress"
+  }
+
+  const newStep: StepState = {
+    ...mStep,
+    attempts: [ ...mStep.attempts, attempt ]
+  }
+
+  const newSteps = state.steps.map(s => s.name === mStep.name ? newStep : s)
+
+  return {
+    ...state,
+    lastModified: now,
+    steps: newSteps,
+  }
+}
+
+export function updateFromStepResult<State>(
   state: WorkflowState<State>,
   step: Step,
   result: StepResult<State>,
@@ -104,11 +140,18 @@ export function updateWorkflowState<State>(
     throw new Error("Not implemented at line 54 in state.ts")
   }
 
-  const attemptId = stepState.attempts.length + 1
-  const attemptStatus = resultToAttemptStatus(result)
-  const newAttempt = { id: attemptId, status: attemptStatus } satisfies Attempt
+  const inProgressAttempt = stepState.attempts.find(attempt => attempt.status === "in_progress")
 
-  const updatedSteps = state.steps.with(stepStateIndex, { ...stepState, attempts: [ ...stepState.attempts, newAttempt ] })
+  if (!inProgressAttempt) {
+    throw new Error("Not implemented at line 146 in state.ts")
+  }
+  const attemptStatus = resultToAttemptStatus(result)
+  const newAttempt = { ...inProgressAttempt, status: attemptStatus } satisfies Attempt
+
+  const updatedSteps = state.steps.with(stepStateIndex, {
+    ...stepState,
+    attempts: stepState.attempts.map(attempt => attempt.id === newAttempt.id ? newAttempt : attempt)
+  })
 
   const [nextTask, newStatus, resultState] = getNextTask(state, step, result, now)
 

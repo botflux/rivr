@@ -1,7 +1,7 @@
 import {Producer} from "../queue";
 import {Workflow} from "./types";
 import {randomUUID} from "crypto";
-import {createWorkflowState, WorkflowState} from "./state/state";
+import {initializeWorkflowState, WorkflowState} from "./state/state";
 
 /**
  * Trigger a workflow from the first step.
@@ -25,7 +25,7 @@ export async function trigger<State, FirstState, WriteOpts> (
     throw new Error("No step is the workflow")
   }
 
-  const workflowState = createWorkflowState(workflow, firstStep.name, state as never, randomUUID(), new Date())
+  const workflowState = initializeWorkflowState(workflow, firstStep.name, state as never, randomUUID(), new Date())
 
   await queue.produce([
     {
@@ -57,7 +57,7 @@ export async function triggerFrom<State, FirstState, StateByStepName extends Rec
 ): Promise<WorkflowState<StateByStepName[Step]>> {
   await workflow.ready()
 
-  const workflowState = createWorkflowState(workflow, step, state as never, randomUUID(), new Date())
+  const workflowState = initializeWorkflowState(workflow, step, state as never, randomUUID(), new Date())
 
   await queue.produce([
     {

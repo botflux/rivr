@@ -1,6 +1,6 @@
 import {describe, test, TestContext} from "node:test";
 import {rivr} from "../workflow";
-import {createWorkflowState, updateWorkflowState} from "./state";
+import {initializeWorkflowState, startProcessing, updateFromStepResult} from "./state";
 import {randomUUID} from "crypto";
 import {omit} from "../../utils/omit";
 
@@ -19,7 +19,7 @@ describe('state', function () {
     await workflow.ready()
 
     // When
-    const state = createWorkflowState(workflow, "add-1", 1, id, now)
+    const state = initializeWorkflowState(workflow, "add-1", 1, id, now)
 
     // Then
     t.assert.deepStrictEqual(state, {
@@ -62,8 +62,8 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id, now)
-    const newState = updateWorkflowState(state, step, {
+    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", now)
+    const newState = updateFromStepResult(state, step, {
       type: "success",
       state: 2
     })
@@ -112,8 +112,8 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id, now)
-    const newState = updateWorkflowState(state, step, {
+    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", now)
+    const newState = updateFromStepResult(state, step, {
       type: "success",
       state: 2
     })
@@ -164,8 +164,8 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id, now)
-    const newState = updateWorkflowState(state, step, {
+    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", now)
+    const newState = updateFromStepResult(state, step, {
       type: "skipped",
     }, now)
 
@@ -219,8 +219,8 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id, now)
-    const newState = updateWorkflowState(state, step, {
+    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", now)
+    const newState = updateFromStepResult(state, step, {
       type: "stopped",
     })
 
@@ -270,8 +270,8 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id, now)
-    const newState = updateWorkflowState(state, step, {
+    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", now)
+    const newState = updateFromStepResult(state, step, {
       type: "failure",
       error: new Error("oops")
     }, now)
@@ -319,8 +319,8 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id, now)
-    const newState = updateWorkflowState(state, step, {
+    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", now)
+    const newState = updateFromStepResult(state, step, {
       type: "failure",
       error: new Error("oops")
     }, now)
@@ -372,8 +372,8 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = createWorkflowState(workflow, "add-1", 1, id, now)
-    const newState = updateWorkflowState(state, step, {
+    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", now)
+    const newState = updateFromStepResult(state, step, {
       type: "failure",
       error: new Error("oops")
     }, now)

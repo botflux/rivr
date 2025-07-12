@@ -1,5 +1,5 @@
 import {describe, test, TestContext, mock} from "node:test"
-import {createWorkflowState, WorkflowState} from "../../workflow/state/state";
+import {initializeWorkflowState, WorkflowState} from "../../workflow/state/state";
 import {randomUUID} from "crypto";
 import {Message} from "../../queue";
 import {WorkflowMessageHandler} from "./workflow-message-handler";
@@ -128,7 +128,7 @@ describe('WorkflowMessageHandler', function () {
         }
       })
       const handler = new WorkflowMessageHandler([ workflow ], undefined, logger)
-      const payload = createWorkflowState(workflow, "add-1", 1, randomUUID(), new Date())
+      const payload = initializeWorkflowState(workflow, "add-1", 1, randomUUID(), new Date())
       const message: Message & { payload: WorkflowState<unknown> } = {
         type: "rivr_workflow@v1",
         createdAt: new Date(),
@@ -159,7 +159,7 @@ describe('WorkflowMessageHandler', function () {
           handler: ({ state }) => state - 2
         })
       const handler = new WorkflowMessageHandler([ workflow ], undefined, logger)
-      const payload = createWorkflowState(workflow, "add-1", 1, randomUUID(), new Date())
+      const payload = initializeWorkflowState(workflow, "add-1", 1, randomUUID(), new Date())
       const message: Message & { payload: WorkflowState<unknown> } = {
         type: "rivr_workflow@v1",
         createdAt: new Date(),
@@ -211,7 +211,7 @@ describe('WorkflowMessageHandler', function () {
       const stateStorage = new MemoryStateStorage()
       const handler = new WorkflowMessageHandler([ workflow ], stateStorage, logger)
 
-      const payload = createWorkflowState(workflow, "add-1", 1, randomUUID(), new Date())
+      const payload = initializeWorkflowState(workflow, "add-1", 1, randomUUID(), new Date())
       const message: Message & { payload: WorkflowState<unknown> } = {
         id: randomUUID(),
         type: "rivr_workflow@v1",
@@ -226,6 +226,21 @@ describe('WorkflowMessageHandler', function () {
       t.assert.deepStrictEqual(messages, [])
       t.assert.deepStrictEqual(logger.messages, [])
       t.assert.deepStrictEqual(stateStorage.states.get(payload.id)?.history, [
+        {
+          ...payload,
+          status: "in_progress",
+          steps: [
+            {
+              name: "add-1",
+              attempts: [
+                {
+                  id: 1,
+                  status: "in_progress"
+                }
+              ]
+            }
+          ]
+        },
         {
           ...payload,
           toExecute: {
