@@ -1,7 +1,7 @@
 import {Producer} from "../queue";
 import {Workflow} from "./types";
 import {randomUUID} from "crypto";
-import {initializeWorkflowState, WorkflowState} from "./state/state";
+import {NormalizedWorkflowState, WorkflowState} from "./state/state";
 
 /**
  * Trigger a workflow from the first step.
@@ -16,7 +16,7 @@ export async function trigger<State, FirstState, WriteOpts> (
   workflow: Workflow<State, FirstState, Record<string, never>, Record<never, never>>,
   state: FirstState,
   opts?: WriteOpts
-): Promise<WorkflowState<FirstState>> {
+): Promise<NormalizedWorkflowState<FirstState>> {
   await workflow.ready()
 
   const firstStep = workflow.getFirstStep()
@@ -25,7 +25,9 @@ export async function trigger<State, FirstState, WriteOpts> (
     throw new Error("No step is the workflow")
   }
 
-  const workflowState = initializeWorkflowState(workflow, firstStep.name, state as never, randomUUID(), new Date())
+  const workflowState = WorkflowState
+    .initialize(workflow, firstStep.name, state as never, randomUUID(), new Date())
+    .toNormalized()
 
   await queue.produce([
     {
@@ -36,7 +38,7 @@ export async function trigger<State, FirstState, WriteOpts> (
     }
   ], opts)
 
-  return workflowState as unknown as WorkflowState<FirstState>
+  return workflowState as unknown as NormalizedWorkflowState<FirstState>
 }
 
 /**
@@ -54,10 +56,12 @@ export async function triggerFrom<State, FirstState, StateByStepName extends Rec
   step: Step,
   state: StateByStepName[Step],
   opts?: WriteOpts
-): Promise<WorkflowState<StateByStepName[Step]>> {
+): Promise<NormalizedWorkflowState<StateByStepName[Step]>> {
   await workflow.ready()
 
-  const workflowState = initializeWorkflowState(workflow, step, state as never, randomUUID(), new Date())
+  const workflowState = WorkflowState
+    .initialize(workflow, step, state as never, randomUUID(), new Date())
+    .toNormalized()
 
   await queue.produce([
     {
@@ -68,5 +72,5 @@ export async function triggerFrom<State, FirstState, StateByStepName extends Rec
     }
   ], opts)
 
-  return workflowState as WorkflowState<StateByStepName[Step]>
+  return workflowState as NormalizedWorkflowState<StateByStepName[Step]>
 }

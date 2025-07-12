@@ -7,7 +7,7 @@ import {
   createStorage,
   RivrInvalidStreamInfixError
 } from "./kurrentdb";
-import {advancedFlow, basicFlow, createWorker, Message, rivr, trigger, WorkflowState} from "rivr";
+import {advancedFlow, basicFlow, createWorker, Message, rivr, trigger, NormalizedWorkflowState} from "rivr";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
 import {jsonEvent, JSONEventType, KurrentDBClient} from "@kurrent/kurrentdb-client";
@@ -318,7 +318,7 @@ describe('kurrentdb', function () {
       })
 
       // When
-      const state: WorkflowState<number> = {
+      const state: NormalizedWorkflowState<number> = {
         status: "successful",
         id: randomUUID(),
         name: "workflow",
@@ -388,7 +388,7 @@ describe('kurrentdb', function () {
 
       await consumption.start()
 
-      const state: WorkflowState<number> = {
+      const state: NormalizedWorkflowState<number> = {
         status: "successful",
         id: randomUUID(),
         name: "workflow",

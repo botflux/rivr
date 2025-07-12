@@ -6,7 +6,7 @@ import {
   Producer,
   Queue,
   StopReason,
-  WorkflowState,
+  NormalizedWorkflowState,
   WorkflowStateStorage
 } from "rivr";
 import {
@@ -414,7 +414,7 @@ type CreateStorageOpts = {
 
 export type WorkflowStateEvent<State> = JSONEventData<JSONEventType<
   "workflow_state_changed",
-  WorkflowState<State>
+  NormalizedWorkflowState<State>
 >>
 
 const workflowStateStreamPrefix = "RivrWorkflowStates"
@@ -427,7 +427,7 @@ class KurrentDBWorkflowStateStorage implements WorkflowStateStorage {
     this.#opts = opts
   }
 
-  async upsert<State>(states: WorkflowState<State>[]): Promise<void> {
+  async upsert<State>(states: NormalizedWorkflowState<State>[]): Promise<void> {
     const client = this.#getClient()
     
     const eventsByStream = states.map(state => {
@@ -448,7 +448,7 @@ class KurrentDBWorkflowStateStorage implements WorkflowStateStorage {
     ))
   }
 
-  async get<State>(id: string): Promise<WorkflowState<State> | undefined> {
+  async get<State>(id: string): Promise<NormalizedWorkflowState<State> | undefined> {
     const client = this.#getClient()
     const streamName = `${workflowStateStreamPrefix}${this.#opts.streamInfix}-${id}`
     
@@ -482,7 +482,7 @@ class KurrentDBWorkflowStateStorage implements WorkflowStateStorage {
   }
 }
 
-function deserializeWorkflowState<State>(data: WorkflowState<State>): WorkflowState<State> {
+function deserializeWorkflowState<State>(data: NormalizedWorkflowState<State>): NormalizedWorkflowState<State> {
   return {
     ...data,
     lastModified: new Date(data.lastModified),

@@ -1,4 +1,4 @@
-import {WorkflowState} from "./state";
+import {NormalizedWorkflowState} from "./state";
 
 export type ListWorkflowStateOpts = {
   page?: number
@@ -8,7 +8,7 @@ export type ListWorkflowStateOpts = {
 export type ListWorkflowStateResult<State> = {
   previousPage?: number
   nextPage?: number
-  results: WorkflowState<State>[]
+  results: NormalizedWorkflowState<State>[]
   totalCount: number
 }
 
@@ -18,14 +18,14 @@ export interface WorkflowStateStorage {
    *
    * @param states
    */
-  upsert<State>(states: WorkflowState<State>[]): Promise<void>
+  upsert<State>(states: NormalizedWorkflowState<State>[]): Promise<void>
 
   /**
    * Get a workflow state by its ID.
    *
    * @param id
    */
-  get<State>(id: string): Promise<WorkflowState<State> | undefined>
+  get<State>(id: string): Promise<NormalizedWorkflowState<State> | undefined>
 }
 
 export type SearchWorkflowStateOpts = {

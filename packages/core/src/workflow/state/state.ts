@@ -25,7 +25,7 @@ export type Task<State> = {
   pickAfter?: Date
 }
 
-export type WorkflowState<State> = {
+export type NormalizedWorkflowState<State> = {
   id: string
   name: string
   toExecute: Task<State>
@@ -35,138 +35,151 @@ export type WorkflowState<State> = {
   lastModified: Date
 }
 
-export function initializeWorkflowState<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName>(
-  workflow: Workflow<State, FirstState, StateByStepName, Record<never, never>>,
-  name: Name,
-  state: StateByStepName[Name],
-  id: string = randomUUID(),
-  now: Date
-): WorkflowState<State> {
-  const steps = Array.from(workflow.steps())
-    .map(({ item }) => item)
-  const index = steps.findIndex((step) => step.name === name)
+export class WorkflowState<State> {
+  #state: NormalizedWorkflowState<State>
 
-  if (index === -1) {
-    throw new Error("Not implemented at line 46 in state.ts")
-  }
-  
-  const previousSteps = steps.slice(0, index)
-  const mStep = steps[index]
-  const nextSteps = steps.slice(index + 1)
-  
-  if (mStep === undefined) {
-    throw new Error("Cannot create a workflow state from an empty workflow.")
+  constructor(state: NormalizedWorkflowState<State>) {
+    this.#state = state;
   }
 
-  return {
-    name: workflow.name,
-    id,
-    status: "in_progress",
-    toExecute: {
-      state: state as unknown as State,
-      status: "todo",
-      step: name as string,
-      attempt: 1,
-      areRetryExhausted: false
-    },
-    steps: [
-      ...previousSteps.map(step => ({
-        name: step.name,
-        attempts: [
-          {
-            status: "skipped" as const,
-            id: 0
-          }
-        ]
-      })),
-      {
-        name: mStep.name,
-        attempts: []
+  startProcessing(
+    stepName: string,
+    inputState: State,
+    now = new Date()
+  ): WorkflowState<State> {
+    const hasAlreadyAnInProgressStep = this.#state.steps.find(s => s.attempts.some(attempt => attempt.status === "in_progress"))
+
+    if (hasAlreadyAnInProgressStep) {
+      throw new Error("Not implemented at line 102 in state.ts")
+    }
+
+    const mStep = this.#state.steps.find(s => s.name === stepName)
+
+    if (!mStep) {
+      throw new Error("Not implemented at line 108 in state.ts")
+    }
+
+    const attempt: Attempt = {
+      id: mStep.attempts.length + 1,
+      status: "in_progress",
+      inputState
+    }
+
+    const newStep: StepState = {
+      ...mStep,
+      attempts: [ ...mStep.attempts, attempt ]
+    }
+
+    const newSteps = this.#state.steps.map(s => s.name === mStep.name ? newStep : s)
+
+    return new WorkflowState({
+      ...this.#state,
+      lastModified: now,
+      steps: newSteps,
+    })
+  }
+
+  updateFromStepResult(
+    step: Step,
+    result: StepResult<State>,
+    now = new Date()
+  ): WorkflowState<State> {
+    const stepStateIndex = this.#state.steps.findIndex(s => s.name === step.name)
+    const stepState = this.#state.steps[stepStateIndex]
+
+    if (stepStateIndex === -1) {
+      throw new Error("Not implemented at line 54 in state.ts")
+    }
+
+    const inProgressAttempt = stepState.attempts.find(attempt => attempt.status === "in_progress")
+
+    if (!inProgressAttempt) {
+      throw new Error("Not implemented at line 146 in state.ts")
+    }
+    const attemptStatus = resultToAttemptStatus(result)
+    const newAttempt = { ...inProgressAttempt, status: attemptStatus } satisfies Attempt
+
+    const updatedSteps = this.#state.steps.with(stepStateIndex, {
+      ...stepState,
+      attempts: stepState.attempts.map(attempt => attempt.id === newAttempt.id ? newAttempt : attempt)
+    })
+
+    const [nextTask, newStatus, resultState] = getNextTask(this.#state, step, result, now)
+
+    return new WorkflowState<State>({
+      ...this.#state,
+      steps: updatedSteps,
+      status: newStatus,
+      toExecute: nextTask,
+      ...resultState !== undefined && {
+        result: resultState
       },
-      ...nextSteps.map(step => ({
-        name: step.name,
-        attempts: []
-      }))
-    ],
-    lastModified: now
-  }
-}
-
-export function startProcessing<State> (
-  state: WorkflowState<State>,
-  stepName: string,
-  inputState: State,
-  now = new Date()
-): WorkflowState<State> {
-  const hasAlreadyAnInProgressStep = state.steps.find(s => s.attempts.some(attempt => attempt.status === "in_progress"))
-
-  if (hasAlreadyAnInProgressStep) {
-    throw new Error("Not implemented at line 102 in state.ts")
+      lastModified: now
+    })
   }
 
-  const mStep = state.steps.find(s => s.name === stepName)
-
-  if (!mStep) {
-    throw new Error("Not implemented at line 108 in state.ts")
+  toNormalized(): NormalizedWorkflowState<State> {
+    return this.#state
   }
 
-  const attempt: Attempt = {
-    id: mStep.attempts.length + 1,
-    status: "in_progress",
-    inputState
+  static initialize<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName>(
+    workflow: Workflow<State, FirstState, StateByStepName, Record<never, never>>,
+    name: Name,
+    state: StateByStepName[Name],
+    id: string = randomUUID(),
+    now: Date = new Date()
+  ): WorkflowState<State> {
+    const steps = Array.from(workflow.steps()).map(({ item }) => item)
+    const index = steps.findIndex((step) => step.name === name)
+
+    if (index === -1) {
+      throw new Error("Not implemented at line 46 in state.ts")
+    }
+
+    const previousSteps = steps.slice(0, index)
+    const mStep = steps[index]
+    const nextSteps = steps.slice(index + 1)
+
+    if (mStep === undefined) {
+      throw new Error("Cannot create a workflow state from an empty workflow.")
+    }
+
+    return new WorkflowState<State>({
+      name: workflow.name,
+      id,
+      status: "in_progress",
+      toExecute: {
+        state: state as unknown as State,
+        status: "todo",
+        step: name as string,
+        attempt: 1,
+        areRetryExhausted: false
+      },
+      steps: [
+        ...previousSteps.map(step => ({
+          name: step.name,
+          attempts: [
+            {
+              status: "skipped" as const,
+              id: 0
+            }
+          ]
+        })),
+        {
+          name: mStep.name,
+          attempts: []
+        },
+        ...nextSteps.map(step => ({
+          name: step.name,
+          attempts: []
+        }))
+      ],
+      lastModified: now
+    })
   }
 
-  const newStep: StepState = {
-    ...mStep,
-    attempts: [ ...mStep.attempts, attempt ]
-  }
-
-  const newSteps = state.steps.map(s => s.name === mStep.name ? newStep : s)
-
-  return {
-    ...state,
-    lastModified: now,
-    steps: newSteps,
-  }
-}
-
-export function updateFromStepResult<State>(
-  state: WorkflowState<State>,
-  step: Step,
-  result: StepResult<State>,
-  now = new Date()
-): WorkflowState<State> {
-  const stepStateIndex = state.steps.findIndex(s => s.name === step.name)
-  const stepState = state.steps[stepStateIndex]
-
-  if (stepStateIndex === -1) {
-    throw new Error("Not implemented at line 54 in state.ts")
-  }
-
-  const inProgressAttempt = stepState.attempts.find(attempt => attempt.status === "in_progress")
-
-  if (!inProgressAttempt) {
-    throw new Error("Not implemented at line 146 in state.ts")
-  }
-  const attemptStatus = resultToAttemptStatus(result)
-  const newAttempt = { ...inProgressAttempt, status: attemptStatus } satisfies Attempt
-
-  const updatedSteps = state.steps.with(stepStateIndex, {
-    ...stepState,
-    attempts: stepState.attempts.map(attempt => attempt.id === newAttempt.id ? newAttempt : attempt)
-  })
-
-  const [nextTask, newStatus, resultState] = getNextTask(state, step, result, now)
-
-  return {
-    ...state,
-    steps: updatedSteps,
-    status: newStatus,
-    toExecute: nextTask,
-    ...resultState !== undefined && {
-      result: resultState
-    },
-    lastModified: now
+  static reconstitute<State>(state: NormalizedWorkflowState<State>): WorkflowState<State> {
+    return new WorkflowState<State>(state)
   }
 }
 
@@ -187,7 +200,7 @@ function resultToAttemptStatus (result: StepResult<unknown>): AttemptStatus {
  * @param result
  * @param now
  */
-function getNextTask<State>(state: WorkflowState<State>, step: Step, result: StepResult<State>, now: Date): [
+function getNextTask<State>(state: NormalizedWorkflowState<State>, step: Step, result: StepResult<State>, now: Date): [
   newTask: Task<State>,
   newStatus: WorkflowStatus,
   resultState: State | undefined

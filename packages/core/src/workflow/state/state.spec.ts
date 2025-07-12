@@ -1,6 +1,6 @@
 import {describe, test, TestContext} from "node:test";
 import {rivr} from "../workflow";
-import {initializeWorkflowState, startProcessing, updateFromStepResult} from "./state";
+import {WorkflowState} from "./state";
 import {randomUUID} from "crypto";
 import {omit} from "../../utils/omit";
 
@@ -19,10 +19,10 @@ describe('state', function () {
     await workflow.ready()
 
     // When
-    const state = initializeWorkflowState(workflow, "add-1", 1, id, now)
+    const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
 
     // Then
-    t.assert.deepStrictEqual(state, {
+    t.assert.deepStrictEqual(state.toNormalized(), {
       id,
       name: "calc",
       status: "in_progress",
@@ -61,10 +61,12 @@ describe('state', function () {
     await workflow.ready()
 
     // When
-    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", 4, now)
+    const state = WorkflowState
+      .initialize(workflow, "add-1", 1, id, now)
+      .startProcessing("add-1", 4, now)
 
     // Then
-    t.assert.deepStrictEqual(omit(state, [ "lastModified" ]), {
+    t.assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
       id,
       name: "calc",
       status: "in_progress",
@@ -113,14 +115,12 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", 4, now)
-    const newState = updateFromStepResult(state, step, {
-      type: "success",
-      state: 2
-    })
+    const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
+      .startProcessing(step.name, 4, now)
+      .updateFromStepResult(step, { type: "success", state: 2 }, now)
 
     // Then
-    t.assert.deepStrictEqual(omit(newState, [ "lastModified" ]), {
+    t.assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
       id,
       name: "calc",
       status: "in_progress",
@@ -164,14 +164,12 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", 4, now)
-    const newState = updateFromStepResult(state, step, {
-      type: "success",
-      state: 2
-    })
+    const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
+      .startProcessing("add-1", 4, now)
+      .updateFromStepResult(step, { type: "success", state: 2 }, now)
 
     // Then
-    t.assert.deepStrictEqual(omit(newState, [ "lastModified" ]), {
+    t.assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
       id,
       name: "calc",
       status: "successful",
@@ -217,13 +215,12 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", 4, now)
-    const newState = updateFromStepResult(state, step, {
-      type: "skipped",
-    }, now)
+    const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
+      .startProcessing("add-1", 4, now)
+      .updateFromStepResult(step, { type: "skipped" }, now)
 
     // Then
-    t.assert.deepStrictEqual(newState, {
+    t.assert.deepStrictEqual(state.toNormalized(), {
       id,
       name: "calc",
       status: "in_progress",
@@ -273,13 +270,12 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", 4, now)
-    const newState = updateFromStepResult(state, step, {
-      type: "stopped",
-    })
+    const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
+      .startProcessing("add-1", 4, now)
+      .updateFromStepResult(step, { type: "stopped" }, now)
 
     // Then
-    t.assert.deepStrictEqual(omit(newState, [ "lastModified" ]), {
+    t.assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
       id,
       name: "calc",
       status: "stopped",
@@ -325,14 +321,12 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", 4, now)
-    const newState = updateFromStepResult(state, step, {
-      type: "failure",
-      error: new Error("oops")
-    }, now)
+    const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
+      .startProcessing(step.name, 4, now)
+      .updateFromStepResult(step, { type: "failure", error: new Error("oops") }, now)
 
     // Then
-    t.assert.deepStrictEqual(newState, {
+    t.assert.deepStrictEqual(state.toNormalized(), {
       id,
       name: "calc",
       status: "in_progress",
@@ -375,14 +369,12 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", 4, now)
-    const newState = updateFromStepResult(state, step, {
-      type: "failure",
-      error: new Error("oops")
-    }, now)
+    const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
+      .startProcessing("add-1", 4, now)
+      .updateFromStepResult(step, { type: "failure", error: new Error("oops") }, now)
 
     // Then
-    t.assert.deepStrictEqual(newState, {
+    t.assert.deepStrictEqual(state.toNormalized(), {
       id,
       name: "calc",
       status: "failed",
@@ -429,14 +421,12 @@ describe('state', function () {
 
     // When
     const { item: step } = workflow.getStepByName("add-1")!
-    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", 4, now)
-    const newState = updateFromStepResult(state, step, {
-      type: "failure",
-      error: new Error("oops")
-    }, now)
+    const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
+      .startProcessing("add-1", 4, now)
+      .updateFromStepResult(step, { type: "failure", error: new Error("oops") }, now)
 
     // Then
-    t.assert.deepStrictEqual(newState, {
+    t.assert.deepStrictEqual(state.toNormalized(), {
       id,
       name: "calc",
       status: "in_progress",

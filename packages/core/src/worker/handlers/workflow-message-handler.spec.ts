@@ -1,5 +1,5 @@
 import {describe, test, TestContext, mock} from "node:test"
-import {initializeWorkflowState, WorkflowState} from "../../workflow/state/state";
+import {NormalizedWorkflowState, WorkflowState} from "../../workflow/state/state";
 import {randomUUID} from "crypto";
 import {Message} from "../../queue";
 import {WorkflowMessageHandler} from "./workflow-message-handler";
@@ -8,17 +8,17 @@ import {rivr} from "../../workflow/workflow";
 import {WorkflowStateStorage} from "../../workflow/state/storage";
 
 class MemoryStateStorage implements WorkflowStateStorage {
-  states = new Map<string, { latest: WorkflowState<unknown>, history: WorkflowState<unknown>[] }>
+  states = new Map<string, { latest: NormalizedWorkflowState<unknown>, history: NormalizedWorkflowState<unknown>[] }>
 
-  async upsert<State>(states: WorkflowState<State>[]): Promise<void> {
+  async upsert<State>(states: NormalizedWorkflowState<State>[]): Promise<void> {
       for (const state of states) {
         const { history = [] } = this.states.get(state.id) ?? {}
         const newState = { latest: state, history: [ ...history, state ] }
         this.states.set(state.id, newState)
       }
   }
-  async get<State>(id: string): Promise<WorkflowState<State> | undefined> {
-      return this.states.get(id)?.latest as WorkflowState<State>
+  async get<State>(id: string): Promise<NormalizedWorkflowState<State> | undefined> {
+      return this.states.get(id)?.latest as NormalizedWorkflowState<State>
   }
 }
 
@@ -62,7 +62,7 @@ describe('WorkflowMessageHandler', function () {
       const logger = new TestLogger()
       const handler = new WorkflowMessageHandler([], undefined, logger)
       const state = randomWorkflowState()
-      const message: Message & { payload: WorkflowState<unknown> } = {
+      const message: Message & { payload: NormalizedWorkflowState<unknown> } = {
         type: "workflow_message@v1",
         payload: state,
         id: randomUUID(),
@@ -91,7 +91,7 @@ describe('WorkflowMessageHandler', function () {
       const testLogger = new TestLogger()
       const handler = new WorkflowMessageHandler([ workflow ], undefined, testLogger)
       const payload = randomWorkflowState()
-      const message: Message & { payload: WorkflowState<unknown> } = {
+      const message: Message & { payload: NormalizedWorkflowState<unknown> } = {
         type: "workflow_message@v1",
         createdAt: new Date(),
         id: randomUUID(),
@@ -128,8 +128,14 @@ describe('WorkflowMessageHandler', function () {
         }
       })
       const handler = new WorkflowMessageHandler([ workflow ], undefined, logger)
-      const payload = initializeWorkflowState(workflow, "add-1", 1, randomUUID(), new Date())
-      const message: Message & { payload: WorkflowState<unknown> } = {
+      const payload = WorkflowState.initialize(
+        workflow,
+        "add-1",
+        1,
+        randomUUID(),
+        new Date()
+      ).toNormalized()
+      const message: Message & { payload: NormalizedWorkflowState<unknown> } = {
         type: "rivr_workflow@v1",
         createdAt: new Date(),
         id: randomUUID(),
@@ -159,8 +165,14 @@ describe('WorkflowMessageHandler', function () {
           handler: ({ state }) => state - 2
         })
       const handler = new WorkflowMessageHandler([ workflow ], undefined, logger)
-      const payload = initializeWorkflowState(workflow, "add-1", 1, randomUUID(), new Date())
-      const message: Message & { payload: WorkflowState<unknown> } = {
+      const payload = WorkflowState.initialize(
+        workflow,
+        "add-1",
+        1,
+        randomUUID(),
+        new Date()
+      ).toNormalized()
+      const message: Message & { payload: NormalizedWorkflowState<unknown> } = {
         type: "rivr_workflow@v1",
         createdAt: new Date(),
         id: randomUUID(),
@@ -197,7 +209,7 @@ describe('WorkflowMessageHandler', function () {
               attempts: []
             }
           ]
-        } satisfies WorkflowState<number>
+        } satisfies NormalizedWorkflowState<number>
       ])
       t.assert.deepStrictEqual(logger.messages, [])
     })
@@ -212,8 +224,14 @@ describe('WorkflowMessageHandler', function () {
       const stateStorage = new MemoryStateStorage()
       const handler = new WorkflowMessageHandler([ workflow ], stateStorage, logger)
 
-      const payload = initializeWorkflowState(workflow, "add-1", 1, randomUUID(), new Date())
-      const message: Message & { payload: WorkflowState<unknown> } = {
+      const payload = WorkflowState.initialize(
+        workflow,
+        "add-1",
+        1,
+        randomUUID(),
+        new Date()
+      ).toNormalized()
+      const message: Message & { payload: NormalizedWorkflowState<unknown> } = {
         id: randomUUID(),
         type: "rivr_workflow@v1",
         createdAt: new Date(),
@@ -270,7 +288,7 @@ describe('WorkflowMessageHandler', function () {
   })
 })
 
-function randomWorkflowState (): WorkflowState<unknown> {
+function randomWorkflowState (): NormalizedWorkflowState<unknown> {
   return {
     name: "calc",
     id: randomUUID(),

@@ -2,7 +2,7 @@ import {describe, test, TestContext} from "node:test";
 import {Consumer, ConsumerOpts, ConsumptionHooks, Message, Producer, Queue, StopReason} from "../../queue";
 import {EventEmitter, on} from "node:events"
 import {ListWorkflowStateOpts, ListWorkflowStateResult, WorkflowStateStorage} from "../../workflow/state/storage";
-import {WorkflowState} from "../../workflow/state/state";
+import {NormalizedWorkflowState} from "../../workflow/state/state";
 import {rivr} from "../../workflow/workflow";
 import {workflowStateStoragePlugin} from "./workflow-state-storage-plugin";
 import {trigger} from "../../workflow/trigger";
@@ -101,15 +101,15 @@ class MemoryQueue implements Queue<never> {
 }
 
 class MemoryStorage implements WorkflowStateStorage {
-  readonly #states = new Map<string, WorkflowState<unknown>>()
+  readonly #states = new Map<string, NormalizedWorkflowState<unknown>>()
 
-    async upsert<State>(states: WorkflowState<State>[]): Promise<void> {
+    async upsert<State>(states: NormalizedWorkflowState<State>[]): Promise<void> {
       for (const state of states) {
         this.#states.set(state.id, state)
       }
     }
-    async get<State>(id: string): Promise<WorkflowState<State> | undefined> {
-      return this.#states.get(id) as WorkflowState<State> | undefined
+    async get<State>(id: string): Promise<NormalizedWorkflowState<State> | undefined> {
+      return this.#states.get(id) as NormalizedWorkflowState<State> | undefined
     }
     list<State>(opts?: ListWorkflowStateOpts): Promise<ListWorkflowStateResult<State>> {
       throw new Error("Method not implemented.");

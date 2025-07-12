@@ -4,7 +4,7 @@ import {
   ListWorkflowStateResult,
   SearchableWorkflowStateStorage,
   SearchWorkflowStateOpts,
-  WorkflowState
+  NormalizedWorkflowState
 } from "rivr";
 
 class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
@@ -31,7 +31,7 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
       this.#getCollection().countDocuments()
     ])
 
-    const states = records.map(({_id, ...state}) => state as WorkflowState<State>)
+    const states = records.map(({_id, ...state}) => state as NormalizedWorkflowState<State>)
 
     const hasPreviousPage = page !== 1
     const hasNextPage = states.length === limit
@@ -48,8 +48,8 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
     }
   }
 
-  async upsert<State>(states: WorkflowState<State>[]): Promise<void> {
-    const writes: AnyBulkWriteOperation<WorkflowState<unknown>>[] = states.map(state => ({
+  async upsert<State>(states: NormalizedWorkflowState<State>[]): Promise<void> {
+    const writes: AnyBulkWriteOperation<NormalizedWorkflowState<unknown>>[] = states.map(state => ({
       replaceOne: {
         upsert: true,
         filter: {id: state.id},
@@ -60,7 +60,7 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
     await this.#getCollection().bulkWrite(writes)
   }
 
-  async get<State>(id: string): Promise<WorkflowState<State> | undefined> {
+  async get<State>(id: string): Promise<NormalizedWorkflowState<State> | undefined> {
     const mRecord = await this.#getCollection().findOne({id})
 
     if (mRecord === null) {
@@ -68,7 +68,7 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
     }
 
     const {_id, ...state} = mRecord
-    return state as WorkflowState<State>
+    return state as NormalizedWorkflowState<State>
   }
 
   async list<State>(opts?: ListWorkflowStateOpts): Promise<ListWorkflowStateResult<State>> {
@@ -83,7 +83,7 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
     return this.#mongoClient
   }
 
-  #getCollection(): Collection<WorkflowState<unknown>> {
+  #getCollection(): Collection<NormalizedWorkflowState<unknown>> {
     return this.#getClient().db(this.#dbName).collection(this.#collectionName)
   }
 }

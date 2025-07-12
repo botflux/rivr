@@ -1,4 +1,4 @@
-import {WorkflowState} from "./state/state";
+import {NormalizedWorkflowState} from "./state/state";
 
 export type Success<State> = {
   type: "success"
@@ -87,7 +87,7 @@ export type OnStepHandledHook<Decorators extends Record<never, never>> = (
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
   step: Step,
   result: StepResult<unknown>,
-  newState: WorkflowState<unknown>
+  newState: NormalizedWorkflowState<unknown>
 ) => (Promise<void> | void)
 
 export type WithContext<T> = {

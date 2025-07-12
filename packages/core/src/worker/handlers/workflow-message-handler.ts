@@ -1,12 +1,15 @@
 import {MessageHandler} from "./message-handler";
-import {startProcessing, updateFromStepResult, WorkflowState} from "../../workflow/state/state";
+import {
+  NormalizedWorkflowState,
+  WorkflowState
+} from "../../workflow/state/state";
 import {ReadyWorkflow, Step, StepResult, Workflow} from "../../workflow/types";
 import {WorkflowStateStorage} from "../../workflow/state/storage";
 import {Message} from "../../queue";
 import {randomUUID} from "crypto";
 import {Logger} from "../../logger/logger";
 
-export class WorkflowMessageHandler implements MessageHandler<WorkflowState<unknown>> {
+export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflowState<unknown>> {
   #workflows: Workflow<any, any, Record<string, never>, Record<never, never>>[]
   #stateStorage?: WorkflowStateStorage
   #logger?: Logger
@@ -21,14 +24,14 @@ export class WorkflowMessageHandler implements MessageHandler<WorkflowState<unkn
     this.#logger = logger;
   }
 
-  support(message: Message): message is Message & { payload: WorkflowState<unknown> } {
+  support(message: Message): message is Message & { payload: NormalizedWorkflowState<unknown> } {
     const {payload} = message
 
     return typeof payload === "object" && payload !== null
       && "name" in payload && typeof payload.name === "string"
   }
 
-  async handle(message: Message & { payload: WorkflowState<unknown> }): Promise<Message[]> {
+  async handle(message: Message & { payload: NormalizedWorkflowState<unknown> }): Promise<Message[]> {
     const {payload: state} = message
     const mWorkflow = this.#workflows.find(w => w.name === state.name)
 
@@ -53,8 +56,11 @@ export class WorkflowMessageHandler implements MessageHandler<WorkflowState<unkn
       return []
     }
 
-    const processingState = startProcessing(state, state.toExecute.step, state.toExecute.state)
-    await this.#stateStorage?.upsert([ processingState ])
+    const processingState = WorkflowState
+      .reconstitute(state)
+      .startProcessing(state.toExecute.step, state.toExecute.state)
+
+    await this.#stateStorage?.upsert([ processingState.toNormalized() ])
     const {item: step, context} = mStepAndExecutionContext
 
     for (const {context, item: hook} of mWorkflow.getHook("preStepHandler")) {
@@ -62,7 +68,7 @@ export class WorkflowMessageHandler implements MessageHandler<WorkflowState<unkn
     }
 
     const result = await this.#executeHandler(step, context, state)
-    const newState = updateFromStepResult(processingState, step, result)
+    const newState = processingState.updateFromStepResult(step, result).toNormalized()
 
     for (const {context, item: hook} of mWorkflow.getHook("onStepHandled")) {
       await hook(context, step, result, newState)
@@ -102,7 +108,7 @@ export class WorkflowMessageHandler implements MessageHandler<WorkflowState<unkn
   async #executeHandler(
     step: Step,
     context: ReadyWorkflow<unknown, unknown, Record<string, never>, Record<never, never>>,
-    state: WorkflowState<unknown>
+    state: NormalizedWorkflowState<unknown>
   ): Promise<StepResult<unknown>> {
     try {
       const stepResultOrResult = await step.handler({
