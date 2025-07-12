@@ -58,7 +58,7 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
 
     const processingState = WorkflowState
       .reconstitute(state)
-      .startProcessing(state.toExecute.step, state.toExecute.state)
+      .startProcessing()
 
     await this.#stateStorage?.upsert([ processingState.toNormalized() ])
     const {item: step, context} = mStepAndExecutionContext

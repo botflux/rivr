@@ -1,7 +1,7 @@
 import {Step, StepResult, Workflow} from "../types";
 import {randomUUID} from "crypto";
 
-export type AttemptStatus = "successful" | "failed" | "skipped" | "stopped" | "in_progress"
+export type AttemptStatus = "successful" | "failed" | "skipped" | "stopped" | "in_progress" | "to_execute"
 
 export type Attempt = {
   id: number
@@ -43,34 +43,31 @@ export class WorkflowState<State> {
   }
 
   startProcessing(
-    stepName: string,
-    inputState: State,
     now = new Date()
   ): WorkflowState<State> {
-    const hasAlreadyAnInProgressStep = this.#state.steps.find(s => s.attempts.some(attempt => attempt.status === "in_progress"))
+    const stepToExecute = this.#state.steps.find(s => s.attempts.some(a => a.status === "to_execute"))
 
-    if (hasAlreadyAnInProgressStep) {
-      throw new Error("Not implemented at line 102 in state.ts")
+    if (!stepToExecute) {
+      throw new Error("Not implemented at line 53 in state.ts")
     }
 
-    const mStep = this.#state.steps.find(s => s.name === stepName)
+    const currentAttempt = stepToExecute.attempts.find(a => a.status === "to_execute");
 
-    if (!mStep) {
-      throw new Error("Not implemented at line 108 in state.ts")
+    if (!currentAttempt) {
+      throw new Error("Not implemented at line 59 in state.ts")
     }
 
     const attempt: Attempt = {
-      id: mStep.attempts.length + 1,
+      ...currentAttempt,
       status: "in_progress",
-      inputState
     }
 
     const newStep: StepState = {
-      ...mStep,
-      attempts: [ ...mStep.attempts, attempt ]
+      ...stepToExecute,
+      attempts: stepToExecute.attempts.map(a => a.id === attempt.id ? attempt : a)
     }
 
-    const newSteps = this.#state.steps.map(s => s.name === mStep.name ? newStep : s)
+    const newSteps = this.#state.steps.map(s => s.name === stepToExecute.name ? newStep : s)
 
     return new WorkflowState({
       ...this.#state,
@@ -158,16 +155,17 @@ export class WorkflowState<State> {
       steps: [
         ...previousSteps.map(step => ({
           name: step.name,
-          attempts: [
-            {
-              status: "skipped" as const,
-              id: 0
-            }
-          ]
+          attempts: []
         })),
         {
           name: mStep.name,
-          attempts: []
+          attempts: [
+            {
+              id: 1,
+              status: "to_execute",
+              inputState: state
+            }
+          ]
         },
         ...nextSteps.map(step => ({
           name: step.name,

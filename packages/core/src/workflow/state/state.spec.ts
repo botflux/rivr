@@ -36,7 +36,13 @@ describe('state', function () {
       steps: [
         {
           name: "add-1",
-          attempts: []
+          attempts: [
+            {
+              id: 1,
+              status: "to_execute",
+              inputState: 1
+            }
+          ]
         }
       ],
       lastModified: now
@@ -63,7 +69,7 @@ describe('state', function () {
     // When
     const state = WorkflowState
       .initialize(workflow, "add-1", 1, id, now)
-      .startProcessing("add-1", 4, now)
+      .startProcessing(now)
 
     // Then
     t.assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
@@ -84,7 +90,7 @@ describe('state', function () {
             {
               id: 1,
               status: "in_progress",
-              inputState: 4
+              inputState: 1
             }
           ]
         },
@@ -116,7 +122,7 @@ describe('state', function () {
     // When
     const { item: step } = workflow.getStepByName("add-1")!
     const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
-      .startProcessing(step.name, 4, now)
+      .startProcessing(now)
       .updateFromStepResult(step, { type: "success", state: 2 }, now)
 
     // Then
@@ -138,7 +144,7 @@ describe('state', function () {
             {
               id: 1,
               status: "successful",
-              inputState: 4
+              inputState: 1
             }
           ]
         },
@@ -165,7 +171,7 @@ describe('state', function () {
     // When
     const { item: step } = workflow.getStepByName("add-1")!
     const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
-      .startProcessing("add-1", 4, now)
+      .startProcessing(now)
       .updateFromStepResult(step, { type: "success", state: 2 }, now)
 
     // Then
@@ -188,7 +194,7 @@ describe('state', function () {
             {
               id: 1,
               status: "successful",
-              inputState: 4
+              inputState: 1
             }
           ]
         },
@@ -216,7 +222,7 @@ describe('state', function () {
     // When
     const { item: step } = workflow.getStepByName("add-1")!
     const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
-      .startProcessing("add-1", 4, now)
+      .startProcessing(now)
       .updateFromStepResult(step, { type: "skipped" }, now)
 
     // Then
@@ -238,7 +244,7 @@ describe('state', function () {
             {
               id: 1,
               status: "skipped",
-              inputState: 4
+              inputState: 1
             }
           ]
         },
@@ -271,7 +277,7 @@ describe('state', function () {
     // When
     const { item: step } = workflow.getStepByName("add-1")!
     const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
-      .startProcessing("add-1", 4, now)
+      .startProcessing(now)
       .updateFromStepResult(step, { type: "stopped" }, now)
 
     // Then
@@ -293,7 +299,7 @@ describe('state', function () {
             {
               id: 1,
               status: "stopped",
-              inputState: 4
+              inputState: 1
             }
           ]
         },
@@ -322,7 +328,7 @@ describe('state', function () {
     // When
     const { item: step } = workflow.getStepByName("add-1")!
     const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
-      .startProcessing(step.name, 4, now)
+      .startProcessing(now)
       .updateFromStepResult(step, { type: "failure", error: new Error("oops") }, now)
 
     // Then
@@ -344,7 +350,7 @@ describe('state', function () {
             {
               id: 1,
               status: "failed",
-              inputState: 4
+              inputState: 1
             }
           ]
         },
@@ -370,7 +376,7 @@ describe('state', function () {
     // When
     const { item: step } = workflow.getStepByName("add-1")!
     const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
-      .startProcessing("add-1", 4, now)
+      .startProcessing(now)
       .updateFromStepResult(step, { type: "failure", error: new Error("oops") }, now)
 
     // Then
@@ -392,7 +398,7 @@ describe('state', function () {
             {
               id: 1,
               status: "failed",
-              inputState: 4
+              inputState: 1
             }
           ]
         },
@@ -422,7 +428,7 @@ describe('state', function () {
     // When
     const { item: step } = workflow.getStepByName("add-1")!
     const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
-      .startProcessing("add-1", 4, now)
+      .startProcessing(now)
       .updateFromStepResult(step, { type: "failure", error: new Error("oops") }, now)
 
     // Then
@@ -444,7 +450,7 @@ describe('state', function () {
             {
               id: 1,
               status: "failed",
-              inputState: 4
+              inputState: 1
             }
           ]
         },
