@@ -187,7 +187,8 @@ describe('WorkflowMessageHandler', function () {
               attempts: [
                 {
                   id: 1,
-                  status: "successful"
+                  status: "successful",
+                  inputState: 1
                 }
               ]
             },
@@ -235,7 +236,8 @@ describe('WorkflowMessageHandler', function () {
               attempts: [
                 {
                   id: 1,
-                  status: "in_progress"
+                  status: "in_progress",
+                  inputState: 1
                 }
               ]
             }
@@ -256,7 +258,8 @@ describe('WorkflowMessageHandler', function () {
               attempts: [
                 {
                   id: 1,
-                  status: "successful"
+                  status: "successful",
+                  inputState: 1
                 }
               ]
             }

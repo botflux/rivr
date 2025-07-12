@@ -53,7 +53,7 @@ export class WorkflowMessageHandler implements MessageHandler<WorkflowState<unkn
       return []
     }
 
-    const processingState = startProcessing(state, state.toExecute.step)
+    const processingState = startProcessing(state, state.toExecute.step, state.toExecute.state)
     await this.#stateStorage?.upsert([ processingState ])
     const {item: step, context} = mStepAndExecutionContext
 

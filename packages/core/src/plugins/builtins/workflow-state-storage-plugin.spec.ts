@@ -158,6 +158,7 @@ describe('workflow state storage plugin', function () {
             {
               id: 1,
               status: "successful",
+              inputState: 4
             },
           ],
           name: 'add-1'

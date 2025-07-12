@@ -6,6 +6,7 @@ export type AttemptStatus = "successful" | "failed" | "skipped" | "stopped" | "i
 export type Attempt = {
   id: number
   status: AttemptStatus
+  inputState?: unknown
 }
 
 export type StepState = {
@@ -94,6 +95,7 @@ export function initializeWorkflowState<State, FirstState, StateByStepName exten
 export function startProcessing<State> (
   state: WorkflowState<State>,
   stepName: string,
+  inputState: State,
   now = new Date()
 ): WorkflowState<State> {
   const hasAlreadyAnInProgressStep = state.steps.find(s => s.attempts.some(attempt => attempt.status === "in_progress"))
@@ -110,7 +112,8 @@ export function startProcessing<State> (
 
   const attempt: Attempt = {
     id: mStep.attempts.length + 1,
-    status: "in_progress"
+    status: "in_progress",
+    inputState
   }
 
   const newStep: StepState = {
