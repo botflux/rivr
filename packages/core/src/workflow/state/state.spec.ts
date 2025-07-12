@@ -43,6 +43,56 @@ describe('state', function () {
     })
   })
 
+  test("should be able to mark a step as 'in_progress'", async (t: TestContext) => {
+    // Given
+    const id = randomUUID()
+    const now = new Date()
+
+    const workflow = rivr.workflow<number>("calc")
+      .step({
+        name: "add-1",
+        handler: ({ state }) => state + 1
+      })
+      .step({
+        name: "add-6",
+        handler: ({ state }) => state + 10
+      })
+
+    await workflow.ready()
+
+    // When
+    const state = startProcessing(initializeWorkflowState(workflow, "add-1", 1, id, now), "add-1", now)
+
+    // Then
+    t.assert.deepStrictEqual(omit(state, [ "lastModified" ]), {
+      id,
+      name: "calc",
+      status: "in_progress",
+      toExecute: {
+        state: 1,
+        status: 'todo',
+        step: "add-1",
+        attempt: 1,
+        areRetryExhausted: false
+      },
+      steps: [
+        {
+          name: "add-1",
+          attempts: [
+            {
+              id: 1,
+              status: "in_progress",
+            }
+          ]
+        },
+        {
+          name: "add-6",
+          attempts: []
+        }
+      ],
+    })
+  })
+
   test("should be able to update based on a successful result", async (t: TestContext) => {
     // Given
     const id = randomUUID()
