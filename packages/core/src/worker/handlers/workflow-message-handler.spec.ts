@@ -206,7 +206,13 @@ describe('WorkflowMessageHandler', function () {
             },
             {
               name: "minus-2",
-              attempts: []
+              attempts: [
+                {
+                  id: 1,
+                  status: "to_execute",
+                  inputState: 2
+                }
+              ]
             }
           ]
         } satisfies NormalizedWorkflowState<number>

@@ -96,12 +96,45 @@ export class WorkflowState<State> {
     const attemptStatus = resultToAttemptStatus(result)
     const newAttempt = { ...inProgressAttempt, status: attemptStatus } satisfies Attempt
 
-    const updatedSteps = this.#state.steps.with(stepStateIndex, {
-      ...stepState,
-      attempts: stepState.attempts.map(attempt => attempt.id === newAttempt.id ? newAttempt : attempt)
-    })
-
     const [nextTask, newStatus, resultState] = getNextTask(this.#state, step, result, now)
+
+    const nextStep = this.#state.steps.find(s => s.name === nextTask.step)
+
+    if (!nextStep) {
+      throw new Error("Not implemented at line 104 in state.ts")
+    }
+
+    const newNextStep: StepState | undefined = nextTask.status === "todo" && nextTask.step !== stepState.name
+      ? {
+        ...nextStep,
+        attempts: [
+          ...nextStep.attempts,
+          {
+            id: nextStep.attempts.length + 1,
+            status: "to_execute",
+            inputState: nextTask.state
+          }
+        ]
+      }
+      : undefined
+
+    const newStep = {
+      ...stepState,
+      attempts: [
+        ...stepState.attempts.map(attempt => attempt.id === newAttempt.id ? newAttempt : attempt),
+        ...nextTask.status === "todo" && nextTask.step === stepState.name ? [
+          {
+            id: stepState.attempts.length + 1,
+            status: "to_execute" as const,
+            inputState: inProgressAttempt.inputState
+          }
+        ] : []
+      ]
+    }
+
+    const updatedSteps = this.#state.steps
+      .with(stepStateIndex, newStep)
+      .map(step => step.name === newNextStep?.name ? newNextStep : step)
 
     return new WorkflowState<State>({
       ...this.#state,

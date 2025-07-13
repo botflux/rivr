@@ -150,7 +150,13 @@ describe('state', function () {
         },
         {
           name: "add-6",
-          attempts: []
+          attempts: [
+            {
+              id: 1,
+              status: "to_execute",
+              inputState: 2
+            }
+          ]
         }
       ],
     })
@@ -250,7 +256,13 @@ describe('state', function () {
         },
         {
           name: "add-6",
-          attempts: []
+          attempts: [
+            {
+              id: 1,
+              status: "to_execute",
+              inputState: 1
+            }
+          ]
         }
       ],
       lastModified: now
@@ -311,7 +323,7 @@ describe('state', function () {
     })
   })
 
-  test("should be able to retry a failed workflow", async (t: TestContext) => {
+  test("should be able to retry a failed workflow", { only: true }, async (t: TestContext) => {
     // Given
     const id = randomUUID()
     const now = new Date()
@@ -350,6 +362,11 @@ describe('state', function () {
             {
               id: 1,
               status: "failed",
+              inputState: 1
+            },
+            {
+              id: 2,
+              status: "to_execute",
               inputState: 1
             }
           ]
@@ -456,7 +473,13 @@ describe('state', function () {
         },
         {
           name: "add-6",
-          attempts: []
+          attempts: [
+            {
+              id: 1,
+              status: "to_execute",
+              inputState: 1
+            }
+          ]
         }
       ],
       lastModified: now

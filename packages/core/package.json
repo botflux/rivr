@@ -9,7 +9,8 @@
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "test": "borp **/*.spec.ts"
+    "test": "borp **/*.spec.ts",
+    "test:only": "borp --only **/*.spec.ts"
   },
   "repository": {
     "type": "git",
