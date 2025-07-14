@@ -16,15 +16,6 @@ export type StepState = {
 
 export type WorkflowStatus = "successful" | "failed" | "skipped" | "stopped" | "in_progress"
 
-export type Task<State> = {
-  status: "todo" | "done"
-  step: string
-  state: State
-  attempt: number
-  areRetryExhausted: boolean
-  pickAfter?: Date
-}
-
 export type NormalizedWorkflowState<State> = {
   id: string
   name: string
