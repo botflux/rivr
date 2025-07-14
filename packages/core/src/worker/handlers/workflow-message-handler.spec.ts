@@ -85,7 +85,7 @@ describe('WorkflowMessageHandler', function () {
       ])
     })
 
-    test("should be able to log a warning if no step matches the state's targeted step", async (t: TestContext) => {
+    test("should be able to log a warning if there is no step to execute", async (t: TestContext) => {
       // Given
       const workflow = rivr.workflow<number>("calc")
       const testLogger = new TestLogger()
@@ -106,11 +106,10 @@ describe('WorkflowMessageHandler', function () {
       t.assert.deepStrictEqual(testLogger.messages, [
         {
           level: "warn",
-          message: `State '${payload.id}' references an unknown step '${payload.toExecute.step}'`,
-          type: "unknown_step",
+          message: `There is no step to execute within the workflow 'calc'`,
+          type: "no_step_to_execute",
           stateId: payload.id,
           stateName: payload.name,
-          stepName: payload.toExecute.step
         }
       ])
     })
@@ -186,13 +185,6 @@ describe('WorkflowMessageHandler', function () {
       t.assert.deepStrictEqual(messages.map(m => m.payload), [
         {
           ...payload,
-          toExecute: {
-            step: "minus-2",
-            state: 2,
-            areRetryExhausted: false,
-            attempt: 1,
-            status: "todo",
-          },
           steps: [
             {
               name: "add-1",
@@ -269,12 +261,6 @@ describe('WorkflowMessageHandler', function () {
         },
         {
           ...payload,
-          toExecute: {
-            ...payload.toExecute,
-            status: 'done',
-            state: 2
-          },
-          result: 2,
           status: "successful",
           steps: [
             {
@@ -299,13 +285,6 @@ function randomWorkflowState (): NormalizedWorkflowState<unknown> {
     name: "calc",
     id: randomUUID(),
     status: "in_progress",
-    toExecute: {
-      status: "todo",
-      state: undefined,
-      step: "step",
-      attempt: 1,
-      areRetryExhausted: false
-    },
     steps: [],
     lastModified: new Date()
   }

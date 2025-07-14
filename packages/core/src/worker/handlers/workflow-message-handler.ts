@@ -1,6 +1,7 @@
 import {MessageHandler} from "./message-handler";
 import {
-  NormalizedWorkflowState,
+  Attempt,
+  NormalizedWorkflowState, StepState,
   WorkflowState
 } from "../../workflow/state/state";
 import {ReadyWorkflow, Step, StepResult, Workflow} from "../../workflow/types";
@@ -44,59 +45,72 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
       return []
     }
 
-    const mStepAndExecutionContext = mWorkflow.getStepByName(state.toExecute.step)
+    const reconstitutedState = WorkflowState.reconstitute(state)
+    const toExecute = reconstitutedState.stepToExecute
 
-    if (!mStepAndExecutionContext) {
-      this.#logger?.warn(`State '${state.id}' references an unknown step '${state.toExecute.step}'`, {
-        type: "unknown_step",
+    if (toExecute === undefined) {
+      this.#logger?.warn(`There is no step to execute within the workflow '${state.name}'`, {
+        type: "no_step_to_execute",
         stateId: state.id,
-        stateName: state.name,
-        stepName: state.toExecute.step
+        stateName: state.name
       })
       return []
     }
 
-    const processingState = WorkflowState
-      .reconstitute(state)
-      .startProcessing()
+    const [ toExecuteStep, toExecuteAttempt ] = toExecute
+
+    const mStepAndExecutionContext = mWorkflow.getStepByName(toExecuteStep.name)
+
+    if (!mStepAndExecutionContext) {
+      this.#logger?.warn(`State '${state.id}' references an unknown step '${toExecuteStep.name}'`, {
+        type: "unknown_step",
+        stateId: state.id,
+        stateName: state.name,
+        stepName: toExecuteStep.name
+      })
+      return []
+    }
+
+    const processingState = reconstitutedState.startProcessing()
 
     await this.#stateStorage?.upsert([ processingState.toNormalized() ])
     const {item: step, context} = mStepAndExecutionContext
 
     for (const {context, item: hook} of mWorkflow.getHook("preStepHandler")) {
-      await hook(context, step, state.toExecute.state)
+      await hook(context, step, toExecuteAttempt.inputState)
     }
 
-    const result = await this.#executeHandler(step, context, state)
-    const newState = processingState.updateFromStepResult(step, result).toNormalized()
+    const result = await this.#executeHandler(step, context, toExecuteStep, toExecuteAttempt)
+    const newState = processingState.updateFromStepResult(step, result)
+
+    const newStateNormalized = newState.toNormalized()
 
     for (const {context, item: hook} of mWorkflow.getHook("onStepHandled")) {
-      await hook(context, step, result, newState)
+      await hook(context, step, result, newStateNormalized)
     }
 
-    await this.#stateStorage?.upsert([newState])
+    await this.#stateStorage?.upsert([newStateNormalized])
 
-    if (newState.status === "successful") {
+    if (newStateNormalized.status === "successful") {
       for (const {context, item: hook} of mWorkflow.getHook("onWorkflowCompleted")) {
-        await hook(context, newState.toExecute.state)
+        await hook(context, toExecuteAttempt.inputState)
       }
-    } else if (newState.status === "stopped") {
+    } else if (newStateNormalized.status === "stopped") {
       for (const {context, item: hook} of mWorkflow.getHook("onWorkflowStopped")) {
-        await hook(context, step, newState.toExecute.state)
+        await hook(context, step, toExecuteAttempt.inputState)
       }
-    } else if (newState.status === "failed" && result.type === "failure") {
+    } else if (newStateNormalized.status === "failed" && result.type === "failure") {
       for (const {context, item: hook} of mWorkflow.getHook("onWorkflowFailed")) {
-        await hook(result.error, context, step, newState.toExecute.state)
+        await hook(result.error, context, step, toExecuteAttempt.inputState)
       }
     }
 
-    if (newState.status === "in_progress") {
+    if (newStateNormalized.status === "in_progress") {
       return [
         {
           id: randomUUID(),
           type: "workflow",
-          payload: newState,
-          ...newState.toExecute.pickAfter !== undefined && {pickAfter: newState.toExecute.pickAfter},
+          payload: newStateNormalized,
           createdAt: new Date()
         }
       ]
@@ -108,7 +122,8 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
   async #executeHandler(
     step: Step,
     context: ReadyWorkflow<unknown, unknown, Record<string, never>, Record<never, never>>,
-    state: NormalizedWorkflowState<unknown>
+    stepState: StepState,
+    attemptState: Attempt
   ): Promise<StepResult<unknown>> {
     try {
       const stepResultOrResult = await step.handler({
@@ -116,8 +131,8 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
         err: (error: unknown) => ({type: "failure", error}),
         skip: () => ({type: "skipped"}),
         ok: (state) => ({type: "success", state}),
-        attempt: state.toExecute.attempt,
-        state: state.toExecute.state,
+        attempt: stepState.attempts.length,
+        state: attemptState.inputState,
         workflow: context
       })
 

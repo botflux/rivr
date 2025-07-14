@@ -26,13 +26,6 @@ describe('state', function () {
       id,
       name: "calc",
       status: "in_progress",
-      toExecute: {
-        state: 1,
-        status: 'todo',
-        step: "add-1",
-        attempt: 1,
-        areRetryExhausted: false
-      },
       steps: [
         {
           name: "add-1",
@@ -76,13 +69,6 @@ describe('state', function () {
       id,
       name: "calc",
       status: "in_progress",
-      toExecute: {
-        state: 1,
-        status: 'todo',
-        step: "add-1",
-        attempt: 1,
-        areRetryExhausted: false
-      },
       steps: [
         {
           name: "add-1",
@@ -130,13 +116,6 @@ describe('state', function () {
       id,
       name: "calc",
       status: "in_progress",
-      toExecute: {
-        state: 2,
-        status: 'todo',
-        step: "add-6",
-        attempt: 1,
-        areRetryExhausted: false
-      },
       steps: [
         {
           name: "add-1",
@@ -185,14 +164,6 @@ describe('state', function () {
       id,
       name: "calc",
       status: "successful",
-      result: 2,
-      toExecute: {
-        state: 2,
-        status: 'done',
-        step: "add-1",
-        attempt: 1,
-        areRetryExhausted: false
-      },
       steps: [
         {
           name: "add-1",
@@ -236,13 +207,6 @@ describe('state', function () {
       id,
       name: "calc",
       status: "in_progress",
-      toExecute: {
-        state: 1,
-        status: 'todo',
-        step: "add-6",
-        attempt: 1,
-        areRetryExhausted: false
-      },
       steps: [
         {
           name: "add-1",
@@ -297,13 +261,6 @@ describe('state', function () {
       id,
       name: "calc",
       status: "stopped",
-      toExecute: {
-        state: 1,
-        status: 'done',
-        step: "add-1",
-        attempt: 1,
-        areRetryExhausted: false
-      },
       steps: [
         {
           name: "add-1",
@@ -323,7 +280,7 @@ describe('state', function () {
     })
   })
 
-  test("should be able to retry a failed workflow", { only: true }, async (t: TestContext) => {
+  test("should be able to retry a failed workflow", async (t: TestContext) => {
     // Given
     const id = randomUUID()
     const now = new Date()
@@ -348,13 +305,6 @@ describe('state', function () {
       id,
       name: "calc",
       status: "in_progress",
-      toExecute: {
-        state: 1,
-        status: 'todo',
-        step: "add-1",
-        attempt: 2,
-        areRetryExhausted: false,
-      },
       steps: [
         {
           name: "add-1",
@@ -401,13 +351,6 @@ describe('state', function () {
       id,
       name: "calc",
       status: "failed",
-      toExecute: {
-        state: 1,
-        status: 'done',
-        step: "add-1",
-        attempt: 1,
-        areRetryExhausted: true,
-      },
       steps: [
         {
           name: "add-1",
@@ -453,13 +396,6 @@ describe('state', function () {
       id,
       name: "calc",
       status: "in_progress",
-      toExecute: {
-        state: 1,
-        status: 'todo',
-        step: "add-6",
-        attempt: 1,
-        areRetryExhausted: false,
-      },
       steps: [
         {
           name: "add-1",
@@ -468,18 +404,17 @@ describe('state', function () {
               id: 1,
               status: "failed",
               inputState: 1
+            },
+            {
+              id: 2,
+              status: "to_execute",
+              inputState: 1
             }
           ]
         },
         {
           name: "add-6",
-          attempts: [
-            {
-              id: 1,
-              status: "to_execute",
-              inputState: 1
-            }
-          ]
+          attempts: []
         }
       ],
       lastModified: now
