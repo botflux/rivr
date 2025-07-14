@@ -6,7 +6,8 @@ export type AttemptStatus = "successful" | "failed" | "skipped" | "stopped" | "i
 export type Attempt = {
   id: number
   status: AttemptStatus
-  inputState?: unknown
+  inputState: unknown
+  result?: StepResult<unknown>
 }
 
 export type StepState = {
@@ -333,7 +334,8 @@ export class WorkflowState<State> {
 
         const currentAttemptNewState: Attempt = {
           ...currentAttempt,
-          status: result.type === "success" ? "successful" : "skipped"
+          status: result.type === "success" ? "successful" : "skipped",
+          result
         }
 
         return {
@@ -365,7 +367,8 @@ export class WorkflowState<State> {
             ...currentStepState,
             attempts: currentStepState.attempts.map(attempt => attempt.id === currentAttempt.id ? {
               ...currentAttempt,
-              status: "stopped"
+              status: "stopped",
+              result
             } : attempt)
           },
           nextStepUpdated: nextStepState,
@@ -385,6 +388,7 @@ export class WorkflowState<State> {
                 ...currentStepState.attempts.map(attempt => attempt.id === currentAttempt.id ? {
                   ...currentAttempt,
                   status: "failed" as const,
+                  result
                 } : attempt),
                 {
                   id: currentStepState.attempts.length + 1,
@@ -405,8 +409,9 @@ export class WorkflowState<State> {
               ...currentStepState,
               attempts: currentStepState.attempts.map(attempt => attempt.id === currentAttempt.id ? {
                 ...currentAttempt,
-                status: "failed" as const
-              } : attempt)
+                status: "failed" as const,
+                result
+              } : attempt),
             },
             nextStepUpdated: nextStepState,
             pickAfter: undefined,
@@ -427,7 +432,8 @@ export class WorkflowState<State> {
             attempts: [
               ...currentStepState.attempts.map(attempt => attempt.id === currentAttempt.id ? {
                 ...currentAttempt,
-                status: "failed" as const
+                status: "failed" as const,
+                result
               } : attempt),
               {
                 status: "to_execute",

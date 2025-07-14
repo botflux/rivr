@@ -4,7 +4,7 @@ import {WorkflowState} from "./state";
 import {randomUUID} from "crypto";
 import {omit} from "../../utils/omit";
 
-describe('state', function () {
+describe('state', {only: true}, function () {
   test("should be able to create a workflow state", async (t: TestContext) => {
     // Given
     const id = randomUUID()
@@ -123,7 +123,11 @@ describe('state', function () {
             {
               id: 1,
               status: "successful",
-              inputState: 1
+              inputState: 1,
+              result: {
+                state: 2,
+                type: "success"
+              }
             }
           ]
         },
@@ -171,7 +175,11 @@ describe('state', function () {
             {
               id: 1,
               status: "successful",
-              inputState: 1
+              inputState: 1,
+              result: {
+                type: "success",
+                state: 2
+              }
             }
           ]
         },
@@ -214,7 +222,10 @@ describe('state', function () {
             {
               id: 1,
               status: "skipped",
-              inputState: 1
+              inputState: 1,
+              result: {
+                type: "skipped"
+              }
             }
           ]
         },
@@ -268,7 +279,10 @@ describe('state', function () {
             {
               id: 1,
               status: "stopped",
-              inputState: 1
+              inputState: 1,
+              result: {
+                type: "stopped"
+              }
             }
           ]
         },
@@ -294,11 +308,13 @@ describe('state', function () {
 
     await workflow.ready()
 
+    const error = new Error("oops")
+
     // When
     const { item: step } = workflow.getStepByName("add-1")!
     const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
       .startProcessing(now)
-      .updateFromStepResult(step, { type: "failure", error: new Error("oops") }, now)
+      .updateFromStepResult(step, { type: "failure", error }, now)
 
     // Then
     t.assert.deepStrictEqual(state.toNormalized(), {
@@ -312,7 +328,11 @@ describe('state', function () {
             {
               id: 1,
               status: "failed",
-              inputState: 1
+              inputState: 1,
+              result: {
+                type: "failure",
+                error
+              }
             },
             {
               id: 2,
@@ -340,11 +360,13 @@ describe('state', function () {
 
     await workflow.ready()
 
+    const error = new Error("oops")
+
     // When
     const { item: step } = workflow.getStepByName("add-1")!
     const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
       .startProcessing(now)
-      .updateFromStepResult(step, { type: "failure", error: new Error("oops") }, now)
+      .updateFromStepResult(step, { type: "failure", error }, now)
 
     // Then
     t.assert.deepStrictEqual(state.toNormalized(), {
@@ -358,7 +380,11 @@ describe('state', function () {
             {
               id: 1,
               status: "failed",
-              inputState: 1
+              inputState: 1,
+              result: {
+                type: "failure",
+                error
+              }
             }
           ]
         },
@@ -385,11 +411,13 @@ describe('state', function () {
 
     await workflow.ready()
 
+    const error = new Error("oops")
+
     // When
     const { item: step } = workflow.getStepByName("add-1")!
     const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
       .startProcessing(now)
-      .updateFromStepResult(step, { type: "failure", error: new Error("oops") }, now)
+      .updateFromStepResult(step, { type: "failure", error }, now)
 
     // Then
     t.assert.deepStrictEqual(state.toNormalized(), {
@@ -403,7 +431,11 @@ describe('state', function () {
             {
               id: 1,
               status: "failed",
-              inputState: 1
+              inputState: 1,
+              result: {
+                type: "failure",
+                error
+              }
             },
             {
               id: 2,
