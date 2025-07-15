@@ -4,7 +4,7 @@ import {WorkflowState} from "./state";
 import {randomUUID} from "crypto";
 import {omit} from "../../utils/omit";
 
-describe('state', {only: true}, function () {
+describe('state', function () {
   test("should be able to create a workflow state", async (t: TestContext) => {
     // Given
     const id = randomUUID()

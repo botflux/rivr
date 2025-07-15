@@ -192,7 +192,11 @@ describe('WorkflowMessageHandler', function () {
                 {
                   id: 1,
                   status: "successful",
-                  inputState: 1
+                  inputState: 1,
+                  result: {
+                    state: 2,
+                    type: "success"
+                  }
                 }
               ]
             },
@@ -269,7 +273,11 @@ describe('WorkflowMessageHandler', function () {
                 {
                   id: 1,
                   status: "successful",
-                  inputState: 1
+                  inputState: 1,
+                  result: {
+                    state: 2,
+                    type: "success"
+                  }
                 }
               ]
             }
