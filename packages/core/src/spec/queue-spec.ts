@@ -242,59 +242,6 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
 
 export function advancedFlow({ createQueue }: QueueSpecOpts) {
   describe('advanced flow', function () {
-    test("should be able to skip a step", async (t: TestContext) => {
-      // Given
-      const results: StepResult<unknown>[] = []
-
-      const workflow = rivr.workflow<number>("complex-calculation")
-        .step({
-          name: "skipped",
-          handler: ctx => ctx.skip()
-        })
-        .step({
-          name: "add-1",
-          handler: ({ state }) => state + 1
-        })
-        .addHook("onStepHandled", (ctx, step, result) => {
-          results.push(result)
-        })
-
-      const queue = createQueue()
-      const worker = createWorker({ primary: queue, workflows: [ workflow ] })
-
-      t.after(async () => {
-        await worker.stop()
-        await queue.disconnect()
-      })
-
-      await worker.start()
-
-      const producer = queue.createProducer()
-
-      t.after(async () => {
-        await producer.disconnect()
-      })
-
-      // When
-      await trigger(
-        producer,
-        workflow,
-        1
-      )
-
-      // Then
-      await waitForPredicate(() => results.length === 2)
-      t.assert.deepStrictEqual(results, [
-        {
-          type: "skipped",
-        },
-        {
-          type: "success",
-          state: 2
-        }
-      ])
-    })
-
     test("should be able to stop a workflow", async (t: TestContext) => {
       // Given
       let result: unknown

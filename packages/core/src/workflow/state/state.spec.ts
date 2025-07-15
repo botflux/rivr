@@ -187,63 +187,6 @@ describe('state', function () {
     })
   })
 
-  test("should be able to skip a step", async (t: TestContext) => {
-    // Given
-    const id = randomUUID()
-    const now = new Date()
-
-    const workflow = rivr.workflow<number>("calc")
-      .step({
-        name: "add-1",
-        handler: ({ state }) => state + 1
-      })
-      .step({
-        name: "add-6",
-        handler: ({ state }) => state + 10
-      })
-
-    await workflow.ready()
-
-    // When
-    const { item: step } = workflow.getStepByName("add-1")!
-    const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
-      .startProcessing(now)
-      .updateFromStepResult(step, { type: "skipped" }, now)
-
-    // Then
-    t.assert.deepStrictEqual(state.toNormalized(), {
-      id,
-      name: "calc",
-      status: "in_progress",
-      steps: [
-        {
-          name: "add-1",
-          attempts: [
-            {
-              id: 1,
-              status: "skipped",
-              inputState: 1,
-              result: {
-                type: "skipped"
-              }
-            }
-          ]
-        },
-        {
-          name: "add-6",
-          attempts: [
-            {
-              id: 1,
-              status: "to_execute",
-              inputState: 1
-            }
-          ]
-        }
-      ],
-      lastModified: now
-    })
-  })
-
   test("should be able to stop a workflow", async (t: TestContext) => {
     // Given
     const id = randomUUID()

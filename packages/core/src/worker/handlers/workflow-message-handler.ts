@@ -130,7 +130,6 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
       const stepResultOrResult = await step.handler({
         stop: () => ({type: "stopped"}),
         err: (error: unknown) => ({type: "failure", error}),
-        skip: () => ({type: "skipped"}),
         ok: (state) => ({type: "success", state}),
         attempt: stepState.attempts.length,
         state: attemptState.inputState,

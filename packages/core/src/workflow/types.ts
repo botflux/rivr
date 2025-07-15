@@ -8,9 +8,6 @@ export type Failure<State> = {
   type: "failure"
   error: unknown
 }
-export type Skipped<State> = {
-  type: "skipped"
-}
 export type Stopped<State> = {
   type: "stopped"
 }
@@ -18,14 +15,12 @@ export type Stopped<State> = {
 export type StepResult<State> =
   | Success<State>
   | Failure<State>
-  | Skipped<State>
   | Stopped<State>
 export type HandlerOpts<State, FirstState, StateByStepName extends Record<never, never>, Decorators extends Record<never, never>> = {
   state: State
   workflow: ReadyWorkflow<State, FirstState, StateByStepName, Decorators>
   ok: (state: State) => Success<State>
   err: (error: unknown) => Failure<State>
-  skip: () => Skipped<State>
   stop: () => Stopped<State>
   attempt: number
 }

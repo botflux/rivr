@@ -123,135 +123,6 @@ export class WorkflowState<State> {
     return this.#state
   }
 
-  #resultToAttemptStatus (result: StepResult<unknown>): AttemptStatus {
-    switch (result.type) {
-      case "success": return "successful"
-      case "failure": return "failed"
-      case "skipped": return "skipped"
-      case "stopped": return "stopped"
-    }
-  }
-
-  // #getNextTask<State>(state: NormalizedWorkflowState<State>, step: Step, result: StepResult<State>, now: Date): [
-  //   newTask: Task<State>,
-  //   newStatus: WorkflowStatus,
-  //   resultState: State | undefined
-  // ] {
-  //   const { delayBetweenAttempts: delayFnOrNumber, maxAttempts, optional } = step
-  //   const currentStepIndex = state.steps.findIndex(s => s.name === step.name)
-  //
-  //   if (currentStepIndex === -1) {
-  //     throw new Error("Cannot find the step")
-  //   }
-  //
-  //   const mNextStep = currentStepIndex + 1 >= state.steps.length
-  //     ? undefined
-  //     : state.steps[currentStepIndex + 1]
-  //
-  //   switch (result.type) {
-  //     case "skipped":
-  //     case "success": {
-  //       const nextState = result.type === "skipped"
-  //         ? state.toExecute.state
-  //         : result.state
-  //
-  //       if (mNextStep === undefined) {
-  //         return [
-  //           {
-  //             ...state.toExecute,
-  //             state: nextState,
-  //             status: "done",
-  //           },
-  //           "successful",
-  //           nextState
-  //         ]
-  //       }
-  //
-  //       return [
-  //         {
-  //           status: "todo",
-  //           step: mNextStep.name,
-  //           state: nextState,
-  //           attempt: 1,
-  //           areRetryExhausted: false
-  //         },
-  //         "in_progress",
-  //         undefined
-  //       ]
-  //     }
-  //
-  //     case "stopped": {
-  //       return [
-  //         {
-  //           ...state.toExecute,
-  //           status: "done",
-  //         },
-  //         "stopped",
-  //         undefined
-  //       ]
-  //     }
-  //
-  //     case "failure": {
-  //       const areRetryExhausted = maxAttempts < state.toExecute.attempt + 1
-  //
-  //       if (areRetryExhausted && optional) {
-  //         if (mNextStep === undefined) {
-  //           return [
-  //             {
-  //               ...state.toExecute,
-  //               status: "done"
-  //             },
-  //             "successful",
-  //             state.toExecute.state
-  //           ]
-  //         }
-  //
-  //         return [
-  //           {
-  //             status: "todo",
-  //             attempt: 1,
-  //             areRetryExhausted: false,
-  //             state: state.toExecute.state,
-  //             step: mNextStep.name,
-  //           },
-  //           "in_progress",
-  //           undefined
-  //         ]
-  //       }
-  //
-  //       if (areRetryExhausted) {
-  //         return [
-  //           {
-  //             ...state.toExecute,
-  //             status: "done",
-  //             areRetryExhausted,
-  //           },
-  //           "failed",
-  //           undefined
-  //         ]
-  //       }
-  //
-  //       const delayBetweenAttempts = typeof delayFnOrNumber === "number"
-  //         ? () => delayFnOrNumber
-  //         : delayFnOrNumber
-  //
-  //       const newDelay = delayBetweenAttempts(state.toExecute.attempt + 1)
-  //       const pickAfter = newDelay === 0 ? undefined : new Date(now.getTime() + newDelay)
-  //
-  //       return [
-  //         {
-  //           ...state.toExecute,
-  //           attempt: state.toExecute.attempt + 1,
-  //           areRetryExhausted,
-  //           ...pickAfter !== undefined && { pickAfter },
-  //         },
-  //         "in_progress",
-  //         undefined
-  //       ]
-  //     }
-  //   }
-  // }
-
   #updateCurrentAndNextStep(
     currentStepState: StepState,
     nextStepState: StepState | undefined,
@@ -268,15 +139,10 @@ export class WorkflowState<State> {
     }
     
     switch (result.type) {
-      case "skipped":
       case "success": {
-        const nextState = result.type === "skipped"
-          ? currentAttempt.inputState
-          : result.state
-
         const currentAttemptNewState: Attempt = {
           ...currentAttempt,
-          status: result.type === "success" ? "successful" : "skipped",
+          status: "successful",
           result
         }
 
@@ -294,7 +160,7 @@ export class WorkflowState<State> {
                 {
                   id: nextStepState.attempts.length + 1,
                   status: "to_execute",
-                  inputState: nextState
+                  inputState: result.state
                 }
               ]
             },
