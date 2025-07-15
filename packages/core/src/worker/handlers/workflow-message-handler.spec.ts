@@ -28,7 +28,7 @@ describe('WorkflowMessageHandler', function () {
     test("should be able to return true given a workflow message", (t: TestContext) => {
       // Given
       const message: Message = {
-        type: "you_can_put_whatever_here",
+        type: "workflow_message@v1",
         id: randomUUID(),
         payload: randomWorkflowState(),
         createdAt: new Date(),

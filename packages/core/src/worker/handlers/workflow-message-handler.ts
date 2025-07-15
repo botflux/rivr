@@ -31,9 +31,9 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
   }
 
   support(message: Message): message is Message & { payload: NormalizedWorkflowState<unknown> } {
-    const {payload} = message
+    const { type, payload} = message
 
-    return typeof payload === "object" && payload !== null
+    return type === "workflow_message@v1" && typeof payload === "object" && payload !== null
       && "name" in payload && typeof payload.name === "string"
   }
 
@@ -114,7 +114,7 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
       return [
         {
           id: randomUUID(),
-          type: "workflow",
+          type: "workflow_message@v1",
           payload: newStateNormalized,
           createdAt: new Date(),
           pickAfter: newStateNormalized.pickAfter
