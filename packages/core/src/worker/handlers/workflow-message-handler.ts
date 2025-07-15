@@ -9,20 +9,25 @@ import {WorkflowStateStorage} from "../../workflow/state/storage";
 import {Message} from "../../queue";
 import {randomUUID} from "crypto";
 import {Logger} from "../../logger/logger";
+import {RealClock} from "../../clock/real-clock";
+import {Clock} from "../../clock/interface";
 
 export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflowState<unknown>> {
   #workflows: Workflow<any, any, Record<string, never>, Record<never, never>>[]
   #stateStorage?: WorkflowStateStorage
   #logger?: Logger
+  #clock: Clock
 
   constructor(
     workflows: Workflow<any, any, Record<string, never>, Record<never, never>>[],
     stateStorage?: WorkflowStateStorage,
-    logger?: Logger
+    logger?: Logger,
+    clock = new RealClock()
   ) {
     this.#workflows = workflows;
     this.#stateStorage = stateStorage;
     this.#logger = logger;
+    this.#clock = clock;
   }
 
   support(message: Message): message is Message & { payload: NormalizedWorkflowState<unknown> } {
@@ -71,7 +76,7 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
       return []
     }
 
-    const processingState = reconstitutedState.startProcessing()
+    const processingState = reconstitutedState.startProcessing(this.#clock.now())
 
     await this.#stateStorage?.upsert([ processingState.toNormalized() ])
     const {item: step, context} = mStepAndExecutionContext
@@ -81,7 +86,7 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
     }
 
     const result = await this.#executeHandler(step, context, toExecuteStep, toExecuteAttempt)
-    const newState = processingState.updateFromStepResult(step, result)
+    const newState = processingState.updateFromStepResult(step, result, this.#clock.now())
 
     const newStateNormalized = newState.toNormalized()
 

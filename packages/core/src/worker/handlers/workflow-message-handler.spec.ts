@@ -6,6 +6,7 @@ import {WorkflowMessageHandler} from "./workflow-message-handler";
 import {TestLogger} from "../../logger/test-logger";
 import {rivr} from "../../workflow/workflow";
 import {WorkflowStateStorage} from "../../workflow/state/storage";
+import {TestClock} from "../../clock/test-clock";
 
 class MemoryStateStorage implements WorkflowStateStorage {
   states = new Map<string, { latest: NormalizedWorkflowState<unknown>, history: NormalizedWorkflowState<unknown>[] }>
@@ -153,6 +154,8 @@ describe('WorkflowMessageHandler', function () {
     test("should be able to produce the message that'll trigger the next step", async (t: TestContext) => {
       // Given
       const logger = new TestLogger()
+      const now = new Date()
+      const clock = new TestClock().setNow(now)
 
       const workflow = rivr.workflow<number>("calc")
         .step({
@@ -163,7 +166,7 @@ describe('WorkflowMessageHandler', function () {
           name: "minus-2",
           handler: ({ state }) => state - 2
         })
-      const handler = new WorkflowMessageHandler([ workflow ], undefined, logger)
+      const handler = new WorkflowMessageHandler([ workflow ], undefined, logger, clock)
       const payload = WorkflowState.initialize(
         workflow,
         "add-1",
@@ -185,6 +188,7 @@ describe('WorkflowMessageHandler', function () {
       t.assert.deepStrictEqual(messages.map(m => m.payload), [
         {
           ...payload,
+          lastModified: now,
           steps: [
             {
               name: "add-1",
@@ -219,12 +223,14 @@ describe('WorkflowMessageHandler', function () {
     test("should be able to save the workflow's state", async (t: TestContext) => {
       // Given
       const logger = new TestLogger()
+      const now = new Date()
+      const clock = new TestClock().setNow(now)
       const workflow = rivr.workflow<number>("calc").step({
         name: "add-1",
         handler: ({ state }) => state + 1,
       })
       const stateStorage = new MemoryStateStorage()
-      const handler = new WorkflowMessageHandler([ workflow ], stateStorage, logger)
+      const handler = new WorkflowMessageHandler([ workflow ], stateStorage, logger, clock)
 
       const payload = WorkflowState.initialize(
         workflow,
@@ -250,6 +256,7 @@ describe('WorkflowMessageHandler', function () {
         {
           ...payload,
           status: "in_progress",
+          lastModified: now,
           steps: [
             {
               name: "add-1",
@@ -265,6 +272,7 @@ describe('WorkflowMessageHandler', function () {
         },
         {
           ...payload,
+          lastModified: now,
           status: "successful",
           steps: [
             {
