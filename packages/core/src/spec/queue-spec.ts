@@ -61,7 +61,7 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
 
     test("should be able to execute a workflow made of two steps", async (t: TestContext) => {
       // Given
-      let result: unknown
+      let stepResult: StepResult<unknown> | undefined
 
       const workflow = rivr.workflow<number>("complex-calculation")
         .step({
@@ -73,7 +73,7 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
           handler: ({ state }) => state * 4
         })
         .addHook("onWorkflowCompleted", (w, state) => {
-          result = state
+          stepResult = state
         })
 
       const queue = createQueue()
@@ -100,8 +100,8 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
       )
 
       // Then
-      await waitForPredicate(() => result !== undefined)
-      t.assert.deepStrictEqual(result, 16)
+      await waitForPredicate(() => stepResult !== undefined, 10_000)
+      t.assert.deepStrictEqual(stepResult, { type: "success", state: 16 })
     })
 
     test("should be able to handle a step error", async (t: TestContext) => {
@@ -189,7 +189,7 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
 
       // Then
       await waitForPredicate(() => result !== undefined)
-      t.assert.deepStrictEqual(result, "State is 11")
+      t.assert.deepStrictEqual(result, { type: "success", state: "State is 11" })
     })
 
     test("should be able to start a workflow at a specific step", async (t: TestContext) => {
@@ -404,56 +404,6 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
           error: new Error("oops 5")
         }
       ])
-    })
-
-    test("should be able to continue the workflow if a failing step is optional", async (t: TestContext) => {
-      // Given
-      let result: unknown
-
-      const workflow = rivr.workflow<number>("complex-calculation")
-        .step({
-          name: "add-1",
-          handler: ({ state }) => state + 1
-        })
-        .step({
-          name: "always-fails",
-          handler: ctx => ctx.err(new Error("oops")),
-          optional: true
-        })
-        .step({
-          name: "multiply-by-4",
-          handler: ({ state }) => state * 4,
-        })
-        .addHook("onWorkflowCompleted", (ctx, state) => {
-          result = state
-        })
-
-      const queue = createQueue()
-      const worker = createWorker({ primary: queue, workflows: [ workflow ] })
-
-      t.after(async () => {
-        await worker.stop()
-        await queue.disconnect()
-      })
-
-      await worker.start()
-
-      const producer = queue.createProducer()
-
-      t.after(async () => {
-        await producer.disconnect()
-      })
-
-      // When
-      await trigger(
-        producer,
-        workflow,
-        10
-      )
-
-      // Then
-      await waitForPredicate(() => result !== undefined)
-      t.assert.strictEqual(result, 44)
     })
   })
 }

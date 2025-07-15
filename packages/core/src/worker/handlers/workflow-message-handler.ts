@@ -93,7 +93,7 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
 
     if (newStateNormalized.status === "successful") {
       for (const {context, item: hook} of mWorkflow.getHook("onWorkflowCompleted")) {
-        await hook(context, toExecuteAttempt.inputState)
+        await hook(context, result)
       }
     } else if (newStateNormalized.status === "stopped") {
       for (const {context, item: hook} of mWorkflow.getHook("onWorkflowStopped")) {
@@ -111,7 +111,8 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
           id: randomUUID(),
           type: "workflow",
           payload: newStateNormalized,
-          createdAt: new Date()
+          createdAt: new Date(),
+          pickAfter: newStateNormalized.pickAfter
         }
       ]
     }

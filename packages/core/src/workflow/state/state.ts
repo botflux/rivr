@@ -24,6 +24,7 @@ export type NormalizedWorkflowState<State> = {
   status: WorkflowStatus
   steps: StepState[]
   lastModified: Date
+  pickAfter?: Date
 }
 
 export class WorkflowState<State> {
@@ -103,78 +104,19 @@ export class WorkflowState<State> {
         .with(currentStepIndex, currentStepUpdated)
         .with(currentStepIndex + 1, nextStepUpdated)
 
-    return new WorkflowState({
+    const newState = {
       ...this.#state,
       lastModified: now,
       status: newStatus,
-      steps: stepsUpdated
-    })
+      steps: stepsUpdated,
+    }
 
-    // const currentStepIndex = this.#state.steps.findIndex(s => s.name === step.name)
-    // const currentStep = this.#state.steps[currentStepIndex]
-    //
-    // if (currentStepIndex === -1) {
-    //   throw new Error("Not implemented at line 54 in state.ts")
-    // }
-    //
-    // const currentInProgressAttempt = currentStep.attempts.find(attempt => attempt.status === "in_progress")
-    //
-    // if (!currentInProgressAttempt) {
-    //   throw new Error("Not implemented at line 146 in state.ts")
-    // }
-    // const attemptStatus = this.#resultToAttemptStatus(result)
-    // const newAttempt = { ...currentInProgressAttempt, status: attemptStatus } satisfies Attempt
-    //
-    // const [nextTask, newStatus, resultState] = this.#getNextTask(this.#state, step, result, now)
-    //
-    // const nextStep = this.#state.steps.find(s => s.name === nextTask.step)
-    //
-    // if (!nextStep) {
-    //   throw new Error("Not implemented at line 104 in state.ts")
-    // }
-    //
-    // const newNextStep: StepState | undefined = nextTask.status === "todo" && nextTask.step !== currentStep.name
-    //   ? {
-    //     ...nextStep,
-    //     attempts: [
-    //       ...nextStep.attempts,
-    //       {
-    //         id: nextStep.attempts.length + 1,
-    //         status: "to_execute",
-    //         inputState: nextTask.state
-    //       }
-    //     ]
-    //   }
-    //   : undefined
-    //
-    // const newStep = {
-    //   ...currentStep,
-    //   attempts: [
-    //     ...currentStep.attempts.map(attempt => attempt.id === newAttempt.id ? newAttempt : attempt),
-    //     ...nextTask.status === "todo" && nextTask.step === currentStep.name ? [
-    //       {
-    //         id: currentStep.attempts.length + 1,
-    //         status: "to_execute" as const,
-    //         inputState: currentInProgressAttempt.inputState
-    //       }
-    //     ] : []
-    //   ]
-    // }
-    //
-    // const updatedSteps = this.#state.steps
-    //   .with(currentStepIndex, newStep)
-    //   .map(step => step.name === newNextStep?.name ? newNextStep : step)
-    //
-    // return new WorkflowState<State>({
-    //   ...this.#state,
-    //   steps: updatedSteps,
-    //   status: newStatus,
-    //   toExecute: nextTask,
-    //   ...resultState !== undefined && {
-    //     result: resultState
-    //   },
-    //   lastModified: now
-    // })
+    delete newState.pickAfter
+
+    return new WorkflowState({
+      ...newState,
+      ...pickAfter !== undefined && { pickAfter }
+    })
   }
 
   toNormalized(): NormalizedWorkflowState<State> {
@@ -317,7 +259,7 @@ export class WorkflowState<State> {
     result: StepResult<State>,
     now: Date
   ): UpdateStateResult {
-    const { delayBetweenAttempts: delayFnOrNumber, maxAttempts, optional } = currentStep
+    const { delayBetweenAttempts: delayFnOrNumber, maxAttempts } = currentStep
     const currentStepAttempts = currentStepState.attempts.length
     const currentAttempt = currentStepState.attempts.find(attempt => attempt.status === "in_progress")
 
@@ -380,7 +322,14 @@ export class WorkflowState<State> {
       case "failure": {
         const areRetryExhausted = currentStepAttempts >= maxAttempts
 
-        if (areRetryExhausted && optional) {
+        if (!areRetryExhausted) {
+          const delayBetweenAttempts = typeof delayFnOrNumber === "number"
+            ? () => delayFnOrNumber
+            : delayFnOrNumber
+
+          const newDelay = delayBetweenAttempts(currentStepAttempts + 1)
+          const pickAfter = newDelay === 0 ? undefined : new Date(now.getTime() + newDelay)
+
           return {
             currentStepUpdated: {
               ...currentStepState,
@@ -391,60 +340,30 @@ export class WorkflowState<State> {
                   result
                 } : attempt),
                 {
-                  id: currentStepState.attempts.length + 1,
                   status: "to_execute",
+                  id: currentStepState.attempts.length + 1,
                   inputState: currentAttempt.inputState
                 }
               ]
             },
             nextStepUpdated: nextStepState,
-            pickAfter: undefined,
+            pickAfter,
             newStatus: "in_progress"
           }
         }
 
-        if (areRetryExhausted) {
-          return {
-            currentStepUpdated: {
-              ...currentStepState,
-              attempts: currentStepState.attempts.map(attempt => attempt.id === currentAttempt.id ? {
-                ...currentAttempt,
-                status: "failed" as const,
-                result
-              } : attempt),
-            },
-            nextStepUpdated: nextStepState,
-            pickAfter: undefined,
-            newStatus: "failed"
-          }
-        }
-
-        const delayBetweenAttempts = typeof delayFnOrNumber === "number"
-          ? () => delayFnOrNumber
-          : delayFnOrNumber
-
-        const newDelay = delayBetweenAttempts(currentStepAttempts + 1)
-        const pickAfter = newDelay === 0 ? undefined : new Date(now.getTime() + newDelay)
-
         return {
           currentStepUpdated: {
             ...currentStepState,
-            attempts: [
-              ...currentStepState.attempts.map(attempt => attempt.id === currentAttempt.id ? {
-                ...currentAttempt,
-                status: "failed" as const,
-                result
-              } : attempt),
-              {
-                status: "to_execute",
-                id: currentStepState.attempts.length + 1,
-                inputState: currentAttempt.inputState
-              }
-            ]
+            attempts: currentStepState.attempts.map(attempt => attempt.id === currentAttempt.id ? {
+              ...currentAttempt,
+              status: "failed" as const,
+              result
+            } : attempt),
           },
           nextStepUpdated: nextStepState,
-          pickAfter,
-          newStatus: "in_progress"
+          pickAfter: undefined,
+          newStatus: "failed"
         }
       }
     }

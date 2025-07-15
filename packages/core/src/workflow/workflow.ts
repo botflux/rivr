@@ -140,7 +140,6 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
     step<Name extends string, StateOut>(opts: StepOpts<Name, State, StateOut, FirstState, StateByStepName, EmptyDecorator>) {
       const {
         delayBetweenAttempts = 0,
-        optional = false,
         maxAttempts = 1,
         ...requiredFields
       } = opts
@@ -151,7 +150,6 @@ function createRootWorkflow<State, FirstState, StateByStepName extends EmptyStat
         id: this.generateNewNodeId(),
         step: {
           ...requiredFields,
-          optional,
           delayBetweenAttempts,
           maxAttempts
         } as Step

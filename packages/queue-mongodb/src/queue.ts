@@ -183,7 +183,18 @@ class MongoDBProducer implements Producer<MongoDBWriteOpts> {
   async produce(messages: Message[], opts: MongoDBWriteOpts = {}): Promise<void> {
     const { session } = opts
 
-    await this.#collection.insertMany(messages.map(message => ({ ...message, status: "todo", version: 1 })), { session })
+    const rawMessages = messages.map(({ pickAfter, ...message }) => ({
+      ...message,
+      status: "todo",
+      version: 1,
+      // The query executed by `#pullMessages` *REQUIRES* `pickAfter` to be non-existant,
+      // but rivr's core sometimes returns an explicit undefined `pickAfter`, which
+      // break the filter.
+      // To avoid any issue, `pickAfter` is cleaned manually here.
+      ...pickAfter !== undefined && { pickAfter }
+    } as MongoMessage))
+
+    await this.#collection.insertMany(rawMessages, { session })
   }
 
   supportsDelayedMessages(): boolean {

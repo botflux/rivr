@@ -323,14 +323,6 @@ describe('kurrentdb', function () {
         id: randomUUID(),
         name: "workflow",
         lastModified: new Date(),
-        toExecute: {
-          status: "done",
-          pickAfter: new Date(),
-          attempt: 1,
-          state: 5,
-          step: "foo",
-          areRetryExhausted: false
-        },
         result: 1,
         steps: [
           {
@@ -338,7 +330,12 @@ describe('kurrentdb', function () {
             attempts: [
               {
                 id: 1,
-                status: "successful"
+                status: "successful",
+                inputState: 1,
+                result: {
+                  type: "success",
+                  state: 2
+                }
               }
             ]
           }
@@ -393,22 +390,18 @@ describe('kurrentdb', function () {
         id: randomUUID(),
         name: "workflow",
         lastModified: new Date(),
-        toExecute: {
-          status: "done",
-          pickAfter: new Date(),
-          attempt: 1,
-          state: 5,
-          step: "foo",
-          areRetryExhausted: false
-        },
-        result: 1,
         steps: [
           {
             name: "foo",
             attempts: [
               {
                 id: 1,
-                status: "successful"
+                status: "successful",
+                inputState: 1,
+                result: {
+                  type: "success",
+                  state: 2
+                }
               }
             ]
           }

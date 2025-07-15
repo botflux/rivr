@@ -486,12 +486,6 @@ function deserializeWorkflowState<State>(data: NormalizedWorkflowState<State>): 
   return {
     ...data,
     lastModified: new Date(data.lastModified),
-    toExecute: {
-      ...data.toExecute,
-      ...data.toExecute?.pickAfter !== undefined && {
-        pickAfter: new Date(data.toExecute.pickAfter)
-      }
-    },
   }
 }
 

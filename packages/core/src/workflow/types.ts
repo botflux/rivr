@@ -34,7 +34,6 @@ export type Step = {
   name: string
   handler: Handler<unknown, unknown, unknown, Record<never, never>, Record<never, never>>
   maxAttempts: number
-  optional: boolean
   delayBetweenAttempts: number | ((attempt: number) => number)
 }
 
@@ -43,16 +42,11 @@ export type StepOpts<Name extends string, StateIn, StateOut, FirstState, StateBy
   handler: Handler<StateIn, StateOut, FirstState, StateByStepName, Decorators>
   maxAttempts?: number
   delayBetweenAttempts?: number | ((attempt: number) => number)
-
-  /**
-   * True if this step can fail without blocking the workflow.
-   */
-  optional?: boolean
 }
 
 export type OnWorkflowCompletedHook<Decorators extends Record<never, never>> = (
   workflow: ReadyWorkflow<unknown, unknown, Record<never, never>, Decorators>,
-  state: unknown
+  result: StepResult<unknown>
 ) => (Promise<void> | void)
 export type OnStepErrorHook<Decorators extends Record<never, never>> = (
   error: unknown,
