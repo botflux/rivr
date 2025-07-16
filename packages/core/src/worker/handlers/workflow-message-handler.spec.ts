@@ -1,12 +1,12 @@
 import {describe, test, TestContext, mock} from "node:test"
 import {NormalizedWorkflowState, WorkflowState} from "../../workflow/state/state";
-import {randomUUID} from "crypto";
 import {Message} from "../../queue";
 import {WorkflowMessageHandler} from "./workflow-message-handler";
 import {TestLogger} from "../../logger/test-logger";
 import {rivr} from "../../workflow/workflow";
 import {WorkflowStateStorage} from "../../workflow/state/storage";
 import {TestClock} from "../../clock/test-clock";
+import {uuidv7} from "uuidv7";
 
 class MemoryStateStorage implements WorkflowStateStorage {
   states = new Map<string, { latest: NormalizedWorkflowState<unknown>, history: NormalizedWorkflowState<unknown>[] }>
@@ -29,7 +29,7 @@ describe('WorkflowMessageHandler', function () {
       // Given
       const message: Message = {
         type: "workflow_message@v1",
-        id: randomUUID(),
+        id: uuidv7(),
         payload: randomWorkflowState(),
         createdAt: new Date(),
       }
@@ -50,7 +50,7 @@ describe('WorkflowMessageHandler', function () {
       t.assert.strictEqual(handler.support({
         type: "hello",
         createdAt: new Date(),
-        id: randomUUID(),
+        id: uuidv7(),
         payload: { message: "hello world"
         }
       }), false, "Should not be supported")
@@ -66,7 +66,7 @@ describe('WorkflowMessageHandler', function () {
       const message: Message & { payload: NormalizedWorkflowState<unknown> } = {
         type: "workflow_message@v1",
         payload: state,
-        id: randomUUID(),
+        id: uuidv7(),
         createdAt: new Date()
       }
 
@@ -95,7 +95,7 @@ describe('WorkflowMessageHandler', function () {
       const message: Message & { payload: NormalizedWorkflowState<unknown> } = {
         type: "workflow_message@v1",
         createdAt: new Date(),
-        id: randomUUID(),
+        id: uuidv7(),
         payload
       }
 
@@ -132,13 +132,13 @@ describe('WorkflowMessageHandler', function () {
         workflow,
         "add-1",
         1,
-        randomUUID(),
+        uuidv7(),
         new Date()
       ).toNormalized()
       const message: Message & { payload: NormalizedWorkflowState<unknown> } = {
         type: "rivr_workflow@v1",
         createdAt: new Date(),
-        id: randomUUID(),
+        id: uuidv7(),
         payload
       }
 
@@ -171,13 +171,13 @@ describe('WorkflowMessageHandler', function () {
         workflow,
         "add-1",
         1,
-        randomUUID(),
+        uuidv7(),
         new Date()
       ).toNormalized()
       const message: Message & { payload: NormalizedWorkflowState<unknown> } = {
         type: "rivr_workflow@v1",
         createdAt: new Date(),
-        id: randomUUID(),
+        id: uuidv7(),
         payload
       }
 
@@ -236,11 +236,11 @@ describe('WorkflowMessageHandler', function () {
         workflow,
         "add-1",
         1,
-        randomUUID(),
+        uuidv7(),
         new Date()
       ).toNormalized()
       const message: Message & { payload: NormalizedWorkflowState<unknown> } = {
-        id: randomUUID(),
+        id: uuidv7(),
         type: "rivr_workflow@v1",
         createdAt: new Date(),
         payload
@@ -299,7 +299,7 @@ describe('WorkflowMessageHandler', function () {
 function randomWorkflowState (): NormalizedWorkflowState<unknown> {
   return {
     name: "calc",
-    id: randomUUID(),
+    id: uuidv7(),
     status: "in_progress",
     steps: [],
     lastModified: new Date()

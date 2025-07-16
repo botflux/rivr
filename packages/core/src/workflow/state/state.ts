@@ -1,5 +1,5 @@
 import {Step, StepResult, Workflow} from "../types";
-import {randomUUID} from "crypto";
+import {uuidv7} from "uuidv7";
 
 export type AttemptStatus = "successful" | "failed" | "skipped" | "stopped" | "in_progress" | "to_execute"
 
@@ -239,7 +239,7 @@ export class WorkflowState<State> {
     workflow: Workflow<State, FirstState, StateByStepName, Record<never, never>>,
     name: Name,
     state: StateByStepName[Name],
-    id: string = randomUUID(),
+    id: string = uuidv7(),
     now: Date = new Date()
   ): WorkflowState<State> {
     const steps = Array.from(workflow.steps()).map(({ item }) => item)

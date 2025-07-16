@@ -1,7 +1,7 @@
 import {Producer} from "../queue";
 import {Workflow} from "./types";
-import {randomUUID} from "crypto";
 import {NormalizedWorkflowState, WorkflowState} from "./state/state";
+import { uuidv7 } from "uuidv7"
 
 /**
  * Trigger a workflow from the first step.
@@ -26,13 +26,13 @@ export async function trigger<State, FirstState, WriteOpts> (
   }
 
   const workflowState = WorkflowState
-    .initialize(workflow, firstStep.name, state as never, randomUUID(), new Date())
+    .initialize(workflow, firstStep.name, state as never, uuidv7(), new Date())
     .toNormalized()
 
   await queue.produce([
     {
       type: "workflow_message@v1",
-      id: randomUUID(),
+      id: uuidv7(),
       payload: workflowState,
       createdAt: new Date()
     }
@@ -60,13 +60,13 @@ export async function triggerFrom<State, FirstState, StateByStepName extends Rec
   await workflow.ready()
 
   const workflowState = WorkflowState
-    .initialize(workflow, step, state as never, randomUUID(), new Date())
+    .initialize(workflow, step, state as never, uuidv7(), new Date())
     .toNormalized()
 
   await queue.produce([
     {
       type: "workflow_message@v1",
-      id: randomUUID(),
+      id: uuidv7(),
       payload: workflowState,
       createdAt: new Date()
     }

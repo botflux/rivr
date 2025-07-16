@@ -2,7 +2,7 @@ import {Consumer, ConsumerOpts, ConsumptionHooks, Message, Producer, Queue, Stop
 import {ClientSession, Collection, Filter, MongoClient, MongoClientOptions, WithId} from "mongodb";
 import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
-import {randomUUID} from "node:crypto";
+import {uuidv7} from "uuidv7";
 
 class InfiniteLoop {
   #stopped = false;
@@ -23,7 +23,7 @@ class PollingConsumer implements Consumer {
   #getCollection: () => Collection<MongoMessage>
   #opts: MongoDBQueueOpts
 
-  #consumptionId = randomUUID()
+  #consumptionId = uuidv7()
   #abort = new AbortController()
   #infiniteLoop = new InfiniteLoop()
   #hooks = new Hooks<ConsumptionHooks>()

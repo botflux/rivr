@@ -139,7 +139,6 @@ describe("rabbitmq engine", () => {
   })
 })
 
-
 function randomMessage(): Message {
   return {
     type: "msg",

@@ -4,7 +4,8 @@
   "description": "KurrentDB module for rivr",
   "main": "dist/index.js",
   "dependencies": {
-    "@kurrent/kurrentdb-client": "^1.0.3"
+    "@kurrent/kurrentdb-client": "^1.0.3",
+    "uuidv7": "^1.0.2"
   },
   "scripts": {
     "test": "borp --timeout 60000 \"*.test.ts\"",

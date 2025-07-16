@@ -11,6 +11,7 @@ import {advancedFlow, basicFlow, createWorker, Message, rivr, trigger, Normalize
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
 import {jsonEvent, JSONEventType, KurrentDBClient} from "@kurrent/kurrentdb-client";
+import {uuidv7} from "uuidv7";
 
 describe('kurrentdb', function () {
   let kurrentdb!: StartedKurrentDbContainer
@@ -320,7 +321,7 @@ describe('kurrentdb', function () {
       // When
       const state: NormalizedWorkflowState<number> = {
         status: "successful",
-        id: randomUUID(),
+        id: uuidv7(),
         name: "workflow",
         lastModified: new Date(),
         result: 1,
@@ -356,7 +357,7 @@ describe('kurrentdb', function () {
 
       // When
       // Then
-      t.assert.strictEqual(await storage.get(randomUUID()), undefined)
+      t.assert.strictEqual(await storage.get(uuidv7()), undefined)
     })
     
     test("should be able to subscribe to workflow state changes", async (t: TestContext) => {
@@ -387,7 +388,7 @@ describe('kurrentdb', function () {
 
       const state: NormalizedWorkflowState<number> = {
         status: "successful",
-        id: randomUUID(),
+        id: uuidv7(),
         name: "workflow",
         lastModified: new Date(),
         steps: [
@@ -443,7 +444,7 @@ describe('kurrentdb', function () {
       // When
       await KurrentDBClient
         .connectionString(kurrentdb.getConnectionString())
-        .appendToStream(`Record${infix}-${randomUUID()}`, [ jsonEvent<MyEvent>({ type: "record_created", data: { value: 2 } }) ])
+        .appendToStream(`Record${infix}-${uuidv7()}`, [ jsonEvent<MyEvent>({ type: "record_created", data: { value: 2 } }) ])
 
       // Then
       await waitForPredicate(() => eventPayload !== undefined)
@@ -520,7 +521,7 @@ describe('kurrentdb', function () {
       // When
       await KurrentDBClient
         .connectionString(kurrentdb.getConnectionString())
-        .appendToStream(`Record${infix}-${randomUUID()}`, [ jsonEvent<MyEvent>({ type: "record_created", data: { value: 2 } }) ])
+        .appendToStream(`Record${infix}-${uuidv7()}`, [ jsonEvent<MyEvent>({ type: "record_created", data: { value: 2 } }) ])
 
       // Then
       await waitForPredicate(() => handled === true)
@@ -543,7 +544,7 @@ function randomInfix() {
 function randomMessage(): Message {
   return {
     type: "foo",
-    id: randomUUID(),
+    id: uuidv7(),
     payload: { msg: "hello world" },
     createdAt: new Date()
   }

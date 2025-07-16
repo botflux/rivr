@@ -7,10 +7,10 @@ import {
 import {ReadyWorkflow, Step, StepResult, Workflow} from "../../workflow/types";
 import {WorkflowStateStorage} from "../../workflow/state/storage";
 import {Message} from "../../queue";
-import {randomUUID} from "crypto";
 import {Logger} from "../../logger/logger";
 import {RealClock} from "../../clock/real-clock";
 import {Clock} from "../../clock/interface";
+import {uuidv7} from "uuidv7";
 
 export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflowState<unknown>> {
   #workflows: Workflow<any, any, Record<string, never>, Record<never, never>>[]
@@ -113,7 +113,7 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
     if (newStateNormalized.status === "in_progress") {
       return [
         {
-          id: randomUUID(),
+          id: uuidv7(),
           type: "workflow_message@v1",
           payload: newStateNormalized,
           createdAt: new Date(),

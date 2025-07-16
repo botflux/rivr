@@ -25,5 +25,8 @@
   "bugs": {
     "url": "https://github.com/botflux/rivr/issues"
   },
-  "homepage": "https://github.com/botflux/rivr#readme"
+  "homepage": "https://github.com/botflux/rivr#readme",
+  "dependencies": {
+    "uuidv7": "^1.0.2"
+  }
 }

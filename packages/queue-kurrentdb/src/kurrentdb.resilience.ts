@@ -6,6 +6,7 @@ import {randomUUID} from "node:crypto"
 import {setTimeout} from "node:timers/promises"
 import {StartedToxiProxyContainer, ToxiProxyContainer} from "@testcontainers/toxiproxy";
 import {Network, StartedNetwork} from "testcontainers";
+import {uuidv7} from "uuidv7";
 
 describe('kurrentdb resilience', function () {
   let network!: StartedNetwork
@@ -229,7 +230,7 @@ function randomInfix() {
 function randomMessage(): Message {
   return {
     type: "test-message",
-    id: randomUUID(),
+    id: uuidv7(),
     payload: { msg: "resilience test", timestamp: Date.now() },
     createdAt: new Date()
   }

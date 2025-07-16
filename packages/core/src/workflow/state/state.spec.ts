@@ -1,13 +1,13 @@
 import {describe, test, TestContext} from "node:test";
 import {rivr} from "../workflow";
 import {WorkflowState} from "./state";
-import {randomUUID} from "crypto";
 import {omit} from "../../utils/omit";
+import {uuidv7} from "uuidv7";
 
 describe('state', function () {
   test("should be able to create a workflow state", async (t: TestContext) => {
     // Given
-    const id = randomUUID()
+    const id = uuidv7()
     const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
@@ -44,7 +44,7 @@ describe('state', function () {
 
   test("should be able to mark a step as 'in_progress'", async (t: TestContext) => {
     // Given
-    const id = randomUUID()
+    const id = uuidv7()
     const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
@@ -90,7 +90,7 @@ describe('state', function () {
 
   test("should be able to update based on a successful result", async (t: TestContext) => {
     // Given
-    const id = randomUUID()
+    const id = uuidv7()
     const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
@@ -146,7 +146,7 @@ describe('state', function () {
   })
 
   test("should be able to end the workflow state", async (t: TestContext) => {
-    const id = randomUUID()
+    const id = uuidv7()
     const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
@@ -189,7 +189,7 @@ describe('state', function () {
 
   test("should be able to stop a workflow", async (t: TestContext) => {
     // Given
-    const id = randomUUID()
+    const id = uuidv7()
     const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
@@ -239,7 +239,7 @@ describe('state', function () {
 
   test("should be able to retry a failed workflow", async (t: TestContext) => {
     // Given
-    const id = randomUUID()
+    const id = uuidv7()
     const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
@@ -291,7 +291,7 @@ describe('state', function () {
 
   test("should be able to stop a workflow if the step's attempts are exhausted", async (t: TestContext) => {
     // Given
-    const id = randomUUID()
+    const id = uuidv7()
     const now = new Date()
 
     const workflow = rivr.workflow<number>("calc")
