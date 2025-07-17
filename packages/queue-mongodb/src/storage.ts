@@ -83,10 +83,6 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
     return state as NormalizedWorkflowState<State>
   }
 
-  async list<State>(opts?: ListWorkflowStateOpts): Promise<ListWorkflowStateResult<State>> {
-    return await this.search(opts)
-  }
-
   #getClient(): MongoClient {
     if (this.#mongoClient === undefined) {
       this.#mongoClient = new MongoClient(this.#url, this.#clientOpts)
