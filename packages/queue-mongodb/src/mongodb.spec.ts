@@ -1,10 +1,20 @@
 import {MongoDBContainer, StartedMongoDBContainer} from "@testcontainers/mongodb";
-import {advancedFlow, basicFlow, installUnhandledRejectionHook, Message, timeBasedFlow} from "rivr";
+import {
+  advancedFlow,
+  basicFlow,
+  installUnhandledRejectionHook,
+  Message,
+  rivr,
+  timeBasedFlow,
+  WorkflowState
+} from "rivr";
 import {createQueue as createMongoQueue} from "./queue"
 import test, {after, before, describe, TestContext} from "node:test";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
 import {uuidv7} from "uuidv7";
+import {createStorage} from "./storage";
+import assert from "node:assert";
 
 let mongodb!: StartedMongoDBContainer
 
@@ -519,6 +529,229 @@ describe("mongodb queue", function () {
       // Then
       await waitForPredicate(() => errors.length > 0)
       t.assert.strictEqual(errors.length > 0, true)
+    })
+  })
+
+  describe('storage', function () {
+    const workflow = rivr.workflow<number>("calc")
+      .step({
+        name: "add-1",
+        handler: opts => opts.state + 1
+      })
+
+    test("should be able to store a workflow state", async (t) => {
+      // Given
+      const storage = createStorage({
+        url: mongodb.getConnectionString(),
+        dbName: randomUUID(),
+        clientOpts: {
+          directConnection: true,
+        }
+      })
+
+      const now = new Date()
+      const id = uuidv7()
+
+      t.after(async () => {
+        await storage.disconnect()
+      })
+
+      const state = WorkflowState
+        .initialize(workflow, "add-1", 10, id, now)
+        .toNormalized()
+
+      // When
+      await storage.upsert([state])
+
+      // Then
+      assert.deepStrictEqual(await storage.get(id), state)
+    })
+
+    test("should be able to paginate workflow state search results by 25 by default", async (t) => {
+      // Given
+      const storage = createStorage({
+        url: mongodb.getConnectionString(),
+        dbName: randomUUID(),
+        clientOpts: {
+          directConnection: true,
+        }
+      })
+
+      const now = new Date()
+
+      t.after(async () => {
+        await storage.disconnect()
+      })
+
+      const states = new Array(100).fill(0).map((_, i) => WorkflowState
+        .initialize(workflow, "add-1", i, undefined, now)
+        .toNormalized())
+
+      // When
+      await storage.upsert(states)
+
+      // Then
+      assert.deepStrictEqual(await storage.search(), {
+        results: states.slice(0, 25),
+        nextPage: 2,
+        totalCount: 100
+      })
+    })
+
+    test("should be able to get the next page", async (t) => {
+      // Given
+      const storage = createStorage({
+        url: mongodb.getConnectionString(),
+        dbName: randomUUID(),
+        clientOpts: {
+          directConnection: true,
+        }
+      })
+
+      const now = new Date()
+
+      t.after(async () => {
+        await storage.disconnect()
+      })
+
+      const states = new Array(100).fill(0).map((_, i) => WorkflowState
+        .initialize(workflow, "add-1", i, undefined, now)
+        .toNormalized())
+
+      await storage.upsert(states)
+
+      // When
+      const { nextPage } = await storage.search()
+
+      // Then
+      assert.notStrictEqual(nextPage, undefined)
+      assert.deepStrictEqual(await storage.search({ page: nextPage }), {
+        results: states.slice(25, 50),
+        nextPage: 3,
+        previousPage: 1,
+        totalCount: 100
+      })
+    })
+
+    test("should be able to change the page's size", async (t) => {
+      // Given
+      const storage = createStorage({
+        url: mongodb.getConnectionString(),
+        dbName: randomUUID(),
+        clientOpts: {
+          directConnection: true,
+        }
+      })
+
+      const now = new Date()
+
+      t.after(async () => {
+        await storage.disconnect()
+      })
+
+      const states = new Array(100).fill(0).map((_, i) => WorkflowState
+        .initialize(workflow, "add-1", i, undefined, now)
+        .toNormalized())
+
+      // When
+      await storage.upsert(states)
+
+      // Then
+      assert.deepStrictEqual(await storage.search({ limit: 50 }), {
+        results: states.slice(0, 50),
+        nextPage: 2,
+        totalCount: 100
+      })
+    })
+
+    test("should be able to search by workflow status", async (t) => {
+      // Given
+      const storage = createStorage({
+        url: mongodb.getConnectionString(),
+        dbName: randomUUID(),
+        clientOpts: {
+          directConnection: true,
+        }
+      })
+
+      t.after(async () => {
+        await storage.disconnect()
+      })
+
+      const now = new Date()
+
+      const failed = new Array(10).fill(0).map((_, i) => WorkflowState
+        .initialize(workflow, "add-1", 10, uuidv7(), now)
+        .startProcessing(now)
+        .updateFromStepResult(workflow.getFirstStep()!, { type: "failure", error: "oops" }, now)
+        .toNormalized())
+
+      const succeeded = new Array(10).fill(0).map((_, i) => WorkflowState
+        .initialize(workflow, "add-1", 10, uuidv7(), now)
+        .startProcessing(now)
+        .updateFromStepResult(workflow.getFirstStep()!, { type: "success", state: 11 }, now)
+        .toNormalized())
+
+      await storage.upsert([ ...succeeded, ...failed ])
+
+      // When
+      // Then
+      assert.deepStrictEqual(await storage.search({ status: ["failed"] }), {
+        results: failed,
+        totalCount: 10
+      })
+      assert.deepStrictEqual(await storage.search({ status: ["successful"] }), {
+        results: succeeded,
+        totalCount: 10
+      })
+    })
+
+    test("should be able to search by workflow name", async (t) => {
+      // Given
+      const storage = createStorage({
+        url: mongodb.getConnectionString(),
+        dbName: randomUUID(),
+        clientOpts: {
+          directConnection: true,
+        }
+      })
+
+      t.after(async () => {
+        await storage.disconnect()
+      })
+
+      const now = new Date()
+
+      const anotherWorkflow = rivr.workflow<number>("calc-2")
+        .step({
+          name: "add-1",
+          handler: opts => opts.state + 1
+        })
+
+      const workflow1States = new Array(10).fill(0).map((_, i) => WorkflowState
+        .initialize(workflow, "add-1", 10, uuidv7(), now)
+        .startProcessing(now)
+        .updateFromStepResult(workflow.getFirstStep()!, { type: "success", state: 11 }, now)
+        .toNormalized())
+
+      const workflow2States = new Array(10).fill(0).map((_, i) => WorkflowState
+        .initialize(anotherWorkflow, "add-1", 10, uuidv7(), now)
+        .startProcessing(now)
+        .updateFromStepResult(anotherWorkflow.getFirstStep()!, { type: "success", state: 11 }, now)
+        .toNormalized())
+
+      // When
+      await storage.upsert([ ...workflow1States, ...workflow2States ])
+
+      // Then
+      assert.deepStrictEqual(await storage.search({ names: ["calc-2"] }), {
+        results: workflow2States,
+        totalCount: 10
+      })
+      assert.deepStrictEqual(await storage.search({ names: ["calc"] }), {
+        results: workflow1States,
+        totalCount: 10
+      })
     })
   })
 

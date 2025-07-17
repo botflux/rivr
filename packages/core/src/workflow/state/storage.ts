@@ -1,4 +1,4 @@
-import {NormalizedWorkflowState} from "./state";
+import {NormalizedWorkflowState, WorkflowStatus} from "./state";
 
 export type ListWorkflowStateOpts = {
   page?: number
@@ -26,11 +26,18 @@ export interface WorkflowStateStorage {
    * @param id
    */
   get<State>(id: string): Promise<NormalizedWorkflowState<State> | undefined>
+
+  /**
+   * Disconnect from the underlying connection.
+   */
+  disconnect(): Promise<void>
 }
 
 export type SearchWorkflowStateOpts = {
   page?: number
   limit?: number
+  status?: WorkflowStatus[]
+  names?: string[]
 }
 
 export interface SearchableWorkflowStateStorage extends WorkflowStateStorage {

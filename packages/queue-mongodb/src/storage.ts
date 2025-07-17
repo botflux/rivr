@@ -1,4 +1,4 @@
-import {AnyBulkWriteOperation, Collection, MongoClient, MongoClientOptions} from "mongodb";
+import {AnyBulkWriteOperation, Collection, Filter, MongoClient, MongoClientOptions} from "mongodb";
 import {
   ListWorkflowStateOpts,
   ListWorkflowStateResult,
@@ -22,13 +22,25 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
     this.#collectionName = collectionName;
   }
 
+  async disconnect(): Promise<void> {
+    await this.#mongoClient?.close(true)
+  }
+
   async search<State>(opts: SearchWorkflowStateOpts = {}): Promise<ListWorkflowStateResult<State>> {
-    const {page = 1, limit = 25} = opts
+    const { page = 1, limit = 25, status, names } = opts
     const skip = (page - 1) * limit
+    const filters = {
+      ...status !== undefined && status.length > 0 && {
+        status: { $in: status }
+      },
+      ...names !== undefined && names.length > 0 && {
+        name: { $in: names }
+      }
+    } satisfies Filter<NormalizedWorkflowState<unknown>>
 
     const [records, count] = await Promise.all([
-      this.#getCollection().find().skip(skip).limit(limit).toArray(),
-      this.#getCollection().countDocuments()
+      this.#getCollection().find(filters).skip(skip).limit(limit).toArray(),
+      this.#getCollection().countDocuments(filters)
     ])
 
     const states = records.map(({_id, ...state}) => state as NormalizedWorkflowState<State>)

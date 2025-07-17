@@ -21,6 +21,9 @@ class MemoryStateStorage implements WorkflowStateStorage {
   async get<State>(id: string): Promise<NormalizedWorkflowState<State> | undefined> {
       return this.states.get(id)?.latest as NormalizedWorkflowState<State>
   }
+  disconnect(): Promise<void> {
+    return Promise.resolve()
+  }
 }
 
 describe('WorkflowMessageHandler', function () {

@@ -474,6 +474,8 @@ class KurrentDBWorkflowStateStorage implements WorkflowStateStorage {
     }
   }
 
+  async disconnect(): Promise<void> {}
+
   #getClient(): KurrentDBClient {
     if (this.#client === undefined) {
       this.#client = KurrentDBClient.connectionString(this.#opts.connectionString)
