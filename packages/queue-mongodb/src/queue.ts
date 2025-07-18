@@ -18,6 +18,28 @@ class InfiniteLoop {
   }
 }
 
+async function createQueueCollectionIndexes(collection: Collection<MongoMessage>) {
+  await collection.createIndexes([
+    {
+      name: "find_message_to_handle",
+      key: {
+        status: 1,
+        consideredDeadAfter: -1,
+        pickAfter: -1
+      }
+    },
+    {
+      name: "update_handled_message",
+      key: {
+        id: -1,
+        version: -1
+      }
+    }
+  ], {
+    background: true
+  })
+}
+
 class PollingConsumer implements Consumer {
   #consumeOpts: ConsumerOpts
   #getCollection: () => Collection<MongoMessage>
@@ -28,6 +50,7 @@ class PollingConsumer implements Consumer {
   #infiniteLoop = new InfiniteLoop()
   #hooks = new Hooks<ConsumptionHooks>()
   #state: "started" | "stopped" = "stopped"
+  #indexCreated = false
 
   constructor(consumeOpts: ConsumerOpts, getCollection: () => Collection<MongoMessage>, opts: MongoDBQueueOpts) {
     this.#consumeOpts = consumeOpts;
@@ -39,6 +62,7 @@ class PollingConsumer implements Consumer {
     if (this.#state === "started") {
       return
     }
+    await this.#ensureIndexes()
 
     this.#startConsuming()
     this.#hooks.executeHook("onStart", [])
@@ -157,6 +181,15 @@ class PollingConsumer implements Consumer {
     this.#hooks.addHook(hook as keyof ConsumptionHooks, handler)
     return this
   }
+
+  async #ensureIndexes() {
+    if (this.#indexCreated) {
+      return
+    }
+
+    this.#indexCreated = true
+    await createQueueCollectionIndexes(this.#getCollection())
+  }
 }
 
 type MongoDBQueueOpts = Required<CreateMongoDBQueueOpts>
@@ -175,12 +208,15 @@ type MongoMessage = Message & {
 
 class MongoDBProducer implements Producer<MongoDBWriteOpts> {
   #collection: Collection<MongoMessage>
+  #indexCreated = false
 
   constructor(collection: Collection<MongoMessage>) {
     this.#collection = collection;
   }
 
   async produce(messages: Message[], opts: MongoDBWriteOpts = {}): Promise<void> {
+    await this.#ensureIndexes()
+
     const { session } = opts
 
     const rawMessages = messages.map(({ pickAfter, ...message }) => ({
@@ -188,7 +224,7 @@ class MongoDBProducer implements Producer<MongoDBWriteOpts> {
       status: "todo",
       version: 1,
       // The query executed by `#pullMessages` *REQUIRES* `pickAfter` to be non-existant,
-      // but rivr's core sometimes returns an explicit undefined `pickAfter`, which
+      // but rivr's core sometimes returns an explicit undefined for `pickAfter`, which
       // break the filter.
       // To avoid any issue, `pickAfter` is cleaned manually here.
       ...pickAfter !== undefined && { pickAfter }
@@ -202,6 +238,15 @@ class MongoDBProducer implements Producer<MongoDBWriteOpts> {
   }
 
   async disconnect(): Promise<void> {}
+
+  async #ensureIndexes() {
+    if (this.#indexCreated) {
+      return
+    }
+
+    this.#indexCreated = true
+    await createQueueCollectionIndexes(this.#collection)
+  }
 }
 
 class MongoDBQueue implements Queue<MongoDBWriteOpts> {
