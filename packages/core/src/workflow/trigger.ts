@@ -32,7 +32,6 @@ export async function trigger<State, FirstState, WriteOpts> (
   await queue.produce([
     {
       type: "workflow_message@v1",
-      id: uuidv7(),
       payload: workflowState,
       createdAt: new Date()
     }
@@ -66,7 +65,6 @@ export async function triggerFrom<State, FirstState, StateByStepName extends Rec
   await queue.produce([
     {
       type: "workflow_message@v1",
-      id: uuidv7(),
       payload: workflowState,
       createdAt: new Date()
     }

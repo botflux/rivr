@@ -1,7 +1,8 @@
-import {Consumer, ConsumerOpts, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
+import {Consumer, ConsumerOpts, ConsumptionHooks, CreateMessage, Message, Producer, Queue, StopReason} from "rivr";
 import {Channel, ConfirmChannel} from "amqplib";
 import {AmqpConnectionManager, AmqpConnectionManagerOptions, ChannelWrapper, connect} from "amqp-connection-manager";
 import {Hooks} from "rivr/dist/hooks/hooks";
+import { uuidv7 } from "uuidv7";
 
 class RabbitMQConsumption implements Consumer {
   #channelWrapper: ChannelWrapper
@@ -91,10 +92,14 @@ class RabbitMQProducer implements Producer<never> {
     this.#opts = opts;
   }
 
-  async produce(messages: Message[], opts?: undefined): Promise<void> {
+  async produce(messages: CreateMessage[], opts?: undefined): Promise<Message[]> {
+    const messagesToCreate = messages.map(message => ({
+      ...message,
+      id: message.id ?? uuidv7(),
+    }))
     const channel = this.#getChannel()
 
-    for (const message of messages) {
+    for (const message of messagesToCreate) {
       if (message.pickAfter === undefined) {
         await this.#publishMessage(channel, this.#opts.exchange, message)
       } else {
@@ -105,6 +110,8 @@ class RabbitMQProducer implements Producer<never> {
         await this.#publishMessage(channel, this.#opts.delayedExchange, message)
       }
     }
+
+    return messagesToCreate
   }
 
   supportsDelayedMessages(): boolean {

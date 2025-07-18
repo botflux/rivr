@@ -7,7 +7,7 @@ import {
   Queue,
   StopReason,
   NormalizedWorkflowState,
-  WorkflowStateStorage
+  WorkflowStateStorage, CreateMessage
 } from "rivr";
 import {
   JSONEventType,
@@ -24,6 +24,7 @@ import {CreatePersistentSubscriptionOpts, CreateQueueOpts} from "./public-types"
 import {DuplexOptions} from "node:stream";
 import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
+import {uuidv7} from "uuidv7";
 
 type KurrentDBQueueOpts = {
   connectionString: string
@@ -169,8 +170,13 @@ class KurrentDBProducer implements Producer<never> {
     this.#opts = opts;
   }
 
-  async produce(messages: Message[], opts?: undefined): Promise<void> {
-    const messagesByStream = Array.from(this.#groupMessagesByStream(messages).entries())
+  async produce(messages: CreateMessage[], opts?: undefined): Promise<Message[]> {
+    const messagesToCreate = messages.map(message => ({
+      ...message,
+      id: message.id ?? uuidv7()
+    }))
+
+    const messagesByStream = Array.from(this.#groupMessagesByStream(messagesToCreate).entries())
     const eventsByStream = messagesByStream.map(([ stream, messages ]) => [
       `${streamPrefix}${this.#opts.streamInfix}-${stream}`,
       messages.map(({ createdAt, pickAfter, ...rest }) => ({
@@ -188,6 +194,8 @@ class KurrentDBProducer implements Producer<never> {
 
     await Promise.all(eventsByStream.map(([ stream, events ]) =>
       this.#client.appendToStream(stream, events)))
+
+    return messagesToCreate
   }
   supportsDelayedMessages(): boolean {
       return false

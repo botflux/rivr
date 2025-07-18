@@ -6,7 +6,7 @@ import {
 } from "../../workflow/state/state";
 import {ReadyWorkflow, Step, StepResult, Workflow} from "../../workflow/types";
 import {WorkflowStateStorage} from "../../workflow/state/storage";
-import {Message} from "../../queue";
+import {CreateMessage, Message} from "../../queue";
 import {Logger} from "../../logger/logger";
 import {RealClock} from "../../clock/real-clock";
 import {Clock} from "../../clock/interface";
@@ -37,7 +37,7 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
       && "name" in payload && typeof payload.name === "string"
   }
 
-  async handle(message: Message & { payload: NormalizedWorkflowState<unknown> }): Promise<Message[]> {
+  async handle(message: Message & { payload: NormalizedWorkflowState<unknown> }): Promise<CreateMessage[]> {
     const {payload: state} = message
     const mWorkflow = this.#workflows.find(w => w.name === state.name)
 
@@ -113,7 +113,6 @@ export class WorkflowMessageHandler implements MessageHandler<NormalizedWorkflow
     if (newStateNormalized.status === "in_progress") {
       return [
         {
-          id: uuidv7(),
           type: "workflow_message@v1",
           payload: newStateNormalized,
           createdAt: new Date(),

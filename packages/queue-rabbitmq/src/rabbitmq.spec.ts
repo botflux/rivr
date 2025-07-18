@@ -43,7 +43,7 @@ describe("rabbitmq engine", () => {
         })
 
         // When
-        const error = await producer.produce([ randomMessage() ]).catch(e => e)
+        const error = await producer.produce([ randomMessage() ]).then(() => undefined).catch(e => e)
 
         // Then
         t.assert.strictEqual(error, undefined)

@@ -43,6 +43,10 @@ export interface Message {
   createdAt: Date
 }
 
+export type CreateMessage = Omit<Message, "id"> & {
+  id?: string
+}
+
 export interface OnMessage {
   (msg: Message): Promise<void>
 }
@@ -58,7 +62,7 @@ export interface Producer<WriteOpts> {
    * @param messages
    * @param opts
    */
-  produce(messages: Message[], opts?: WriteOpts): Promise<void>
+  produce(messages: CreateMessage[], opts?: WriteOpts): Promise<Message[]>
 
   /**
    * Returns true if delayed messages can be produced; otherwise false.

@@ -37,6 +37,7 @@
   "homepage": "https://github.com/botflux/rivr#readme",
   "dependencies": {
     "amqp-connection-manager": "^4.1.14",
-    "amqplib": "^0.10.8"
+    "amqplib": "^0.10.8",
+    "uuidv7": "^1.0.2"
   }
 }

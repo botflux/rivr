@@ -1,4 +1,4 @@
-import {Consumer, ConsumerOpts, ConsumptionHooks, Message, Producer, Queue, StopReason} from "rivr";
+import {Consumer, ConsumerOpts, ConsumptionHooks, CreateMessage, Message, Producer, Queue, StopReason} from "rivr";
 import {ClientSession, Collection, Filter, MongoClient, MongoClientOptions, WithId} from "mongodb";
 import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
@@ -214,12 +214,16 @@ class MongoDBProducer implements Producer<MongoDBWriteOpts> {
     this.#collection = collection;
   }
 
-  async produce(messages: Message[], opts: MongoDBWriteOpts = {}): Promise<void> {
+  async produce(messages: CreateMessage[], opts: MongoDBWriteOpts = {}): Promise<Message[]> {
     await this.#ensureIndexes()
 
     const { session } = opts
+    const messagesToCreate = messages.map(message => ({
+      ...message,
+      id: message.id ?? uuidv7(),
+    }))
 
-    const rawMessages = messages.map(({ pickAfter, ...message }) => ({
+    const rawMessages = messagesToCreate.map(({ pickAfter, ...message }) => ({
       ...message,
       status: "todo",
       version: 1,
@@ -231,6 +235,7 @@ class MongoDBProducer implements Producer<MongoDBWriteOpts> {
     } as MongoMessage))
 
     await this.#collection.insertMany(rawMessages, { session })
+    return messagesToCreate
   }
 
   supportsDelayedMessages(): boolean {

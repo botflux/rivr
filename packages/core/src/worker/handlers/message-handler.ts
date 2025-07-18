@@ -1,4 +1,4 @@
-import {Message} from "../../queue";
+import {CreateMessage, Message} from "../../queue";
 
 /**
  * The message handler is an abstraction used by the
@@ -31,5 +31,5 @@ export interface MessageHandler<T> {
    *
    * @param message
    */
-  handle(message: Message & { payload: T }): Promise<Message[]>
+  handle(message: Message & { payload: T }): Promise<CreateMessage[]>
 }

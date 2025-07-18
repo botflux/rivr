@@ -1,5 +1,5 @@
 import {MessageHandler} from "./handlers/message-handler";
-import {Consumer, Message, Producer, Queue} from "../queue";
+import {Consumer, CreateMessage, Message, Producer, Queue} from "../queue";
 import {OnError, Worker} from "./worker";
 import {WorkflowMessageHandler} from "./handlers/workflow-message-handler";
 import {OutboxMessageHandler} from "./handlers/outbox-message-handler";
@@ -98,7 +98,7 @@ export class DefaultWorker implements Worker {
     return this
   }
 
-  async #produce(messages: Message[]) {
+  async #produce(messages: CreateMessage[]) {
     const delayedMessages = messages.filter(message => message.pickAfter !== undefined)
     const notDelayedMessages = messages.filter(message => message.pickAfter === undefined)
 

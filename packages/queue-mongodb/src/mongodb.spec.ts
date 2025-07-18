@@ -58,7 +58,7 @@ describe("mongodb queue", function () {
           createdAt: new Date(),
           payload: { msg: "hello world" },
         }
-      ]).catch(e => e)
+      ]).then(() => undefined).catch(e => e)
 
       // Then
       t.assert.strictEqual(error, undefined)

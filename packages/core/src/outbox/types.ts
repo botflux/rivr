@@ -9,6 +9,10 @@ export type OutboxMessage = {
   payload: Message
 }
 
+export type CreateOutboxMessage = Omit<OutboxMessage, "id"> & {
+  id?: string
+}
+
 /**
  * An outbox is just a thin wrapper around a queue.
  * Everytime you produce through an outbox instance,
@@ -26,7 +30,7 @@ export interface Outbox<WriteOpts> {
    * @param messages
    * @param opts
    */
-  produce(messages: OutboxMessage[], opts?: WriteOpts): Promise<void>
+  produce(messages: CreateOutboxMessage[], opts?: WriteOpts): Promise<OutboxMessage[]>
 }
 
 export type OutboxState = {
@@ -42,11 +46,11 @@ class DefaultOutbox<WriteOpts> implements Outbox<WriteOpts> {
     this.#producer = producer;
   }
 
-  async produce(messages: OutboxMessage[], opts?: WriteOpts): Promise<void> {
-    await this.#producer.produce(
+  async produce(messages: CreateOutboxMessage[], opts?: WriteOpts): Promise<OutboxMessage[]> {
+    return await this.#producer.produce(
       messages,
       opts
-    )
+    ) as OutboxMessage[]
   }
 
   disconnect(): Promise<void> {
