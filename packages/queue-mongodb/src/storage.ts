@@ -1,6 +1,5 @@
 import {AnyBulkWriteOperation, Collection, Filter, MongoClient, MongoClientOptions} from "mongodb";
 import {
-  ListWorkflowStateOpts,
   ListWorkflowStateResult,
   SearchableWorkflowStateStorage,
   SearchWorkflowStateOpts,
@@ -13,6 +12,7 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
   readonly #dbName: string
   readonly #collectionName: string
 
+  #indexesChecked = false
   #mongoClient: MongoClient | undefined
 
   constructor(url: string, clientOpts: MongoClientOptions, dbName: string, collectionName: string) {
@@ -27,6 +27,7 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
   }
 
   async search<State>(opts: SearchWorkflowStateOpts = {}): Promise<ListWorkflowStateResult<State>> {
+    await this.#ensureIndexesExists()
     const { page = 1, limit = 25, status, names } = opts
     const skip = (page - 1) * limit
     const filters = {
@@ -61,6 +62,7 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
   }
 
   async upsert<State>(states: NormalizedWorkflowState<State>[]): Promise<void> {
+    await this.#ensureIndexesExists()
     const writes: AnyBulkWriteOperation<NormalizedWorkflowState<unknown>>[] = states.map(state => ({
       replaceOne: {
         upsert: true,
@@ -73,6 +75,7 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
   }
 
   async get<State>(id: string): Promise<NormalizedWorkflowState<State> | undefined> {
+    await this.#ensureIndexesExists()
     const mRecord = await this.#getCollection().findOne({id})
 
     if (mRecord === null) {
@@ -93,6 +96,37 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
 
   #getCollection(): Collection<NormalizedWorkflowState<unknown>> {
     return this.#getClient().db(this.#dbName).collection(this.#collectionName)
+  }
+
+  async #ensureIndexesExists(): Promise<void> {
+    if (this.#indexesChecked) {
+      return
+    }
+
+    await this.#getCollection().createIndexes([
+      /**
+       * This index is used by the workflow storage's search method.
+       */
+      {
+        name: "read_path_index",
+        background: true,
+        key: {
+          name: 1,
+          status: 1
+        }
+      },
+      /**
+       * This index is used by the consumer to update workflow states efficiently.
+       */
+      {
+        name: "write_path_index",
+        background: true,
+        key: {
+          id: 1,
+        },
+        unique: true
+      }
+    ])
   }
 }
 
