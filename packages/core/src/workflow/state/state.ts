@@ -1,13 +1,24 @@
-import {Step, StepResult, Workflow} from "../types";
+import {Failure, Step, StepResult, Workflow} from "../types";
 import {uuidv7} from "uuidv7";
 
 export type AttemptStatus = "successful" | "failed" | "skipped" | "stopped" | "in_progress" | "to_execute"
+
+export type NormalizedError = {
+  name?: string
+  message: string
+  stack?: string
+}
+
+export type AttemptResult = Exclude<StepResult<unknown>, Failure<unknown>> | {
+  type: "failure"
+  error: NormalizedError
+}
 
 export type Attempt = {
   id: number
   status: AttemptStatus
   inputState: unknown
-  result?: StepResult<unknown>
+  result?: AttemptResult
 }
 
 export type StepState = {
@@ -203,7 +214,7 @@ export class WorkflowState<State> {
                 ...currentStepState.attempts.map(attempt => attempt.id === currentAttempt.id ? {
                   ...currentAttempt,
                   status: "failed" as const,
-                  result
+                  result: this.#toAttemptResult(result)
                 } : attempt),
                 {
                   status: "to_execute",
@@ -224,7 +235,7 @@ export class WorkflowState<State> {
             attempts: currentStepState.attempts.map(attempt => attempt.id === currentAttempt.id ? {
               ...currentAttempt,
               status: "failed" as const,
-              result
+              result: this.#toAttemptResult(result)
             } : attempt),
           },
           nextStepUpdated: nextStepState,
@@ -233,6 +244,40 @@ export class WorkflowState<State> {
         }
       }
     }
+  }
+
+  #toAttemptResult(result: StepResult<State>): AttemptResult {
+    if (result.type !== "failure")
+      return result
+
+    const { error } = result
+    return {
+      type: "failure" as const,
+      error: this.#toNormalizedError(error)
+    }
+  }
+
+  #toNormalizedError(error: unknown): NormalizedError {
+    if (typeof error === "string") {
+      return { message: error }
+    }
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "message" in error &&
+      typeof error.message === "string" &&
+      "name" in error &&
+      typeof error.name === "string"
+    ) {
+      return {
+        name: error.name,
+        message: error.message,
+        stack: (error as Error).stack
+      }
+    }
+
+    return { message: `Cannot normalize the error '${JSON.stringify(error)}'` }
   }
 
   static initialize<State, FirstState, StateByStepName extends Record<never, never>, Name extends keyof StateByStepName>(

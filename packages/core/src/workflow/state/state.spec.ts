@@ -274,7 +274,11 @@ describe('state', function () {
               inputState: 1,
               result: {
                 type: "failure",
-                error
+                error: {
+                  name: error.name,
+                  message: error.message,
+                  stack: error.stack
+                }
               }
             },
             {
@@ -326,7 +330,11 @@ describe('state', function () {
               inputState: 1,
               result: {
                 type: "failure",
-                error
+                error: {
+                  name: "Error",
+                  message: error.message,
+                  stack: error.stack
+                }
               }
             }
           ]
