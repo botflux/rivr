@@ -8,7 +8,7 @@ import {
   timeBasedFlow,
   WorkflowState
 } from "rivr";
-import {createQueue as createMongoQueue} from "./queue"
+import {createEngine, createEngine as createMongoEngine} from "./queue"
 import test, {after, before, describe, TestContext} from "node:test";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
@@ -32,13 +32,13 @@ describe("mongodb queue", function () {
   describe('producer/consumer', function () {
     test("should be able to produce in a queue", async (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true
         }
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -66,14 +66,14 @@ describe("mongodb queue", function () {
 
     test("should be able to consume a message", async (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true
         },
         delayBetweenEmptyPolls: 100
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -117,14 +117,14 @@ describe("mongodb queue", function () {
     
     test("should be able to consume from multiple consumptions", async (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         delayBetweenEmptyPolls: 100,
         clientOpts: {
           directConnection: true
         },
         dbName: randomUUID()
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -179,14 +179,14 @@ describe("mongodb queue", function () {
     
     test("should be able to retry nack messages", async (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true,
         },
         delayBetweenEmptyPolls: 100,
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -238,7 +238,7 @@ describe("mongodb queue", function () {
 
     test("should be able to take another consumer's messages if not handled in time", async (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         delayBetweenEmptyPolls: 100,
         clientOpts: {
@@ -246,7 +246,7 @@ describe("mongodb queue", function () {
         },
         dbName: randomUUID(),
         deadMessageTimeout: 2_000
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -305,13 +305,13 @@ describe("mongodb queue", function () {
   describe('disconnect', function () {
     test("should be able to ignore if already disconnected", async (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true,
         },
-      })
+      }).createQueue()
 
       // Produce a message to initialize the MongoClient.
       await queue
@@ -331,13 +331,13 @@ describe("mongodb queue", function () {
   describe('hooks', function () {
     test("onStart is not triggered if the consumer is not started", (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
         },
         dbName: randomUUID()
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -357,13 +357,13 @@ describe("mongodb queue", function () {
 
     test("should be able to trigger the onStart hook", async (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
         },
         dbName: randomUUID()
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -389,13 +389,13 @@ describe("mongodb queue", function () {
 
     test("should be able to trigger the onStop hook", async (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
         },
         dbName: randomUUID()
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -418,13 +418,13 @@ describe("mongodb queue", function () {
 
     test("should be able to ignore duplicate calls to start", async (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
         },
         dbName: randomUUID()
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -451,13 +451,13 @@ describe("mongodb queue", function () {
     
     test("should be able to ignore duplicate calls to stop", async (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
         },
         dbName: randomUUID()
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -481,14 +481,14 @@ describe("mongodb queue", function () {
 
     test("should be able to trigger the onError hook", async (t: TestContext) => {
       // Given
-      const queue = createMongoQueue({
+      const queue = createEngine({
         url: mongodb.getConnectionString(),
         clientOpts: {
           directConnection: true,
         },
         dbName: randomUUID(),
         delayBetweenEmptyPolls: 100
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -756,16 +756,16 @@ describe("mongodb queue", function () {
   })
 
   describe('workflows', function () {
-    const createQueue = () => createMongoQueue({
+    const createEngine = () => createMongoEngine({
       url: mongodb.getConnectionString(),
       clientOpts: { directConnection: true },
       dbName: randomUUID(),
       delayBetweenEmptyPolls: 100,
     })
 
-    basicFlow({ createQueue })
-    advancedFlow({ createQueue })
-    timeBasedFlow({ createQueue })
+    basicFlow({ createEngine })
+    advancedFlow({ createEngine })
+    timeBasedFlow({ createEngine })
   })
 })
 

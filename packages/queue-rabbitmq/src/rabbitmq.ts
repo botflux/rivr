@@ -1,4 +1,14 @@
-import {Consumer, ConsumerOpts, ConsumptionHooks, CreateMessage, Message, Producer, Queue, StopReason} from "rivr";
+import {
+  Consumer,
+  ConsumerOpts,
+  ConsumptionHooks,
+  CreateMessage,
+  Engine,
+  Message,
+  Producer,
+  Queue,
+  StopReason
+} from "rivr";
 import {Channel, ConfirmChannel} from "amqplib";
 import {AmqpConnectionManager, AmqpConnectionManagerOptions, ChannelWrapper, connect} from "amqp-connection-manager";
 import {Hooks} from "rivr/dist/hooks/hooks";
@@ -302,4 +312,20 @@ function isUnexpectedCloseError(error: unknown): boolean {
   ]
 
   return possibilities.some(element => (error.message as string).match(element))
+}
+
+class RabbitMQEngine implements Engine<never> {
+  #opts: CreateRabbitMQQueueOpts
+
+  constructor(opts: CreateRabbitMQQueueOpts) {
+    this.#opts = opts;
+  }
+
+  createQueue(): Queue<never> {
+    return createQueue(this.#opts)
+  }
+}
+
+export function createEngine(opts: CreateRabbitMQQueueOpts): Engine<never> {
+  return new RabbitMQEngine(opts)
 }

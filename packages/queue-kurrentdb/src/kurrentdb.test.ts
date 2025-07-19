@@ -2,7 +2,7 @@ import {after, before, describe, test, TestContext} from "node:test"
 import {KurrentDbContainer, StartedKurrentDbContainer} from "@testcontainers/kurrentdb"
 import {
   consumeCustomSubscription,
-  consumeWorkflowStateChanges,
+  consumeWorkflowStateChanges, createEngine,
   createQueue,
   createStorage,
   RivrInvalidStreamInfixError
@@ -298,7 +298,7 @@ describe('kurrentdb', function () {
   })
   
   describe('workflow', function () {
-    const makeQueue = () => createQueue({
+    const makeEngine = () => createEngine({
       connectionString: kurrentdb.getConnectionString(),
       streamInfix: randomInfix(),
       createSubscriptionOpts: {
@@ -306,8 +306,8 @@ describe('kurrentdb', function () {
       },
     })
 
-    basicFlow({ createQueue: makeQueue })
-    advancedFlow({ createQueue: makeQueue })
+    basicFlow({ createEngine: makeEngine })
+    advancedFlow({ createEngine: makeEngine })
   })
 
   describe('workflow state storage', function () {

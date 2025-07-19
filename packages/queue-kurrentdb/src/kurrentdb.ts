@@ -7,7 +7,7 @@ import {
   Queue,
   StopReason,
   NormalizedWorkflowState,
-  WorkflowStateStorage, CreateMessage
+  WorkflowStateStorage, CreateMessage, Engine
 } from "rivr";
 import {
   JSONEventType,
@@ -564,4 +564,24 @@ export function consumeWorkflowStateChanges(opts: ConsumeWorkflowStateChangesOpt
       })
     }
   )
+}
+
+class KurrentDBEngine implements Engine<never> {
+  #opts: CreateQueueOpts
+
+  constructor(opts: CreateQueueOpts) {
+    this.#opts = opts;
+  }
+
+  createQueue(): Queue<never> {
+    return createQueue(this.#opts)
+  }
+
+  createStorage(): WorkflowStateStorage {
+    return createStorage(this.#opts)
+  }
+}
+
+export function createEngine(opts: CreateQueueOpts): Engine<never> {
+  return new KurrentDBEngine(opts)
 }

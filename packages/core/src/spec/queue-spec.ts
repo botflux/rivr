@@ -5,6 +5,7 @@ import {rivr} from "../workflow/workflow";
 import {trigger, triggerFrom} from "../workflow/trigger";
 import {Step, StepResult} from "../workflow/types";
 import {createWorker} from "../worker/default-worker";
+import {Engine} from "../engine";
 
 export type QueueSpecOpts = {
   /**
@@ -13,10 +14,10 @@ export type QueueSpecOpts = {
    * In case of a DB queue, a random table name, or a random collection name must be generated.
    * For streaming system/queueing system, a topic/stream/queue name must be generated.
    */
-  createQueue: () => Queue<any>
+  createEngine: () => Engine<any>
 }
 
-export function basicFlow ({ createQueue }: QueueSpecOpts) {
+export function basicFlow ({ createEngine }: QueueSpecOpts) {
   describe('basic flow', function () {
     test("should be able to execute a step", async (t: TestContext) => {
       // Given
@@ -31,7 +32,7 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
           result = r
         })
 
-      const queue = createQueue()
+      const queue = createEngine().createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
 
       t.after(async () => {
@@ -76,7 +77,7 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
           stepResult = state
         })
 
-      const queue = createQueue()
+      const queue = createEngine().createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
 
       t.after(async () => {
@@ -119,7 +120,7 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
           result = r
         })
 
-      const queue = createQueue()
+      const queue = createEngine().createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
 
       t.after(async () => {
@@ -164,7 +165,7 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
           result = r
         })
 
-      const queue = createQueue()
+      const queue = createEngine().createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
 
       t.after(async () => {
@@ -209,7 +210,7 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
           result = r
         })
 
-      const queue = createQueue()
+      const queue = createEngine().createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
 
       t.after(async () => {
@@ -240,7 +241,7 @@ export function basicFlow ({ createQueue }: QueueSpecOpts) {
   })
 }
 
-export function advancedFlow({ createQueue }: QueueSpecOpts) {
+export function advancedFlow({ createEngine }: QueueSpecOpts) {
   describe('advanced flow', function () {
     test("should be able to stop a workflow", async (t: TestContext) => {
       // Given
@@ -261,7 +262,7 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
           result = state
         })
 
-      const queue = createQueue()
+      const queue = createEngine().createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
 
       t.after(async () => {
@@ -304,7 +305,7 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
           results.push(result)
         })
 
-      const queue = createQueue()
+      const queue = createEngine().createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
 
       t.after(async () => {
@@ -355,7 +356,7 @@ export function advancedFlow({ createQueue }: QueueSpecOpts) {
   })
 }
 
-export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
+export function timeBasedFlow({ createEngine }: QueueSpecOpts) {
   describe('time base flow', function () {
     test("should be able to delay retries", async (t: TestContext) => {
       // Given
@@ -376,7 +377,7 @@ export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
           results.push(result)
         })
 
-      const queue = createQueue()
+      const queue = createEngine().createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
 
       t.after(async () => {
@@ -447,7 +448,7 @@ export function timeBasedFlow({ createQueue }: QueueSpecOpts) {
         })
 
 
-      const queue = createQueue()
+      const queue = createEngine().createQueue()
       const worker = createWorker({ primary: queue, workflows: [ workflow ] })
 
       t.after(async () => {

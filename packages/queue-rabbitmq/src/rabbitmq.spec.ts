@@ -4,7 +4,7 @@ import {GenericContainerBuilder, Wait} from "testcontainers";
 import {RabbitMQContainer, StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
 import {join} from "node:path";
 import {randomUUID} from "node:crypto";
-import {createQueue as createRabbitMQQueue} from "./rabbitmq";
+import {createEngine as createRabbitMQEngine} from "./rabbitmq";
 import {setTimeout} from "node:timers/promises";
 
 installUnhandledRejectionHook()
@@ -21,7 +21,7 @@ describe("rabbitmq engine", () => {
       await container?.stop()
     })
 
-    const createQueue = () => createRabbitMQQueue({
+    const createEngine = () => createRabbitMQEngine({
       url: container.getAmqpUrl(),
       exchange: randomUUID(),
       queue: randomUUID(),
@@ -30,7 +30,7 @@ describe("rabbitmq engine", () => {
     describe('producer/consumer', function () {
       test("should be able to produce a message", async (t: TestContext) => {
         // Given
-        const queue = createQueue()
+        const queue = createEngine().createQueue()
 
         t.after(async () => {
           await queue.disconnect()
@@ -51,7 +51,7 @@ describe("rabbitmq engine", () => {
       
       test("should be able to consume a message", async (t: TestContext) => {
         // Given
-        const queue = createQueue()
+        const queue = createEngine().createQueue()
 
         t.after(async () => {
           await queue.disconnect()
@@ -89,8 +89,8 @@ describe("rabbitmq engine", () => {
 
     })
 
-    basicFlow({ createQueue })
-    advancedFlow({ createQueue })
+    basicFlow({ createEngine })
+    advancedFlow({ createEngine })
   })
 
   describe('not-recommended setup (with delayed exchange)', function () {
@@ -125,7 +125,7 @@ describe("rabbitmq engine", () => {
       await container?.stop()
     })
 
-    const createQueue = () => createRabbitMQQueue({
+    const createEngine = () => createRabbitMQEngine({
       url: container.getAmqpUrl(),
       exchange: randomUUID(),
       queue: randomUUID(),
@@ -133,9 +133,9 @@ describe("rabbitmq engine", () => {
       enableDelayedMessageExchange: true
     })
 
-    basicFlow({ createQueue })
-    advancedFlow({ createQueue })
-    timeBasedFlow({ createQueue })
+    basicFlow({ createEngine })
+    advancedFlow({ createEngine })
+    timeBasedFlow({ createEngine })
   })
 })
 

@@ -1,13 +1,26 @@
-import {Consumer, ConsumerOpts, ConsumptionHooks, CreateMessage, Message, Producer, Queue, StopReason} from "rivr";
+import {
+  Consumer,
+  ConsumerOpts,
+  ConsumptionHooks,
+  CreateMessage,
+  Engine,
+  Message,
+  Producer,
+  Queue,
+  SearchableWorkflowStateStorage,
+  StopReason,
+  WorkflowStateStorage
+} from "rivr";
 import {ClientSession, Collection, Filter, MongoClient, MongoClientOptions, WithId} from "mongodb";
 import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
 import {uuidv7} from "uuidv7";
+import {createStorage} from "./storage";
 
 class InfiniteLoop {
   #stopped = false;
 
-  *[Symbol.iterator] () {
+  * [Symbol.iterator]() {
     while (!this.#stopped) {
       yield undefined
     }
@@ -76,7 +89,7 @@ class PollingConsumer implements Consumer {
 
     this.#infiniteLoop.stop()
     this.#abort.abort()
-    this.#hooks.executeHook("onStop", [ "manually_stopped" ])
+    this.#hooks.executeHook("onStop", ["manually_stopped"])
     this.#state = "stopped"
   }
 
@@ -86,24 +99,24 @@ class PollingConsumer implements Consumer {
         const messages = await this.#pullMessages(this.#opts.countPerPoll)
 
         for (const message of messages) {
-          const { _id, status, consideredDeadAfter, pulledAt, pulledBy, version, ...rest } = message
+          const {_id, status, consideredDeadAfter, pulledAt, pulledBy, version, ...rest} = message
           try {
             await this.#consumeOpts.onMessage(rest)
             await this.#getCollection().findOneAndUpdate({
               id: message.id,
               version
             }, {
-              $set: { status: "done", version: version + 1 }
+              $set: {status: "done", version: version + 1}
             })
           } catch (error: unknown) {
             await this.#getCollection().updateOne({
               id: message.id,
               version
             }, {
-              $set: { status: "todo", version: version + 1 },
-              $unset: { pulledAt: "", pulledBy: "", consideredDeadAfter: "" }
+              $set: {status: "todo", version: version + 1},
+              $unset: {pulledAt: "", pulledBy: "", consideredDeadAfter: ""}
             })
-            this.#hooks.executeHook("onError", [ error ])
+            this.#hooks.executeHook("onError", [error])
           }
         }
 
@@ -160,14 +173,14 @@ class PollingConsumer implements Consumer {
       }
 
       messages.push(mMessage)
-    } while(limit)
+    } while (limit)
 
     return messages
   }
 
   async #wait(ms: number) {
     try {
-      await setTimeout(ms, { signal: this.#abort.signal })
+      await setTimeout(ms, {signal: this.#abort.signal})
     } catch (error: unknown) {
       // TODO check if abort error
       throw error
@@ -217,13 +230,13 @@ class MongoDBProducer implements Producer<MongoDBWriteOpts> {
   async produce(messages: CreateMessage[], opts: MongoDBWriteOpts = {}): Promise<Message[]> {
     await this.#ensureIndexes()
 
-    const { session } = opts
+    const {session} = opts
     const messagesToCreate = messages.map(message => ({
       ...message,
       id: message.id ?? uuidv7(),
     }))
 
-    const rawMessages = messagesToCreate.map(({ pickAfter, ...message }) => ({
+    const rawMessages = messagesToCreate.map(({pickAfter, ...message}) => ({
       ...message,
       status: "todo",
       version: 1,
@@ -231,18 +244,19 @@ class MongoDBProducer implements Producer<MongoDBWriteOpts> {
       // but rivr's core sometimes returns an explicit undefined for `pickAfter`, which
       // break the filter.
       // To avoid any issue, `pickAfter` is cleaned manually here.
-      ...pickAfter !== undefined && { pickAfter }
+      ...pickAfter !== undefined && {pickAfter}
     } as MongoMessage))
 
-    await this.#collection.insertMany(rawMessages, { session })
+    await this.#collection.insertMany(rawMessages, {session})
     return messagesToCreate
   }
 
   supportsDelayedMessages(): boolean {
-      return true
+    return true
   }
 
-  async disconnect(): Promise<void> {}
+  async disconnect(): Promise<void> {
+  }
 
   async #ensureIndexes() {
     if (this.#indexCreated) {
@@ -325,7 +339,7 @@ export type CreateMongoDBQueueOpts = {
   deadMessageTimeout?: number
 }
 
-export function createQueue (opts: CreateMongoDBQueueOpts): Queue<never> {
+export function createQueue(opts: CreateMongoDBQueueOpts): Queue<never> {
   const {
     collectionName = "rivr-messages",
     delayBetweenEmptyPolls = 5_000,
@@ -343,4 +357,24 @@ export function createQueue (opts: CreateMongoDBQueueOpts): Queue<never> {
     countPerPoll,
     deadMessageTimeout
   })
+}
+
+class MongoDBEngine implements Engine<MongoDBWriteOpts> {
+  #opts: CreateMongoDBQueueOpts
+
+  constructor(opts: CreateMongoDBQueueOpts) {
+    this.#opts = opts;
+  }
+
+  createQueue(): Queue<MongoDBWriteOpts> {
+    return createQueue(this.#opts)
+  }
+
+  createStorage() {
+    return createStorage(this.#opts)
+  }
+}
+
+export function createEngine(opts: CreateMongoDBQueueOpts): Engine<MongoDBWriteOpts> {
+  return new MongoDBEngine(opts)
 }

@@ -13,3 +13,4 @@ export {OutboxMessageHandler} from "./worker/handlers/outbox-message-handler";
 export {DefaultWorker} from "./worker/default-worker";
 export {createWorker} from "./worker/default-worker";
 export {CreateWorkerOpts} from "./worker/default-worker";
+export {Engine} from "./engine";
