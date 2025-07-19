@@ -12,7 +12,6 @@ import test, {after, before, describe, TestContext} from "node:test";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
 import {uuidv7} from "uuidv7";
-import {createStorage} from "./storage";
 import assert from "node:assert";
 import {createEngine as createMongoEngine, createEngine} from "./engine";
 
@@ -551,13 +550,13 @@ describe("mongodb queue", function () {
 
     test("should be able to store a workflow state", async (t) => {
       // Given
-      const storage = createStorage({
+      const storage = createEngine({
         url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true,
         }
-      })
+      }).createStorage!()
 
       const now = new Date()
       const id = uuidv7()
@@ -579,13 +578,13 @@ describe("mongodb queue", function () {
 
     test("should be able to paginate workflow state search results by 25 by default", async (t) => {
       // Given
-      const storage = createStorage({
+      const storage = createEngine({
         url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true,
         }
-      })
+      }).createStorage!()
 
       const now = new Date()
 
