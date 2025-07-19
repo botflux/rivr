@@ -1,6 +1,6 @@
 import {after, before, describe, test, TestContext} from "node:test"
 import {KurrentDbContainer, StartedKurrentDbContainer} from "@testcontainers/kurrentdb"
-import {createQueue} from "./kurrentdb"
+import {createEngine} from "./kurrentdb"
 import {Message} from "rivr"
 import {randomUUID} from "node:crypto"
 import {setTimeout} from "node:timers/promises"
@@ -43,13 +43,13 @@ describe('kurrentdb resilience', function () {
       await proxy.instance.remove()
     })
 
-    const queue = createQueue({
+    const queue = createEngine({
       connectionString: `kurrentdb://${proxy.host}:${proxy.port}?tls=false`,
       createSubscriptionOpts: {
         groupName: randomUUID(),
       },
       streamInfix: randomInfix()
-    })
+    }).createQueue()
 
     t.after(async () => {
       await queue.disconnect()
@@ -101,25 +101,25 @@ describe('kurrentdb resilience', function () {
     const groupName = randomUUID();
     const streamInfix = randomInfix();
 
-    const unstable = createQueue({
+    const unstable = createEngine({
       connectionString: `kurrentdb://${proxy.host}:${proxy.port}?tls=false`,
       createSubscriptionOpts: {
         groupName
       },
       streamInfix
-    })
+    }).createQueue()
 
     t.after(async () => {
       await unstable.disconnect()
     })
 
-    const stable = createQueue({
+    const stable = createEngine({
       connectionString: kurrentdb.getConnectionString(),
       createSubscriptionOpts: {
         groupName
       },
       streamInfix
-    })
+    }).createQueue()
 
     t.after(async () => {
       await stable.disconnect()
@@ -177,13 +177,13 @@ describe('kurrentdb resilience', function () {
     const groupName = randomUUID();
     const streamInfix = randomInfix();
 
-    const unstable = createQueue({
+    const unstable = createEngine({
       connectionString: `kurrentdb://${proxy.host}:${proxy.port}?tls=false`,
       createSubscriptionOpts: {
         groupName
       },
       streamInfix
-    })
+    }).createQueue()
 
     t.after(async () => {
       await unstable.disconnect()

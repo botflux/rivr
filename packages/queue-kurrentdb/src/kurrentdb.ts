@@ -20,7 +20,7 @@ import {
   UnavailableError
 } from "@kurrent/kurrentdb-client"
 import {JSONEventData} from "@kurrent/kurrentdb-client/dist/types/events";
-import {CreatePersistentSubscriptionOpts, CreateQueueOpts} from "./public-types";
+import {CreatePersistentSubscriptionOpts, CreateEngineOpts} from "./public-types";
 import {DuplexOptions} from "node:stream";
 import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
@@ -302,55 +302,6 @@ export class RivrInvalidStreamInfixError extends Error {
   }
 }
 
-export function createQueue(opts: CreateQueueOpts): Queue<never> {
-  const {
-    partitionStream = shardQueueByHour,
-    createSubscriptionOpts: {
-      groupName = "rivr-consumers",
-      messageTimeout = 30_000,
-      checkPointAfter = 2_000,
-      checkPointLowerBound = 10,
-      checkPointUpperBound = 1_000,
-      consumerStrategyName = "RoundRobin",
-      extraStatistics = false,
-      historyBufferSize = 500,
-      liveBufferSize = 500,
-      maxRetryCount = 10,
-      maxSubscriberCount = "unbounded",
-      readBatchSize = 20,
-    } = {},
-    streamInfix,
-    ...rest
-  } = opts
-
-  if (streamInfix.includes("-")) {
-    throw new RivrInvalidStreamInfixError(streamInfix)
-  }
-
-  return new KurrentDBQueue({
-    ...rest,
-    streamInfix,
-    streamToSubscribe: `$ce-${streamPrefix}${streamInfix}`,
-    partitionStream: partitionStream,
-    groupName,
-    persistentSubscriptionCreationOpts: {
-      resolveLinkTos: true,
-      messageTimeout,
-      maxSubscriberCount,
-      consumerStrategyName,
-      historyBufferSize,
-      liveBufferSize,
-      readBatchSize,
-      checkPointUpperBound,
-      checkPointLowerBound,
-      checkPointAfter,
-      startFrom: "start",
-      maxRetryCount,
-      extraStatistics,
-    }
-  })
-}
-
 function shardQueueByHour (msg: Message): string {
   return msg.createdAt.toISOString().substring(0, 13)
 }
@@ -499,14 +450,6 @@ function deserializeWorkflowState<State>(data: NormalizedWorkflowState<State>): 
   }
 }
 
-export function createStorage(opts: CreateStorageOpts): WorkflowStateStorage {
-  if (opts.streamInfix.includes("-")) {
-    throw new RivrInvalidStreamInfixError(opts.streamInfix)
-  }
-  
-  return new KurrentDBWorkflowStateStorage(opts)
-}
-
 export type ConsumeWorkflowStateChangesOpts = Omit<ConsumeCustomSubscriptionOpts<WorkflowStateEvent<unknown>>, "streamName"> & {
   streamInfix: string
 }
@@ -567,21 +510,66 @@ export function consumeWorkflowStateChanges(opts: ConsumeWorkflowStateChangesOpt
 }
 
 class KurrentDBEngine implements Engine<never> {
-  #opts: CreateQueueOpts
+  #opts: KurrentDBQueueOpts
 
-  constructor(opts: CreateQueueOpts) {
+  constructor(opts: KurrentDBQueueOpts) {
     this.#opts = opts;
   }
 
   createQueue(): Queue<never> {
-    return createQueue(this.#opts)
+    return new KurrentDBQueue(this.#opts)
   }
 
   createStorage(): WorkflowStateStorage {
-    return createStorage(this.#opts)
+    return new KurrentDBWorkflowStateStorage(this.#opts)
   }
 }
 
-export function createEngine(opts: CreateQueueOpts): Engine<never> {
-  return new KurrentDBEngine(opts)
+export function createEngine(opts: CreateEngineOpts): Engine<never> {
+  const {
+    partitionStream = shardQueueByHour,
+    createSubscriptionOpts: {
+      groupName = "rivr-consumers",
+      messageTimeout = 30_000,
+      checkPointAfter = 2_000,
+      checkPointLowerBound = 10,
+      checkPointUpperBound = 1_000,
+      consumerStrategyName = "RoundRobin",
+      extraStatistics = false,
+      historyBufferSize = 500,
+      liveBufferSize = 500,
+      maxRetryCount = 10,
+      maxSubscriberCount = "unbounded",
+      readBatchSize = 20,
+    } = {},
+    streamInfix,
+    ...rest
+  } = opts
+
+  if (streamInfix.includes("-")) {
+    throw new RivrInvalidStreamInfixError(streamInfix)
+  }
+
+  return new KurrentDBEngine({
+    ...rest,
+    streamInfix,
+    streamToSubscribe: `$ce-${streamPrefix}${streamInfix}`,
+    partitionStream: partitionStream,
+    groupName,
+    persistentSubscriptionCreationOpts: {
+      resolveLinkTos: true,
+      messageTimeout,
+      maxSubscriberCount,
+      consumerStrategyName,
+      historyBufferSize,
+      liveBufferSize,
+      readBatchSize,
+      checkPointUpperBound,
+      checkPointLowerBound,
+      checkPointAfter,
+      startFrom: "start",
+      maxRetryCount,
+      extraStatistics,
+    }
+  })
 }

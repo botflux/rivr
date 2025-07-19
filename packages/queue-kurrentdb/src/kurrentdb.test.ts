@@ -3,8 +3,6 @@ import {KurrentDbContainer, StartedKurrentDbContainer} from "@testcontainers/kur
 import {
   consumeCustomSubscription,
   consumeWorkflowStateChanges, createEngine,
-  createQueue,
-  createStorage,
   RivrInvalidStreamInfixError
 } from "./kurrentdb";
 import {advancedFlow, basicFlow, createWorker, Message, rivr, trigger, NormalizedWorkflowState} from "rivr";
@@ -27,13 +25,13 @@ describe('kurrentdb', function () {
   describe('queue', function () {
     test("should be able to produce in the queue", async (t: TestContext) => {
       // Given
-      const queue = createQueue({
+      const queue = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         createSubscriptionOpts: {
           groupName: randomUUID(),
         },
         streamInfix: randomInfix()
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -56,13 +54,13 @@ describe('kurrentdb', function () {
 
     test("should be able to consume messages", async (t: TestContext) => {
       // Given
-      const queue = createQueue({
+      const queue = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         createSubscriptionOpts: {
           groupName: randomUUID(),
         },
         streamInfix: randomInfix()
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -99,13 +97,13 @@ describe('kurrentdb', function () {
 
     test("should be able to not override the subscription", async (t: TestContext) => {
       // Given
-      const queue = createQueue({
+      const queue = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         createSubscriptionOpts: {
           groupName: randomUUID(),
         },
         streamInfix: randomInfix()
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -129,13 +127,13 @@ describe('kurrentdb', function () {
 
     test("should be able to create the persistent subscription once", async (t: TestContext) => {
       // Given
-      const queue = createQueue({
+      const queue = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         createSubscriptionOpts: {
           groupName: randomUUID(),
         },
         streamInfix: randomInfix()
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -170,7 +168,7 @@ describe('kurrentdb', function () {
       // When
       // Then
       t.assert.throws(
-        () => createQueue({ streamInfix: "foo-bar", connectionString: "" }),
+        () => createEngine({ streamInfix: "foo-bar", connectionString: "" }),
         new RivrInvalidStreamInfixError("foo-bar")
       )
     })
@@ -179,10 +177,10 @@ describe('kurrentdb', function () {
   describe('consumption hooks', function () {
     test("should be able to call the start hook", async (t: TestContext) => {
       // Given
-      const queue = createQueue({
+      const queue = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         streamInfix: randomInfix(),
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -209,10 +207,10 @@ describe('kurrentdb', function () {
 
     test("should be able to call the start hook once", async (t: TestContext) => {
       // Given
-      const queue = createQueue({
+      const queue = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         streamInfix: randomInfix(),
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -240,10 +238,10 @@ describe('kurrentdb', function () {
 
     test("should be able to call the stop hook", async (t: TestContext) => {
       // Given
-      const queue = createQueue({
+      const queue = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         streamInfix: randomInfix(),
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -268,10 +266,10 @@ describe('kurrentdb', function () {
 
     test("should be able to call the stop hook once", async (t: TestContext) => {
       // Given
-      const queue = createQueue({
+      const queue = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         streamInfix: randomInfix(),
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()
@@ -313,10 +311,10 @@ describe('kurrentdb', function () {
   describe('workflow state storage', function () {
     test("should be able to store workflow states", async (t: TestContext) => {
       // Given
-      const storage = createStorage({
+      const storage = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         streamInfix: randomInfix()
-      })
+      }).createStorage!()
 
       // When
       const state: NormalizedWorkflowState<number> = {
@@ -350,10 +348,10 @@ describe('kurrentdb', function () {
 
     test("should be able to return undefined if no workflow exists for the given id", async (t: TestContext) => {
       // Given
-      const storage = createStorage({
+      const storage = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         streamInfix: randomInfix()
-      })
+      }).createStorage!()
 
       // When
       // Then
@@ -364,10 +362,10 @@ describe('kurrentdb', function () {
       // Given
       const infix = randomInfix()
 
-      const storage = createStorage({
+      const storage = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         streamInfix: infix
-      })
+      }).createStorage!()
 
       let event: unknown
 
@@ -455,13 +453,13 @@ describe('kurrentdb', function () {
       // Given
       const infix = randomInfix()
 
-      const queue = createQueue({
+      const queue = createEngine({
         connectionString: kurrentdb.getConnectionString(),
         streamInfix: infix,
         createSubscriptionOpts: {
           groupName: randomUUID(),
         }
-      })
+      }).createQueue()
 
       t.after(async () => {
         await queue.disconnect()

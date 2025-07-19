@@ -4,7 +4,7 @@ import type {ConsumerStrategy} from "@kurrent/kurrentdb-client/dist/types";
 import {SubscribeToPersistentSubscriptionToStreamOptions} from "@kurrent/kurrentdb-client";
 import {DuplexOptions} from "node:stream";
 
-export type CreateQueueOpts = {
+export type CreateEngineOpts = {
   connectionString: string
 
   /**
