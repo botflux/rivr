@@ -4,9 +4,9 @@ import {
   basicFlow,
   installUnhandledRejectionHook,
   Message,
-  rivr,
+  rivr, SearchableWorkflowStateStorage,
   timeBasedFlow,
-  WorkflowState
+  WorkflowState, WorkflowStateStorage
 } from "rivr";
 import test, {after, before, describe, TestContext} from "node:test";
 import {randomUUID} from "node:crypto";
@@ -578,13 +578,13 @@ describe("mongodb queue", function () {
 
     test("should be able to paginate workflow state search results by 25 by default", async (t) => {
       // Given
-      const storage = createEngine({
+      const storage = ensureSearchable(createEngine({
         url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true,
         }
-      }).createStorage!()
+      }).createStorage!())
 
       const now = new Date()
 
@@ -609,13 +609,15 @@ describe("mongodb queue", function () {
 
     test("should be able to get the next page", async (t) => {
       // Given
-      const storage = createStorage({
-        url: mongodb.getConnectionString(),
-        dbName: randomUUID(),
-        clientOpts: {
-          directConnection: true,
-        }
-      })
+      const storage = ensureSearchable(
+        createEngine({
+          url: mongodb.getConnectionString(),
+          dbName: randomUUID(),
+          clientOpts: {
+            directConnection: true,
+          }
+        }).createStorage!()
+      )
 
       const now = new Date()
 
@@ -644,13 +646,13 @@ describe("mongodb queue", function () {
 
     test("should be able to change the page's size", async (t) => {
       // Given
-      const storage = createStorage({
+      const storage = ensureSearchable(createEngine({
         url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true,
         }
-      })
+      }).createStorage!())
 
       const now = new Date()
 
@@ -675,13 +677,13 @@ describe("mongodb queue", function () {
 
     test("should be able to search by workflow status", async (t) => {
       // Given
-      const storage = createStorage({
+      const storage = ensureSearchable(createEngine({
         url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true,
         }
-      })
+      }).createStorage!())
 
       t.after(async () => {
         await storage.disconnect()
@@ -717,13 +719,13 @@ describe("mongodb queue", function () {
 
     test("should be able to search by workflow name", async (t) => {
       // Given
-      const storage = createStorage({
+      const storage = ensureSearchable(createEngine({
         url: mongodb.getConnectionString(),
         dbName: randomUUID(),
         clientOpts: {
           directConnection: true,
         }
-      })
+      }).createStorage!())
 
       t.after(async () => {
         await storage.disconnect()
@@ -789,4 +791,12 @@ async function waitForPredicate(fn: () => boolean | Promise<boolean>, ms = 5_000
   while (!await fn() && new Date().getTime() - now < ms) {
     await setTimeout(20)
   }
+}
+
+function ensureSearchable(storage: WorkflowStateStorage | SearchableWorkflowStateStorage): SearchableWorkflowStateStorage {
+  if (!("search" in storage && storage.search !== undefined)) {
+    throw new Error("Storage must be searchable")
+  }
+
+  return storage as SearchableWorkflowStateStorage
 }
