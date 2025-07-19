@@ -16,11 +16,11 @@ import { uuidv7 } from "uuidv7";
 
 class RabbitMQConsumption implements Consumer {
   #channelWrapper: ChannelWrapper
-  #opts: RabbitMQQueueOpts
+  #opts: RabbitMQEngineOpts
   #consumeOpts: ConsumerOpts
   #hooks = new Hooks<ConsumptionHooks>()
 
-  constructor(channelManager: AmqpConnectionManager, opts: RabbitMQQueueOpts, consumeOpts: ConsumerOpts) {
+  constructor(channelManager: AmqpConnectionManager, opts: RabbitMQEngineOpts, consumeOpts: ConsumerOpts) {
     this.#opts = opts;
     this.#consumeOpts = consumeOpts;
     this.#channelWrapper = channelManager.createChannel({
@@ -83,7 +83,7 @@ class RabbitMQConsumption implements Consumer {
   }
 }
 
-type RabbitMQQueueOpts = {
+type RabbitMQEngineOpts = {
   url: string
   connectionManagerOpts?: AmqpConnectionManagerOptions
   exchange: string
@@ -94,10 +94,10 @@ type RabbitMQQueueOpts = {
 
 class RabbitMQProducer implements Producer<never> {
   #connection: AmqpConnectionManager
-  #opts: RabbitMQQueueOpts
+  #opts: RabbitMQEngineOpts
   #channel: ChannelWrapper | undefined
 
-  constructor(connection: AmqpConnectionManager, opts: RabbitMQQueueOpts) {
+  constructor(connection: AmqpConnectionManager, opts: RabbitMQEngineOpts) {
     this.#connection = connection;
     this.#opts = opts;
   }
@@ -172,10 +172,10 @@ class RabbitMQProducer implements Producer<never> {
 }
 
 class RabbitMQQueue implements Queue<never> {
-  #opts: RabbitMQQueueOpts
+  #opts: RabbitMQEngineOpts
   #channelManager: AmqpConnectionManager
 
-  constructor(opts: RabbitMQQueueOpts) {
+  constructor(opts: RabbitMQEngineOpts) {
     this.#opts = opts;
     this.#channelManager = connect(opts.url, opts.connectionManagerOpts)
   }
@@ -203,7 +203,7 @@ class RabbitMQQueue implements Queue<never> {
   }
 }
 
-async function ensureQueuesExists(channel: Channel, opts: RabbitMQQueueOpts) {
+async function ensureQueuesExists(channel: Channel, opts: RabbitMQEngineOpts) {
   await channel.assertQueue(opts.queue, {
     durable: true,
     arguments: {
@@ -275,7 +275,7 @@ export type CreateRabbitMQQueueOpts = {
   enableDelayedMessageExchange?: boolean
 }
 
-export function createQueue(opts: CreateRabbitMQQueueOpts): Queue<never> {
+function createQueue(opts: CreateRabbitMQQueueOpts): Queue<never> {
   const {
     delayedExchange = "rivr-delayed-exchange",
     exchange = "rivr-exchange",
@@ -315,17 +315,31 @@ function isUnexpectedCloseError(error: unknown): boolean {
 }
 
 class RabbitMQEngine implements Engine<never> {
-  #opts: CreateRabbitMQQueueOpts
+  #opts: RabbitMQEngineOpts
 
-  constructor(opts: CreateRabbitMQQueueOpts) {
+  constructor(opts: RabbitMQEngineOpts) {
     this.#opts = opts;
   }
 
   createQueue(): Queue<never> {
-    return createQueue(this.#opts)
+    return new RabbitMQQueue(this.#opts)
   }
 }
 
 export function createEngine(opts: CreateRabbitMQQueueOpts): Engine<never> {
-  return new RabbitMQEngine(opts)
+  const {
+    delayedExchange = "rivr-delayed-exchange",
+    exchange = "rivr-exchange",
+    queue = "rivr-messages",
+    enableDelayedMessageExchange = false,
+    ...rest
+  } = opts
+
+  return new RabbitMQEngine({
+    ...rest,
+    delayedExchange,
+    enableDelayedMessageExchange,
+    exchange,
+    queue
+  })
 }
