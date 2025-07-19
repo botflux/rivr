@@ -1,21 +1,9 @@
-import {
-  Consumer,
-  ConsumerOpts,
-  ConsumptionHooks,
-  CreateMessage,
-  Engine,
-  Message,
-  Producer,
-  Queue,
-  SearchableWorkflowStateStorage,
-  StopReason,
-  WorkflowStateStorage
-} from "rivr";
-import {ClientSession, Collection, Filter, MongoClient, MongoClientOptions, WithId} from "mongodb";
+import {Consumer, ConsumerOpts, ConsumptionHooks, CreateMessage, Message, Producer, Queue, StopReason} from "rivr";
+import {Collection, MongoClient, WithId} from "mongodb";
 import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
 import {uuidv7} from "uuidv7";
-import {createStorage} from "./storage";
+import {MongoDBEngineOpts, MongoDBWriteOpts} from "./engine";
 
 class InfiniteLoop {
   #stopped = false;
@@ -56,7 +44,7 @@ async function createQueueCollectionIndexes(collection: Collection<MongoMessage>
 class PollingConsumer implements Consumer {
   #consumeOpts: ConsumerOpts
   #getCollection: () => Collection<MongoMessage>
-  #opts: MongoDBQueueOpts
+  #opts: MongoDBEngineOpts
 
   #consumptionId = uuidv7()
   #abort = new AbortController()
@@ -65,7 +53,7 @@ class PollingConsumer implements Consumer {
   #state: "started" | "stopped" = "stopped"
   #indexCreated = false
 
-  constructor(consumeOpts: ConsumerOpts, getCollection: () => Collection<MongoMessage>, opts: MongoDBQueueOpts) {
+  constructor(consumeOpts: ConsumerOpts, getCollection: () => Collection<MongoMessage>, opts: MongoDBEngineOpts) {
     this.#consumeOpts = consumeOpts;
     this.#getCollection = getCollection;
     this.#opts = opts;
@@ -96,7 +84,7 @@ class PollingConsumer implements Consumer {
   async #startConsuming() {
     for (const _ of this.#infiniteLoop) {
       try {
-        const messages = await this.#pullMessages(this.#opts.countPerPoll)
+        const messages = await this.#pullMessages(this.#opts.queue.countPerPoll)
 
         for (const message of messages) {
           const {_id, status, consideredDeadAfter, pulledAt, pulledBy, version, ...rest} = message
@@ -120,8 +108,8 @@ class PollingConsumer implements Consumer {
           }
         }
 
-        if (messages.length < this.#opts.countPerPoll) {
-          await this.#wait(this.#opts.delayBetweenEmptyPolls)
+        if (messages.length < this.#opts.queue.countPerPoll) {
+          await this.#wait(this.#opts.queue.delayBetweenEmptyPolls)
         }
       } catch (error: unknown) {
         this.#hooks.executeHook("onError", [error])
@@ -163,7 +151,7 @@ class PollingConsumer implements Consumer {
         $set: {
           pulledBy: this.#consumptionId,
           pulledAt: new Date(),
-          consideredDeadAfter: new Date(new Date().getTime() + this.#opts.deadMessageTimeout),
+          consideredDeadAfter: new Date(new Date().getTime() + this.#opts.queue.deadMessageTimeout),
           status: "doing"
         }
       })
@@ -203,12 +191,6 @@ class PollingConsumer implements Consumer {
     this.#indexCreated = true
     await createQueueCollectionIndexes(this.#getCollection())
   }
-}
-
-type MongoDBQueueOpts = Required<CreateMongoDBQueueOpts>
-
-export type MongoDBWriteOpts = {
-  session?: ClientSession
 }
 
 type MongoMessage = Message & {
@@ -268,11 +250,11 @@ class MongoDBProducer implements Producer<MongoDBWriteOpts> {
   }
 }
 
-class MongoDBQueue implements Queue<MongoDBWriteOpts> {
-  readonly #opts: MongoDBQueueOpts
+export class MongoDBQueue implements Queue<MongoDBWriteOpts> {
+  readonly #opts: MongoDBEngineOpts
   #mongoClient: MongoClient | undefined
 
-  constructor(opts: MongoDBQueueOpts) {
+  constructor(opts: MongoDBEngineOpts) {
     this.#opts = opts;
   }
 
@@ -303,78 +285,7 @@ class MongoDBQueue implements Queue<MongoDBWriteOpts> {
   }
 
   #getCollection(): Collection<MongoMessage> {
-    return this.#getClient().db(this.#opts.dbName).collection(this.#opts.collectionName);
+    return this.#getClient().db(this.#opts.dbName).collection(this.#opts.queue.collectionName);
   }
 }
 
-export type CreateMongoDBQueueOpts = {
-  url: string
-  clientOpts?: MongoClientOptions
-  dbName: string
-  /**
-   * @default {"rivr-messages"}
-   */
-  collectionName?: string
-
-  /**
-   * @default {5_000}
-   */
-  delayBetweenEmptyPolls?: number
-
-  /**
-   * @default {100}
-   */
-  countPerPoll?: number
-
-  /**
-   * This timeout is relevant when you have competing consumers.
-   * This is the time after which a consumer considers a message
-   * handled by another consumer as timed-out.
-   *
-   * In other word, this is the time after which the message is re-routed
-   * to another consumer if the consumer has failed.
-   *
-   * @default {600_000} 10 minutes
-   */
-  deadMessageTimeout?: number
-}
-
-export function createQueue(opts: CreateMongoDBQueueOpts): Queue<never> {
-  const {
-    collectionName = "rivr-messages",
-    delayBetweenEmptyPolls = 5_000,
-    countPerPoll = 100,
-    clientOpts = {},
-    deadMessageTimeout = 600_000,
-    ...rest
-  } = opts
-
-  return new MongoDBQueue({
-    ...rest,
-    collectionName,
-    delayBetweenEmptyPolls,
-    clientOpts,
-    countPerPoll,
-    deadMessageTimeout
-  })
-}
-
-class MongoDBEngine implements Engine<MongoDBWriteOpts> {
-  #opts: CreateMongoDBQueueOpts
-
-  constructor(opts: CreateMongoDBQueueOpts) {
-    this.#opts = opts;
-  }
-
-  createQueue(): Queue<MongoDBWriteOpts> {
-    return createQueue(this.#opts)
-  }
-
-  createStorage() {
-    return createStorage(this.#opts)
-  }
-}
-
-export function createEngine(opts: CreateMongoDBQueueOpts): Engine<MongoDBWriteOpts> {
-  return new MongoDBEngine(opts)
-}

@@ -8,13 +8,13 @@ import {
   timeBasedFlow,
   WorkflowState
 } from "rivr";
-import {createEngine, createEngine as createMongoEngine} from "./queue"
 import test, {after, before, describe, TestContext} from "node:test";
 import {randomUUID} from "node:crypto";
 import {setTimeout} from "node:timers/promises";
 import {uuidv7} from "uuidv7";
 import {createStorage} from "./storage";
 import assert from "node:assert";
+import {createEngine as createMongoEngine, createEngine} from "./engine";
 
 let mongodb!: StartedMongoDBContainer
 
@@ -72,7 +72,9 @@ describe("mongodb queue", function () {
         clientOpts: {
           directConnection: true
         },
-        delayBetweenEmptyPolls: 100
+        queue: {
+          delayBetweenEmptyPolls: 100
+        }
       }).createQueue()
 
       t.after(async () => {
@@ -119,11 +121,13 @@ describe("mongodb queue", function () {
       // Given
       const queue = createEngine({
         url: mongodb.getConnectionString(),
-        delayBetweenEmptyPolls: 100,
         clientOpts: {
           directConnection: true
         },
-        dbName: randomUUID()
+        dbName: randomUUID(),
+        queue: {
+          delayBetweenEmptyPolls: 100,
+        }
       }).createQueue()
 
       t.after(async () => {
@@ -185,7 +189,9 @@ describe("mongodb queue", function () {
         clientOpts: {
           directConnection: true,
         },
-        delayBetweenEmptyPolls: 100,
+        queue: {
+          delayBetweenEmptyPolls: 100,
+        }
       }).createQueue()
 
       t.after(async () => {
@@ -240,12 +246,14 @@ describe("mongodb queue", function () {
       // Given
       const queue = createEngine({
         url: mongodb.getConnectionString(),
-        delayBetweenEmptyPolls: 100,
         clientOpts: {
           directConnection: true,
         },
         dbName: randomUUID(),
-        deadMessageTimeout: 2_000
+        queue: {
+          delayBetweenEmptyPolls: 100,
+          deadMessageTimeout: 2_000
+        }
       }).createQueue()
 
       t.after(async () => {
@@ -487,7 +495,9 @@ describe("mongodb queue", function () {
           directConnection: true,
         },
         dbName: randomUUID(),
-        delayBetweenEmptyPolls: 100
+        queue: {
+          delayBetweenEmptyPolls: 100
+        }
       }).createQueue()
 
       t.after(async () => {
@@ -760,7 +770,9 @@ describe("mongodb queue", function () {
       url: mongodb.getConnectionString(),
       clientOpts: { directConnection: true },
       dbName: randomUUID(),
-      delayBetweenEmptyPolls: 100,
+      queue: {
+        delayBetweenEmptyPolls: 100,
+      }
     })
 
     basicFlow({ createEngine })
