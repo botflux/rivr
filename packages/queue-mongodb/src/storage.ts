@@ -6,7 +6,7 @@ import {
   NormalizedWorkflowState
 } from "rivr";
 
-class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
+export class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
   readonly #url: string
   readonly #clientOpts: MongoClientOptions
   readonly #dbName: string
@@ -128,25 +128,4 @@ class MongoDBWorkflowStateStorage implements SearchableWorkflowStateStorage {
       }
     ])
   }
-}
-
-export type CreateStorageOpts = {
-  url: string
-  clientOpts?: MongoClientOptions
-  dbName: string
-  /**
-   * @default {"rivr-workflow-states"}
-   */
-  collectionName?: string
-}
-
-export function createStorage(opts: CreateStorageOpts): SearchableWorkflowStateStorage {
-  const {collectionName = "rivr-workflow-states", dbName, url, clientOpts = {}} = opts
-
-  return new MongoDBWorkflowStateStorage(
-    url,
-    clientOpts,
-    dbName,
-    collectionName
-  )
 }

@@ -1,7 +1,7 @@
 import {ClientSession, MongoClientOptions} from "mongodb";
 import {Engine, Queue} from "rivr";
 import {MongoDBQueue} from "./queue";
-import { createStorage } from "./storage";
+import {createStorage, MongoDBWorkflowStateStorage} from "./storage";
 
 export type MongoDBEngineOpts = Required<Omit<CreateEngineOpts, "storage" | "queue">> & {
   storage: Required<CreateStorageOpts>
@@ -23,7 +23,12 @@ class MongoDBEngine implements Engine<MongoDBWriteOpts> {
   }
 
   createStorage() {
-    return createStorage(this.#opts)
+    return new MongoDBWorkflowStateStorage(
+      this.#opts.url,
+      this.#opts.clientOpts,
+      this.#opts.dbName,
+      this.#opts.storage.collectionName
+    )
   }
 }
 
