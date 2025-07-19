@@ -72,6 +72,12 @@ export interface Producer<WriteOpts> {
   disconnect(): Promise<void>
 }
 
+export const kDeadLetterQueue= Symbol("kDeadLetterQueue")
+
+export interface DeadLetterQueue<WriteOpts> extends Queue<WriteOpts> {
+  [kDeadLetterQueue]: true
+}
+
 export interface Queue<WriteOpts> {
   createProducer(): Producer<WriteOpts>
   /**
