@@ -1,7 +1,7 @@
 import {ClientSession, MongoClientOptions} from "mongodb";
 import {Engine, Queue} from "rivr";
 import {MongoDBQueue} from "./queue";
-import {createStorage, MongoDBWorkflowStateStorage} from "./storage";
+import {MongoDBWorkflowStateStorage} from "./storage";
 
 export type MongoDBEngineOpts = Required<Omit<CreateEngineOpts, "storage" | "queue">> & {
   storage: Required<CreateStorageOpts>
