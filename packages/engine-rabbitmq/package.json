@@ -1,5 +1,5 @@
 {
-  "name": "@rivr/queue-rabbitmq",
+  "name": "@rivr/engine-rabbitmq",
   "version": "1.0.0",
   "description": "A RabbitMQ engine for rivr workflows",
   "main": "dist/rabbitmq.js",

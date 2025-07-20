@@ -1,5 +1,5 @@
 {
-  "name": "@rivr/queue-kurrentdb",
+  "name": "@rivr/engine-kurrentdb",
   "version": "1.0.0",
   "description": "KurrentDB module for rivr",
   "main": "dist/index.js",
@@ -28,10 +28,10 @@
   },
   "homepage": "https://github.com/botflux/rivr#readme",
   "devDependencies": {
-    "@testcontainers/kurrentdb": "^11.1.0",
-    "@testcontainers/toxiproxy": "^11.1.0",
+    "@testcontainers/kurrentdb": "^11.3.0",
+    "@testcontainers/toxiproxy": "^11.3.0",
     "@types/node": "^24.0.4",
-    "testcontainers": "^11.1.0",
+    "testcontainers": "^11.3.0",
     "ts-node": "^10.9.2"
   }
 }
