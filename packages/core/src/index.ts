@@ -14,3 +14,4 @@ export {DefaultWorker} from "./worker/default-worker";
 export {createWorker} from "./worker/default-worker";
 export {CreateWorkerOpts} from "./worker/default-worker";
 export {Engine} from "./engine";
+export * from "./dead-letter-queue"

@@ -1,5 +1,6 @@
-import {DeadLetterQueue, Queue} from "./queue";
+import {Queue} from "./queue";
 import { WorkflowStateStorage, SearchableWorkflowStateStorage } from "./workflow/state/storage"
+import {DeadLetterQueue} from "./dead-letter-queue";
 
 export interface Engine<WriteOpts> {
   /**
