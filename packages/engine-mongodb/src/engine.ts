@@ -1,11 +1,13 @@
 import {ClientSession, MongoClientOptions} from "mongodb";
-import {Engine, Queue} from "rivr";
+import {DeadLetterQueue, Engine, Queue} from "rivr";
 import {MongoDBQueue} from "./queue";
 import {MongoDBWorkflowStateStorage} from "./storage";
+import {MongoDBDeadLetterQueue} from "./dead-letter-queue";
 
-export type MongoDBEngineOpts = Required<Omit<CreateEngineOpts, "storage" | "queue">> & {
+export type MongoDBEngineOpts = Required<Omit<CreateEngineOpts, "storage" | "queue" | "deadLetterQueue">> & {
   storage: Required<CreateStorageOpts>
   queue: Required<CreateQueueOpts>
+  deadLetterQueue: Required<CreateDeadLetterQueueOpts>
 }
 export type MongoDBWriteOpts = {
   session?: ClientSession
@@ -34,6 +36,22 @@ class MongoDBEngine implements Engine<MongoDBWriteOpts> {
       countPerPoll,
       deadMessageTimeout,
       delayBetweenEmptyPolls
+    })
+  }
+
+  createDeadLetterQueue(): DeadLetterQueue<MongoDBWriteOpts> {
+    const {
+      url,
+      clientOpts,
+      dbName,
+      deadLetterQueue: { collectionName }
+    } = this.#opts
+
+    return new MongoDBDeadLetterQueue({
+      url,
+      clientOpts,
+      dbName,
+      collectionName
     })
   }
 
@@ -82,6 +100,14 @@ export type CreateStorageOpts = {
    */
   collectionName?: string
 }
+
+export type CreateDeadLetterQueueOpts = {
+  /**
+   * @default {"rivr-dead-letters"}
+   */
+  collectionName?: string
+}
+
 export type CreateEngineOpts = {
   url: string
   clientOpts?: MongoClientOptions
@@ -89,6 +115,7 @@ export type CreateEngineOpts = {
 
   queue?: CreateQueueOpts
   storage?: CreateStorageOpts
+  deadLetterQueue?: CreateDeadLetterQueueOpts
 }
 
 export function createEngine(opts: CreateEngineOpts): Engine<MongoDBWriteOpts> {
@@ -103,6 +130,9 @@ export function createEngine(opts: CreateEngineOpts): Engine<MongoDBWriteOpts> {
     storage: {
       collectionName: storageCollectionName = "rivr-workflow-states",
     } = {},
+    deadLetterQueue: {
+      collectionName: deadLetterCollectionName = "rivr-dead-letters",
+    } = {},
     ...rest
   } = opts
 
@@ -110,6 +140,7 @@ export function createEngine(opts: CreateEngineOpts): Engine<MongoDBWriteOpts> {
     ...rest,
     clientOpts,
     queue: {collectionName: queueCollectionName, delayBetweenEmptyPolls, countPerPoll, deadMessageTimeout},
-    storage: {collectionName: storageCollectionName}
+    storage: {collectionName: storageCollectionName},
+    deadLetterQueue: { collectionName: deadLetterCollectionName }
   })
 }

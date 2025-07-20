@@ -3,7 +3,7 @@ import {Collection, MongoClient, MongoClientOptions, WithId} from "mongodb";
 import {setTimeout} from "node:timers/promises"
 import {Hooks} from "rivr/dist/hooks/hooks";
 import {uuidv7} from "uuidv7";
-import {MongoDBEngineOpts, MongoDBWriteOpts} from "./engine";
+import {MongoDBWriteOpts} from "./engine";
 
 class InfiniteLoop {
   #stopped = false;

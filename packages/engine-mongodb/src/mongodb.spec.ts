@@ -780,6 +780,41 @@ describe("mongodb queue", function () {
     advancedFlow({ createEngine })
     timeBasedFlow({ createEngine })
   })
+
+  describe('dead letter queue', function () {
+    test("should be able to produce messages", async (t) => {
+      // Given
+      const engine = createEngine({
+        url: mongodb.getConnectionString(),
+        dbName: randomUUID(),
+        clientOpts: {
+          directConnection: true,
+        },
+      })
+
+      const dlq = engine.createDeadLetterQueue!()
+
+      t.after(async () => {
+        await dlq.disconnect()
+      })
+
+      // When
+      const letters = await dlq.produce([
+        {
+          type: "msg",
+          payload: { msg: "hello" },
+          createdAt: new Date(),
+          reason: "workflow_not_found"
+        }
+      ])
+
+      // Then
+      assert.deepStrictEqual(await dlq.list(10), {
+        count: 1,
+        results: letters
+      })
+    })
+  })
 })
 
 function sortMessages (a: Message, b: Message) {
