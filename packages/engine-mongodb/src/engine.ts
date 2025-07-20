@@ -19,7 +19,22 @@ class MongoDBEngine implements Engine<MongoDBWriteOpts> {
   }
 
   createQueue(): Queue<MongoDBWriteOpts> {
-    return new MongoDBQueue(this.#opts)
+    const {
+      queue: { collectionName, deadMessageTimeout, delayBetweenEmptyPolls, countPerPoll },
+      dbName,
+      clientOpts,
+      url
+    } = this.#opts
+
+    return new MongoDBQueue({
+      url,
+      clientOpts,
+      dbName,
+      collectionName,
+      countPerPoll,
+      deadMessageTimeout,
+      delayBetweenEmptyPolls
+    })
   }
 
   createStorage() {
