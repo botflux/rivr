@@ -1,11 +1,15 @@
 import {CreateMessage, Message} from "./queue";
 
 export const kDeadLetterQueue= Symbol("kDeadLetterQueue")
-export type CreateDeadLetter = CreateMessage & {
+export type CreateDeadLetter = {
+  id?: string
   reason: string
+  message: CreateMessage
 }
-export type DeadLetter = Message & {
+export type DeadLetter = {
+  id: string
   reason: string
+  message: Message
 }
 export type ListDeadLettersResult = {
   count: number

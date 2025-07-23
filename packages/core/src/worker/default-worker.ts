@@ -5,6 +5,7 @@ import {WorkflowMessageHandler} from "./handlers/workflow-message-handler";
 import {OutboxMessageHandler} from "./handlers/outbox-message-handler";
 import {Workflow} from "../workflow/types";
 import {WorkflowStateStorage} from "../workflow/state/storage";
+import {DeadLetterQueue} from "../dead-letter-queue";
 
 export type CreateWorkerOpts = {
   primary: Queue<unknown>
@@ -32,6 +33,8 @@ export type CreateWorkerOpts = {
    * state changes are stored.
    */
   workflowStateStorage?: WorkflowStateStorage
+
+  deadLetterQueue?: DeadLetterQueue<never>
 }
 
 export function createWorker(opts: CreateWorkerOpts): Worker {
@@ -76,6 +79,13 @@ export class DefaultWorker implements Worker {
               await this.#produce(messages)
             }
           }
+
+          await this.#opts.deadLetterQueue?.produce([
+            {
+              reason: "unsupported_message_type",
+              message: msg,
+            }
+          ])
         }
       })),
       ...customConsumptions
