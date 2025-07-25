@@ -2,11 +2,16 @@ import { describe, test } from "node:test"
 import {createWorker, DefaultWorker} from "./default-worker";
 import {Engine} from "../engine";
 import {
+  AdvancedDeadLetterQueue,
   CreateDeadLetter,
   DeadLetter,
   DeadLetterQueue,
+  IdAndVersion,
   kDeadLetterQueue,
-  ListDeadLettersResult
+  ListDeadLettersOpts,
+  ListDeadLettersResult,
+  ReintegrateManyResult,
+  ReintegrateResult
 } from "../dead-letter-queue";
 import {Consumer, ConsumerOpts, ConsumptionHooks, CreateMessage, Message, Producer, Queue, StopReason} from "../queue";
 import {WorkflowStateStorage, SearchableWorkflowStateStorage} from "../workflow/state/storage";
@@ -101,7 +106,7 @@ class MemoryQueue implements Queue<never> {
 
 }
 
-class MemoryDeadLetterQueue implements DeadLetterQueue<never> {
+class MemoryDeadLetterQueue implements AdvancedDeadLetterQueue<never> {
   [kDeadLetterQueue]: true = true
 
   dlqs: DeadLetter[] = []
@@ -113,10 +118,24 @@ class MemoryDeadLetterQueue implements DeadLetterQueue<never> {
     return Promise.resolve(dlqToProduce)
   }
 
-  list(count: number): Promise<ListDeadLettersResult> {
+  list(opts: ListDeadLettersOpts = {}): Promise<ListDeadLettersResult> {
     return Promise.resolve({
-      results: this.dlqs.slice(0, count),
+      results: this.dlqs,
       count: this.dlqs.length,
+    })
+  }
+
+  reintegrateOne(id: string, version: string, producer: Producer<never>): Promise<void> {
+      throw new Error("Not implemented at line 114 in default-worker.spec.ts")
+  }
+
+  reintegrateMany(ids: IdAndVersion[], producer: Producer<never>): Promise<ReintegrateManyResult> {
+      throw new Error("Not implemented at line 117 in default-worker.spec.ts")
+  }
+
+  reintegrateFirsts(count: number): Promise<ReintegrateResult> {
+    return Promise.resolve({
+      reintegratedCount: 0
     })
   }
 
@@ -129,7 +148,7 @@ class MemoryEngine implements Engine<never> {
   createQueue(): Queue<never> {
     return new MemoryQueue()
   }
-  createDeadLetterQueue?(): DeadLetterQueue<never> {
+  createDeadLetterQueue?(): DeadLetterQueue<never> | AdvancedDeadLetterQueue<never> {
     return new MemoryDeadLetterQueue()
   }
   createStorage?: (() => WorkflowStateStorage | SearchableWorkflowStateStorage) | undefined;
@@ -140,7 +159,7 @@ describe('default worker', function () {
     // Given
     const engine = new MemoryEngine()
 
-    const dlq = engine.createDeadLetterQueue!()
+    const dlq = assertAdvancedDeadLetterQueue(engine.createDeadLetterQueue!())
 
     t.after(async () => {
       await dlq.disconnect()
@@ -177,11 +196,11 @@ describe('default worker', function () {
 
     // Then
     await waitForPredicate(async () => {
-      const result = await dlq.list(10)
+      const result = await dlq.list()
       return result.results.length > 0
     })
 
-    const list = await dlq.list(10)
+    const list = await dlq.list()
     const results = list.results.map(dl => omit(dl, ["id"]))
 
     assert.deepStrictEqual({ count: list.count, results }, {
@@ -201,4 +220,16 @@ async function waitForPredicate(fn: () => Promise<boolean> | boolean, ms = 5_000
   while (!await fn() && new Date().getTime() - now < ms) {
     await setTimeout(20)
   }
+}
+
+function isAdvancedDql (dlq: DeadLetterQueue<never> | AdvancedDeadLetterQueue<never>): dlq is AdvancedDeadLetterQueue<never> {
+  return "list" in dlq
+}
+
+function assertAdvancedDeadLetterQueue(dlq: DeadLetterQueue<never> | AdvancedDeadLetterQueue<never>): AdvancedDeadLetterQueue<never> {
+  if (!isAdvancedDql(dlq)) {
+    throw new Error("Not an advanced dead letter queue")
+  }
+
+  return dlq
 }

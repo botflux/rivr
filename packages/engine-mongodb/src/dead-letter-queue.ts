@@ -2,7 +2,7 @@ import {
   CreateDeadLetter,
   CreateMessage, DeadLetter,
   DeadLetterQueue,
-  kDeadLetterQueue, ListDeadLettersResult,
+  kDeadLetterQueue, ReintegrateResult,
   Message,
   Producer
 } from "rivr";
@@ -52,7 +52,7 @@ export class MongoDBDeadLetterQueue implements DeadLetterQueue<never> {
     await this.#mongoClient?.close(true);
   }
 
-  async list(limit: number): Promise<ListDeadLettersResult> {
+  async list(limit: number): Promise<ReintegrateResult> {
     const [ documents, count ] = await Promise.all([
       this.#getCollection().find().limit(limit).toArray(),
       this.#getCollection().countDocuments()

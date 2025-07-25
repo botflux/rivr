@@ -1,6 +1,6 @@
 import {Queue} from "./queue";
 import { WorkflowStateStorage, SearchableWorkflowStateStorage } from "./workflow/state/storage"
-import {DeadLetterQueue} from "./dead-letter-queue";
+import {AdvancedDeadLetterQueue, DeadLetterQueue} from "./dead-letter-queue";
 
 export interface Engine<WriteOpts> {
   /**
@@ -11,7 +11,7 @@ export interface Engine<WriteOpts> {
   /**
    * Create the queue where the messages that couldn't be delivery are stored.
    */
-  createDeadLetterQueue?(): DeadLetterQueue<WriteOpts>
+  createDeadLetterQueue?(): DeadLetterQueue<WriteOpts> | AdvancedDeadLetterQueue<WriteOpts>
 
   /**
    * Create a storage
