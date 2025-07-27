@@ -1,7 +1,8 @@
 import {MongoDBContainer, StartedMongoDBContainer} from "@testcontainers/mongodb";
 import {
+  AdvancedDeadLetterQueue,
   advancedFlow,
-  basicFlow,
+  basicFlow, DeadLetterQueue,
   installUnhandledRejectionHook,
   Message,
   rivr, SearchableWorkflowStateStorage,
@@ -792,7 +793,7 @@ describe("mongodb queue", function () {
         },
       })
 
-      const dlq = engine.createDeadLetterQueue!()
+      const dlq = assertAdvancedDeadLetterQueue(engine.createDeadLetterQueue!())
 
       t.after(async () => {
         await dlq.disconnect()
@@ -801,15 +802,17 @@ describe("mongodb queue", function () {
       // When
       const letters = await dlq.produce([
         {
-          type: "msg",
-          payload: { msg: "hello" },
-          createdAt: new Date(),
-          reason: "workflow_not_found"
+          reason: "workflow_not_found",
+          message: {
+            type: "msg",
+            payload: { msg: "hello" },
+            createdAt: new Date(),
+          }
         }
       ])
 
       // Then
-      assert.deepStrictEqual(await dlq.list(10), {
+      assert.deepStrictEqual(await dlq.list({ pageSize: 10 }), {
         count: 1,
         results: letters
       })
@@ -834,4 +837,16 @@ function ensureSearchable(storage: WorkflowStateStorage | SearchableWorkflowStat
   }
 
   return storage as SearchableWorkflowStateStorage
+}
+
+function isAdvancedDql (dlq: DeadLetterQueue<never> | AdvancedDeadLetterQueue<never>): dlq is AdvancedDeadLetterQueue<never> {
+  return "list" in dlq
+}
+
+function assertAdvancedDeadLetterQueue(dlq: DeadLetterQueue<never> | AdvancedDeadLetterQueue<never>): AdvancedDeadLetterQueue<never> {
+  if (!isAdvancedDql(dlq)) {
+    throw new Error("Not an advanced dead letter queue")
+  }
+
+  return dlq
 }
