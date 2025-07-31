@@ -10,6 +10,7 @@ export type DeadLetter = {
   id: string
   reason: string
   message: Message
+  createdAt: Date
 }
 export type ReintegrateResult = {
   reintegratedCount: number

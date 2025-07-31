@@ -55,7 +55,7 @@ export class MongoDBDeadLetterQueue implements AdvancedDeadLetterQueue<never> {
     } satisfies Filter<MongoDeadLetter>
 
     const [ documents, count ] = await Promise.all([
-      this.#getCollection().find(filters).skip(offset).limit(pageSize).toArray(),
+      this.#getCollection().find(filters).sort({ createdAt: -1 }).skip(offset).limit(pageSize).toArray(),
       this.#getCollection().countDocuments(filters)
     ])
 
@@ -79,6 +79,7 @@ export class MongoDBDeadLetterQueue implements AdvancedDeadLetterQueue<never> {
     const messagesToCreate = messages.map(message => ({
       ...message,
       id: message.id ?? uuidv7(),
+      createdAt: new Date()
     } as DeadLetter))
 
     const rawMessages = messagesToCreate.map(message => ({

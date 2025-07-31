@@ -110,9 +110,18 @@ class MemoryDeadLetterQueue implements AdvancedDeadLetterQueue<never> {
   [kDeadLetterQueue]: true = true
 
   dlqs: DeadLetter[] = []
+  #now: () => Date
+
+  constructor(now: () => Date) {
+    this.#now = now;
+  }
 
   produce(messages: CreateDeadLetter[], opts?: undefined): Promise<DeadLetter[]> {
-    const dlqToProduce = messages.map(letter => ({ ...letter, id: letter.id ?? uuidv7() } as DeadLetter))
+    const dlqToProduce = messages.map(letter => ({
+      ...letter,
+      id: letter.id ?? uuidv7(),
+      createdAt: this.#now(),
+    } as DeadLetter))
 
     this.dlqs.push(...dlqToProduce)
     return Promise.resolve(dlqToProduce)
@@ -145,11 +154,17 @@ class MemoryDeadLetterQueue implements AdvancedDeadLetterQueue<never> {
 }
 
 class MemoryEngine implements Engine<never> {
+  #now: () => Date
+
+  constructor(now: () => Date = () => new Date()) {
+    this.#now = now;
+  }
+
   createQueue(): Queue<never> {
     return new MemoryQueue()
   }
   createDeadLetterQueue?(): DeadLetterQueue<never> | AdvancedDeadLetterQueue<never> {
-    return new MemoryDeadLetterQueue()
+    return new MemoryDeadLetterQueue(this.#now)
   }
   createStorage?: (() => WorkflowStateStorage | SearchableWorkflowStateStorage) | undefined;
 }
@@ -157,7 +172,8 @@ class MemoryEngine implements Engine<never> {
 describe('default worker', function () {
   test("should be able to send the unsupported message to the dead letter queue", async (t) => {
     // Given
-    const engine = new MemoryEngine()
+    const now = new Date()
+    const engine = new MemoryEngine(() => now)
 
     const dlq = assertAdvancedDeadLetterQueue(engine.createDeadLetterQueue!())
 
@@ -207,6 +223,7 @@ describe('default worker', function () {
       count: 1,
       results: [
         {
+          createdAt: now,
           message,
           reason: "unsupported_message_type",
         }
