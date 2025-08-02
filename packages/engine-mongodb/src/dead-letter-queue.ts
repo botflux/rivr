@@ -1,33 +1,35 @@
 import {
+  AdvancedDeadLetterQueue,
   CreateDeadLetter,
-  CreateMessage, DeadLetter,
-  DeadLetterQueue,
-  kDeadLetterQueue, ReintegrateResult,
-  Message,
-  Producer, AdvancedDeadLetterQueue,
-  IdAndVersion,
+  DeadLetter,
+  kDeadLetterQueue,
   ListDeadLettersOpts,
   ListDeadLettersResult,
+  Producer, Queue,
   ReintegrateManyResult
 } from "rivr";
 import {Collection, Filter, MongoClient, MongoClientOptions} from "mongodb";
 import {uuidv7} from "uuidv7";
+import {MongoDBWriteOpts} from "./engine";
 
 export type MongoDBDeadLetterQueueOpts = {
   url: string
   clientOpts: MongoClientOptions
   dbName: string
   collectionName: string
+  normalQueue: Queue<MongoDBWriteOpts>
 }
 
 type MongoDeadLetter = DeadLetter & {
-  status: "todo" | "doing" | "done",
-  version: number
+  acquiredBy: string
+  consideredDeadAfter: Date
+  status: "idle" | "acquired"
 }
 
 export class MongoDBDeadLetterQueue implements AdvancedDeadLetterQueue<never> {
   [kDeadLetterQueue]: true = true;
   #mongoClient: MongoClient | undefined;
+  #producer: Producer<MongoDBWriteOpts> | undefined;
   #opts: MongoDBDeadLetterQueueOpts
 
   constructor(opts: MongoDBDeadLetterQueueOpts) {
@@ -61,40 +63,88 @@ export class MongoDBDeadLetterQueue implements AdvancedDeadLetterQueue<never> {
 
     return {
       count,
-      results: documents.map(({ _id, status, version, ...rest }) => rest)
+      results: documents.map(({ _id, status, ...rest }) => rest)
     }
   }
 
-  reintegrateOne(id: string, version: string, producer: Producer<never>): Promise<void> {
-      throw new Error("Method not implemented.");
-  }
-  reintegrateMany(ids: IdAndVersion[], producer: Producer<never>): Promise<ReintegrateManyResult> {
-      throw new Error("Method not implemented.");
-  }
-  reintegrateFirsts(count: number | "all", producer: Producer<never>): Promise<ReintegrateResult> {
-      throw new Error("Method not implemented.");
+  async reintegrateMany(ids: string[]): Promise<ReintegrateManyResult> {
+    const client = this.#getClient()
+    const collection = this.#getCollection()
+
+    const resultAndIds = await Promise.all(ids.map(async id => {
+      const mDeadLetter = await collection.findOneAndUpdate({
+        id,
+        $or: [
+          {
+            status: "idle"
+          },
+          {
+            status: "acquired",
+            consideredDeadAfter: { $lte: new Date() }
+          }
+        ]
+      }, {
+        $set: {
+          status: "acquired",
+          consideredDeadAfter: new Date(new Date().getTime() + 10_000),
+        }
+      })
+
+      if (mDeadLetter === null) {
+        return [ "missingIds", id ] as const
+      }
+
+      await client.withSession(async session => {
+        await this.#getProducer().produce([
+          mDeadLetter.message
+        ], { session, client })
+
+        await collection.deleteOne({ id }, { session })
+      })
+
+      return [ "reintegratedIds", id ] as const
+    }))
+
+    return resultAndIds.reduce(
+      (acc, [key, id]) => ({
+        ...acc,
+        [key]: [...acc[key], id]
+      }), {
+        missingIds: [],
+        reintegratedIds: []
+      })
   }
 
-  async produce(messages: CreateDeadLetter[], opts?: undefined): Promise<DeadLetter[]> {
+  async produce(messages: CreateDeadLetter[]): Promise<DeadLetter[]> {
     const messagesToCreate = messages.map(message => ({
       ...message,
       id: message.id ?? uuidv7(),
-      createdAt: new Date()
+      createdAt: new Date(),
     } as DeadLetter))
 
-    const rawMessages = messagesToCreate.map(message => ({
-      ...message,
-      status: "todo",
-      version: 1,
+    // Copy dead letters otherwise MongoDB adds a _id field.
+    const mongoDbMessages = messagesToCreate.map(m => ({
+      ...m,
+      status: "idle",
     } as MongoDeadLetter))
 
-    await this.#getCollection().insertMany(rawMessages)
+    await this.#getCollection().insertMany(mongoDbMessages)
 
     return messagesToCreate
   }
 
   async disconnect(): Promise<void> {
     await this.#mongoClient?.close(true);
+    await this.#producer?.disconnect();
+    await this.#opts.normalQueue.disconnect();
+  }
+
+  #getProducer(): Producer<MongoDBWriteOpts> {
+    if (this.#producer === undefined) {
+      this.#producer = this.#opts.normalQueue.createProducer()
+    }
+
+    return this.#producer
   }
 
   #getClient(): MongoClient {

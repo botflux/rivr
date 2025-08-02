@@ -1,4 +1,4 @@
-import {ClientSession, MongoClientOptions} from "mongodb";
+import {ClientSession, MongoClient, MongoClientOptions} from "mongodb";
 import {DeadLetterQueue, Engine, Queue} from "rivr";
 import {MongoDBQueue} from "./queue";
 import {MongoDBWorkflowStateStorage} from "./storage";
@@ -11,6 +11,11 @@ export type MongoDBEngineOpts = Required<Omit<CreateEngineOpts, "storage" | "que
 }
 export type MongoDBWriteOpts = {
   session?: ClientSession
+  /**
+   * You can specify a client to use in case the session (see `session` option)
+   * was created with another client.
+   */
+  client?: MongoClient
 }
 
 class MongoDBEngine implements Engine<MongoDBWriteOpts> {
@@ -51,7 +56,8 @@ class MongoDBEngine implements Engine<MongoDBWriteOpts> {
       url,
       clientOpts,
       dbName,
-      collectionName
+      collectionName,
+      normalQueue: this.createQueue()
     })
   }
 

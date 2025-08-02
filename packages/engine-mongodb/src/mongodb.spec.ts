@@ -817,6 +817,69 @@ describe("mongodb queue", function () {
         results: letters
       })
     })
+
+    test("should be able to reintegrate messages", async (t) => {
+      // Given
+      const engine = createEngine({
+        url: mongodb.getConnectionString(),
+        dbName: randomUUID(),
+        queue: {
+          delayBetweenEmptyPolls: 100,
+        },
+        clientOpts: {
+          directConnection: true,
+        }
+      })
+
+      const dlq = assertAdvancedDeadLetterQueue(engine.createDeadLetterQueue!())
+
+      t.after(async () => {
+        await dlq.disconnect()
+      })
+
+      const letters = await dlq.produce([
+        {
+          reason: "workflow_not_found",
+          message: {
+            id: uuidv7(),
+            type: "msg",
+            payload: { msg: "hello" },
+            createdAt: new Date(),
+          }
+        }
+      ])
+
+      const queue = engine.createQueue()
+
+      t.after(async () => {
+        await queue.disconnect()
+      })
+
+      let message: Message | undefined
+
+      const consumer= queue.createConsumer({
+        async onMessage(msg) {
+          message = msg
+        }
+      })
+
+      t.after(async () => {
+        await consumer.stop()
+      })
+
+      await consumer.start()
+
+      // When
+      const result = await dlq.reintegrateMany(letters.map(l => l.id))
+
+      // Then
+      await waitForPredicate(() => message !== undefined)
+      assert.deepStrictEqual(message, letters[0].message)
+      assert.deepStrictEqual(result, {
+        missingIds: [],
+        reintegratedIds: [ letters[0].id ]
+      })
+    })
   })
 })
 

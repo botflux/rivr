@@ -11,6 +11,7 @@ export type DeadLetter = {
   reason: string
   message: Message
   createdAt: Date
+  version: string
 }
 export type ReintegrateResult = {
   reintegratedCount: number
@@ -27,14 +28,6 @@ export interface DeadLetterQueue<WriteOpts> {
    */
   produce(messages: CreateDeadLetter[], opts?: WriteOpts): Promise<DeadLetter[]>
 
-  /**
-   * Reintegrate dead letters into the normal flow.
-   *
-   * @param count the number of dead letters you want to reintegrate
-   * @param producer the producer in which the dead letters are produced
-   */
-  reintegrateFirsts(count: number | 'all', producer: Producer<never>): Promise<ReintegrateResult>
-
   disconnect(): Promise<void>
 }
 
@@ -48,12 +41,6 @@ export type ReintegrateManyResult = {
    * The list of ids that match no dead letter.
    */
   missingIds: string[]
-
-  /**
-   * The list of dead letters that were not reintegrated because
-   * their ID were updated.
-   */
-  wrongVersionIds: string[]
 }
 
 export type ListDeadLettersResult = {
@@ -77,22 +64,11 @@ export interface AdvancedDeadLetterQueue<WriteOpts> extends DeadLetterQueue<Writ
   list(opts?: ListDeadLettersOpts): Promise<ListDeadLettersResult>
 
   /**
-   * Reintegrate the message matching the given ID.
-   * Throw an error if the given ID matches no dead letter.
-   *
-   * @param id Dead letter's ID
-   * @param version Dead letter's version
-   * @param producer
-   */
-  reintegrateOne(id: string, version: string, producer: Producer<never>): Promise<void>
-
-  /**
    * Reintegrate a batch of dead letters from their IDs.
    *
    * @param ids
-   * @param producer
    */
-  reintegrateMany(ids: IdAndVersion[], producer: Producer<never>): Promise<ReintegrateManyResult>
+  reintegrateMany(ids: string[]): Promise<ReintegrateManyResult>
 }
 
 export type IdAndVersion = {

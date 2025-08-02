@@ -202,11 +202,11 @@ type MongoMessage = Message & {
 }
 
 class MongoDBProducer implements Producer<MongoDBWriteOpts> {
-  #collection: Collection<MongoMessage>
+  #getCollection: (client?: MongoClient) => Collection<MongoMessage>
   #indexCreated = false
 
-  constructor(collection: Collection<MongoMessage>) {
-    this.#collection = collection;
+  constructor(getCollection: (client?: MongoClient) => Collection<MongoMessage>) {
+    this.#getCollection = getCollection;
   }
 
   async produce(messages: CreateMessage[], opts: MongoDBWriteOpts = {}): Promise<Message[]> {
@@ -229,7 +229,7 @@ class MongoDBProducer implements Producer<MongoDBWriteOpts> {
       ...pickAfter !== undefined && {pickAfter}
     } as MongoMessage))
 
-    await this.#collection.insertMany(rawMessages, {session})
+    await this.#getCollection(opts.client).insertMany(rawMessages, {session})
     return messagesToCreate
   }
 
@@ -246,7 +246,7 @@ class MongoDBProducer implements Producer<MongoDBWriteOpts> {
     }
 
     this.#indexCreated = true
-    await createQueueCollectionIndexes(this.#collection)
+    await createQueueCollectionIndexes(this.#getCollection())
   }
 }
 
@@ -272,7 +272,7 @@ export class MongoDBQueue implements Queue<MongoDBWriteOpts> {
 
   createProducer(): Producer<MongoDBWriteOpts> {
     return new MongoDBProducer(
-      this.#getCollection()
+      this.#getCollection.bind(this)
     )
   }
 
@@ -296,8 +296,10 @@ export class MongoDBQueue implements Queue<MongoDBWriteOpts> {
     return this.#mongoClient
   }
 
-  #getCollection(): Collection<MongoMessage> {
-    return this.#getClient().db(this.#opts.dbName).collection(this.#opts.collectionName);
+  #getCollection(client?: MongoClient): Collection<MongoMessage> {
+    const c = client ?? this.#getClient()
+
+    return c.db(this.#opts.dbName).collection(this.#opts.collectionName);
   }
 }
 

@@ -138,7 +138,7 @@ class MemoryDeadLetterQueue implements AdvancedDeadLetterQueue<never> {
       throw new Error("Not implemented at line 114 in default-worker.spec.ts")
   }
 
-  reintegrateMany(ids: IdAndVersion[], producer: Producer<never>): Promise<ReintegrateManyResult> {
+  reintegrateMany(ids: string[]): Promise<ReintegrateManyResult> {
       throw new Error("Not implemented at line 117 in default-worker.spec.ts")
   }
 
