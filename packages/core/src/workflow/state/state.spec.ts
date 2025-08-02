@@ -1,11 +1,12 @@
-import {describe, test, TestContext} from "node:test";
+import {describe, test} from "node:test";
+import assert from "node:assert/strict";
 import {rivr} from "../workflow";
 import {WorkflowState} from "./state";
 import {omit} from "../../utils/omit";
 import {uuidv7} from "uuidv7";
 
 describe('state', function () {
-  test("should be able to create a workflow state", async (t: TestContext) => {
+  test("should be able to create a workflow state", async () => {
     // Given
     const id = uuidv7()
     const now = new Date()
@@ -22,7 +23,7 @@ describe('state', function () {
     const state = WorkflowState.initialize(workflow, "add-1", 1, id, now)
 
     // Then
-    t.assert.deepStrictEqual(state.toNormalized(), {
+    assert.deepStrictEqual(state.toNormalized(), {
       id,
       name: "calc",
       status: "in_progress",
@@ -42,7 +43,7 @@ describe('state', function () {
     })
   })
 
-  test("should be able to mark a step as 'in_progress'", async (t: TestContext) => {
+  test("should be able to mark a step as 'in_progress'", async () => {
     // Given
     const id = uuidv7()
     const now = new Date()
@@ -65,7 +66,7 @@ describe('state', function () {
       .startProcessing(now)
 
     // Then
-    t.assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
+    assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
       id,
       name: "calc",
       status: "in_progress",
@@ -88,7 +89,7 @@ describe('state', function () {
     })
   })
 
-  test("should be able to update based on a successful result", async (t: TestContext) => {
+  test("should be able to update based on a successful result", async () => {
     // Given
     const id = uuidv7()
     const now = new Date()
@@ -112,7 +113,7 @@ describe('state', function () {
       .updateFromStepResult(step, { type: "success", state: 2 }, now)
 
     // Then
-    t.assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
+    assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
       id,
       name: "calc",
       status: "in_progress",
@@ -145,7 +146,7 @@ describe('state', function () {
     })
   })
 
-  test("should be able to end the workflow state", async (t: TestContext) => {
+  test("should be able to end the workflow state", async () => {
     const id = uuidv7()
     const now = new Date()
 
@@ -164,7 +165,7 @@ describe('state', function () {
       .updateFromStepResult(step, { type: "success", state: 2 }, now)
 
     // Then
-    t.assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
+    assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
       id,
       name: "calc",
       status: "successful",
@@ -187,7 +188,7 @@ describe('state', function () {
     })
   })
 
-  test("should be able to stop a workflow", async (t: TestContext) => {
+  test("should be able to stop a workflow", async () => {
     // Given
     const id = uuidv7()
     const now = new Date()
@@ -211,7 +212,7 @@ describe('state', function () {
       .updateFromStepResult(step, { type: "stopped" }, now)
 
     // Then
-    t.assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
+    assert.deepStrictEqual(omit(state.toNormalized(), [ "lastModified" ]), {
       id,
       name: "calc",
       status: "stopped",
@@ -237,7 +238,7 @@ describe('state', function () {
     })
   })
 
-  test("should be able to retry a failed workflow", async (t: TestContext) => {
+  test("should be able to retry a failed workflow", async () => {
     // Given
     const id = uuidv7()
     const now = new Date()
@@ -260,7 +261,7 @@ describe('state', function () {
       .updateFromStepResult(step, { type: "failure", error }, now)
 
     // Then
-    t.assert.deepStrictEqual(state.toNormalized(), {
+    assert.deepStrictEqual(state.toNormalized(), {
       id,
       name: "calc",
       status: "in_progress",
@@ -293,7 +294,7 @@ describe('state', function () {
     })
   })
 
-  test("should be able to stop a workflow if the step's attempts are exhausted", async (t: TestContext) => {
+  test("should be able to stop a workflow if the step's attempts are exhausted", async () => {
     // Given
     const id = uuidv7()
     const now = new Date()
@@ -316,7 +317,7 @@ describe('state', function () {
       .updateFromStepResult(step, { type: "failure", error }, now)
 
     // Then
-    t.assert.deepStrictEqual(state.toNormalized(), {
+    assert.deepStrictEqual(state.toNormalized(), {
       id,
       name: "calc",
       status: "failed",

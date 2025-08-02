@@ -40,13 +40,13 @@ describe("mongodb queue", function () {
         }
       }).createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
       const producer = queue.createProducer()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await producer.disconnect()
       })
 
@@ -61,7 +61,7 @@ describe("mongodb queue", function () {
       ]).then(() => undefined).catch(e => e)
 
       // Then
-      t.assert.strictEqual(error, undefined)
+      assert.strictEqual(error, undefined)
     })
 
     test("should be able to consume a message", async (t: TestContext) => {
@@ -77,13 +77,13 @@ describe("mongodb queue", function () {
         }
       }).createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
       const producer = queue.createProducer()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await producer.disconnect()
       })
 
@@ -95,7 +95,7 @@ describe("mongodb queue", function () {
         }
       })
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await consumer.stop()
       })
 
@@ -114,7 +114,7 @@ describe("mongodb queue", function () {
 
       // Then
       await waitForPredicate(() => message !== undefined)
-      t.assert.deepStrictEqual(message, producedMessage)
+      assert.deepStrictEqual(message, producedMessage)
     })
     
     test("should be able to consume from multiple consumptions", async (t: TestContext) => {
@@ -130,7 +130,7 @@ describe("mongodb queue", function () {
         }
       }).createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
@@ -142,7 +142,7 @@ describe("mongodb queue", function () {
         }
       })
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await consumer1.stop()
       })
 
@@ -154,7 +154,7 @@ describe("mongodb queue", function () {
         }
       })
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await consumer2.stop()
       })
 
@@ -162,12 +162,12 @@ describe("mongodb queue", function () {
 
       const producer = queue.createProducer()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await producer.disconnect()
       })
 
       // When
-      const producedMessages: Message[] = new Array(10).fill(0).map(() => ({
+      const producedMessages: Message[] = new Array(10).fill(0).map((t: TestContext) => ({
         type: "msg",
         id: uuidv7(),
         payload: { msg: "hello world" },
@@ -178,7 +178,7 @@ describe("mongodb queue", function () {
 
       // Then
       await waitForPredicate(() => messages.length === 10)
-      t.assert.deepStrictEqual(messages.toSorted(sortMessages), producedMessages.toSorted(sortMessages))
+      assert.deepStrictEqual(messages.toSorted(sortMessages), producedMessages.toSorted(sortMessages))
     })
     
     test("should be able to retry nack messages", async (t: TestContext) => {
@@ -194,7 +194,7 @@ describe("mongodb queue", function () {
         }
       }).createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
@@ -214,7 +214,7 @@ describe("mongodb queue", function () {
         }
       })
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await consumer.stop()
       })
 
@@ -222,7 +222,7 @@ describe("mongodb queue", function () {
 
       const producer = queue.createProducer()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await producer.disconnect()
       })
 
@@ -238,8 +238,8 @@ describe("mongodb queue", function () {
 
       // Then
       await waitForPredicate(() => messages.length > 0)
-      t.assert.deepStrictEqual(messages, [ producedMessage ])
-      t.assert.deepStrictEqual(failedMessages, [ producedMessage, producedMessage ])
+      assert.deepStrictEqual(messages, [ producedMessage ])
+      assert.deepStrictEqual(failedMessages, [ producedMessage, producedMessage ])
     })
 
     test("should be able to take another consumer's messages if not handled in time", async (t: TestContext) => {
@@ -256,7 +256,7 @@ describe("mongodb queue", function () {
         }
       }).createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
@@ -270,7 +270,7 @@ describe("mongodb queue", function () {
         }
       })
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await succeedingConsumer.stop()
       })
 
@@ -282,7 +282,7 @@ describe("mongodb queue", function () {
         }
       })
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await failingConsumer.stop()
       })
 
@@ -290,7 +290,7 @@ describe("mongodb queue", function () {
 
       const producer = queue.createProducer()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await producer.disconnect()
       })
 
@@ -305,8 +305,8 @@ describe("mongodb queue", function () {
 
       // Then
       await waitForPredicate(() => pickedBySucceedingConsumer.length > 0)
-      t.assert.deepStrictEqual(pickedByFailingConsumer, [ producedMessage ])
-      t.assert.deepStrictEqual(pickedBySucceedingConsumer, [producedMessage])
+      assert.deepStrictEqual(pickedByFailingConsumer, [ producedMessage ])
+      assert.deepStrictEqual(pickedBySucceedingConsumer, [producedMessage])
     })
   })
 
@@ -331,8 +331,8 @@ describe("mongodb queue", function () {
       const error2 = await queue.disconnect().catch((err) => err)
 
       // Then
-      t.assert.strictEqual(error1, undefined)
-      t.assert.strictEqual(error2, undefined)
+      assert.strictEqual(error1, undefined)
+      assert.strictEqual(error2, undefined)
     })
   })
 
@@ -347,7 +347,7 @@ describe("mongodb queue", function () {
         dbName: randomUUID()
       }).createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
@@ -360,7 +360,7 @@ describe("mongodb queue", function () {
       consumer.addHook("onStart", () => called = true)
 
       // Then
-      t.assert.strictEqual(called, false)
+      assert.strictEqual(called, false)
     })
 
     test("should be able to trigger the onStart hook", async (t: TestContext) => {
@@ -373,7 +373,7 @@ describe("mongodb queue", function () {
         dbName: randomUUID()
       }).createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
@@ -384,7 +384,7 @@ describe("mongodb queue", function () {
       let called = false
       consumer.addHook("onStart", () => called = true)
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await consumer.stop()
       })
 
@@ -392,7 +392,7 @@ describe("mongodb queue", function () {
       await consumer.start()
 
       // Then
-      t.assert.strictEqual(called, true)
+      assert.strictEqual(called, true)
     })
 
     test("should be able to trigger the onStop hook", async (t: TestContext) => {
@@ -405,7 +405,7 @@ describe("mongodb queue", function () {
         dbName: randomUUID()
       }).createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
@@ -421,7 +421,7 @@ describe("mongodb queue", function () {
       await consumer.stop()
 
       // Then
-      t.assert.strictEqual(reason, "manually_stopped")
+      assert.strictEqual(reason, "manually_stopped")
     })
 
     test("should be able to ignore duplicate calls to start", async (t: TestContext) => {
@@ -434,7 +434,7 @@ describe("mongodb queue", function () {
         dbName: randomUUID()
       }).createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
@@ -445,7 +445,7 @@ describe("mongodb queue", function () {
       let calls = 0
       consumer.addHook("onStart", () => calls ++)
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await consumer.stop()
       })
 
@@ -454,7 +454,7 @@ describe("mongodb queue", function () {
       await consumer.start()
 
       // Then
-      t.assert.strictEqual(calls, 1)
+      assert.strictEqual(calls, 1)
     })
     
     test("should be able to ignore duplicate calls to stop", async (t: TestContext) => {
@@ -467,7 +467,7 @@ describe("mongodb queue", function () {
         dbName: randomUUID()
       }).createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
@@ -484,7 +484,7 @@ describe("mongodb queue", function () {
       await consumer.stop()
 
       // Then
-      t.assert.strictEqual(calls, 1)
+      assert.strictEqual(calls, 1)
     })
 
     test("should be able to trigger the onError hook", async (t: TestContext) => {
@@ -500,7 +500,7 @@ describe("mongodb queue", function () {
         }
       }).createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
@@ -516,7 +516,7 @@ describe("mongodb queue", function () {
         errors.push(err)
       })
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await consumer.stop()
       })
 
@@ -524,7 +524,7 @@ describe("mongodb queue", function () {
 
       // When
       const p = queue.createProducer()
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await p.disconnect()
       })
       await p.produce([
@@ -538,7 +538,7 @@ describe("mongodb queue", function () {
 
       // Then
       await waitForPredicate(() => errors.length > 0)
-      t.assert.strictEqual(errors.length > 0, true)
+      assert.strictEqual(errors.length > 0, true)
     })
   })
 
@@ -562,7 +562,7 @@ describe("mongodb queue", function () {
       const now = new Date()
       const id = uuidv7()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await storage.disconnect()
       })
 
@@ -589,7 +589,7 @@ describe("mongodb queue", function () {
 
       const now = new Date()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await storage.disconnect()
       })
 
@@ -622,7 +622,7 @@ describe("mongodb queue", function () {
 
       const now = new Date()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await storage.disconnect()
       })
 
@@ -657,7 +657,7 @@ describe("mongodb queue", function () {
 
       const now = new Date()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await storage.disconnect()
       })
 
@@ -686,7 +686,7 @@ describe("mongodb queue", function () {
         }
       }).createStorage!())
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await storage.disconnect()
       })
 
@@ -728,7 +728,7 @@ describe("mongodb queue", function () {
         }
       }).createStorage!())
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await storage.disconnect()
       })
 
@@ -795,7 +795,7 @@ describe("mongodb queue", function () {
 
       const dlq = assertAdvancedDeadLetterQueue(engine.createDeadLetterQueue!())
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await dlq.disconnect()
       })
 
@@ -833,7 +833,7 @@ describe("mongodb queue", function () {
 
       const dlq = assertAdvancedDeadLetterQueue(engine.createDeadLetterQueue!())
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await dlq.disconnect()
       })
 
@@ -851,7 +851,7 @@ describe("mongodb queue", function () {
 
       const queue = engine.createQueue()
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await queue.disconnect()
       })
 
@@ -863,7 +863,7 @@ describe("mongodb queue", function () {
         }
       })
 
-      t.after(async () => {
+      t.after(async (t: TestContext) => {
         await consumer.stop()
       })
 

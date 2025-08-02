@@ -1,4 +1,5 @@
 import {after, before, describe, test, TestContext} from "node:test"
+import assert from "node:assert/strict"
 import {KurrentDbContainer, StartedKurrentDbContainer} from "@testcontainers/kurrentdb"
 import {
   consumeCustomSubscription,
@@ -49,7 +50,7 @@ describe('kurrentdb', function () {
       ]).then(() => {}).catch(e => e)
 
       // Then
-      t.assert.strictEqual(mError, undefined)
+      assert.strictEqual(mError, undefined)
     })
 
     test("should be able to consume messages", async (t: TestContext) => {
@@ -92,7 +93,7 @@ describe('kurrentdb', function () {
 
       // Then
       await waitForPredicate(() => msg !== undefined, 15_000)
-      t.assert.deepStrictEqual(msg, randomMsg)
+      assert.deepStrictEqual(msg, randomMsg)
     })
 
     test("should be able to not override the subscription", async (t: TestContext) => {
@@ -122,7 +123,7 @@ describe('kurrentdb', function () {
       // When
       // Then
       const mError = await consumer.start().catch(e => e)
-      t.assert.strictEqual(mError, undefined)
+      assert.strictEqual(mError, undefined)
     })
 
     test("should be able to create the persistent subscription once", async (t: TestContext) => {
@@ -160,14 +161,14 @@ describe('kurrentdb', function () {
       // When
       // Then
       const mError = await consumer2.start().catch(e => e)
-      t.assert.strictEqual(mError, undefined)
+      assert.strictEqual(mError, undefined)
     })
 
     test("should be able to ensure the infix does not contain '-'", (t) => {
       // Given
       // When
       // Then
-      t.assert.throws(
+      assert.throws(
         () => createEngine({ streamInfix: "foo-bar", connectionString: "" }),
         new RivrInvalidStreamInfixError("foo-bar")
       )
@@ -202,7 +203,7 @@ describe('kurrentdb', function () {
       await consumer.start()
 
       // Then
-      t.assert.strictEqual(called, true)
+      assert.strictEqual(called, true)
     })
 
     test("should be able to call the start hook once", async (t: TestContext) => {
@@ -233,7 +234,7 @@ describe('kurrentdb', function () {
       await consumer.start()
 
       // Then
-      t.assert.strictEqual(calls, 1)
+      assert.strictEqual(calls, 1)
     })
 
     test("should be able to call the stop hook", async (t: TestContext) => {
@@ -261,7 +262,7 @@ describe('kurrentdb', function () {
       await consumer.stop()
 
       // Then
-      t.assert.deepStrictEqual(params, [ "manually_stopped" ])
+      assert.deepStrictEqual(params, [ "manually_stopped" ])
     })
 
     test("should be able to call the stop hook once", async (t: TestContext) => {
@@ -291,7 +292,7 @@ describe('kurrentdb', function () {
       await consumption.stop()
 
       // Then
-      t.assert.deepStrictEqual(calls, [ [ "manually_stopped" ] ])
+      assert.deepStrictEqual(calls, [ [ "manually_stopped" ] ])
     })
   })
   
@@ -343,7 +344,7 @@ describe('kurrentdb', function () {
       await storage.upsert([ state ])
 
       // Then
-      t.assert.deepStrictEqual(await storage.get(state.id), state)
+      assert.deepStrictEqual(await storage.get(state.id), state)
     })
 
     test("should be able to return undefined if no workflow exists for the given id", async (t: TestContext) => {
@@ -355,7 +356,7 @@ describe('kurrentdb', function () {
 
       // When
       // Then
-      t.assert.strictEqual(await storage.get(uuidv7()), undefined)
+      assert.strictEqual(await storage.get(uuidv7()), undefined)
     })
     
     test("should be able to subscribe to workflow state changes", async (t: TestContext) => {
@@ -412,7 +413,7 @@ describe('kurrentdb', function () {
 
       // Then
       await waitForPredicate(() => event !== undefined)
-      t.assert.deepStrictEqual(event, state)
+      assert.deepStrictEqual(event, state)
     })
   })
 
@@ -446,7 +447,7 @@ describe('kurrentdb', function () {
 
       // Then
       await waitForPredicate(() => eventPayload !== undefined)
-      t.assert.deepStrictEqual(eventPayload, { value: 2 })
+      assert.deepStrictEqual(eventPayload, { value: 2 })
     })
 
     test("should be able to trigger workflow from a persistent subscription", async (t: TestContext) => {
@@ -523,7 +524,7 @@ describe('kurrentdb', function () {
 
       // Then
       await waitForPredicate(() => handled === true)
-      t.assert.strictEqual(handled, true)
+      assert.strictEqual(handled, true)
     })
   })
 })

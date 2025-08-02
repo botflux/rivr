@@ -1,4 +1,5 @@
 import test, {after, before, describe, TestContext} from "node:test";
+import assert from "node:assert/strict";
 import {advancedFlow, basicFlow, installUnhandledRejectionHook, Message, timeBasedFlow} from "rivr";
 import {GenericContainerBuilder, Wait} from "testcontainers";
 import {RabbitMQContainer, StartedRabbitMQContainer} from "@testcontainers/rabbitmq";
@@ -46,7 +47,7 @@ describe("rabbitmq engine", () => {
         const error = await producer.produce([ randomMessage() ]).then(() => undefined).catch(e => e)
 
         // Then
-        t.assert.strictEqual(error, undefined)
+        assert.strictEqual(error, undefined)
       })
       
       test("should be able to consume a message", async (t: TestContext) => {
@@ -84,7 +85,7 @@ describe("rabbitmq engine", () => {
 
         // Then
         await waitForPredicate(() => receivedMessages.length === 2, 5_000)
-        t.assert.deepStrictEqual(receivedMessages.toSorted(sortMessages), producedMessages.toSorted(sortMessages))
+        assert.deepStrictEqual(receivedMessages.toSorted(sortMessages), producedMessages.toSorted(sortMessages))
       })
 
     })

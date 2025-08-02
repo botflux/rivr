@@ -1,8 +1,9 @@
-import {describe, test, TestContext} from "node:test"
+import {describe, test} from "node:test"
+import assert from "node:assert/strict"
 import {Hooks} from "./hooks";
 
 describe('hooks', function () {
-  test("should be able to execute a hook", (t: TestContext) => {
+  test("should be able to execute a hook", () => {
     // Given
     let called = false
 
@@ -13,10 +14,10 @@ describe('hooks', function () {
     hooks.executeHook("onClose", [])
 
     // Then
-    t.assert.strictEqual(called, true)
+    assert.strictEqual(called, true)
   })
 
-  test("should be able to execute a hook with params", (t: TestContext) => {
+  test("should be able to execute a hook with params", () => {
     // Given
     let params: unknown[] = []
 
@@ -29,6 +30,6 @@ describe('hooks', function () {
     hooks.executeHook("onError", [ "this is an error", "another string" ])
 
     // Then
-    t.assert.deepStrictEqual(params, [ "this is an error", "another string" ])
+    assert.deepStrictEqual(params, [ "this is an error", "another string" ])
   })
 })

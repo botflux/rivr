@@ -1,4 +1,5 @@
-import {describe, test, TestContext, mock} from "node:test"
+import {describe, test} from "node:test"
+import assert from "node:assert/strict"
 import {NormalizedWorkflowState, WorkflowState} from "../../workflow/state/state";
 import {Message} from "../../queue";
 import {WorkflowMessageHandler} from "./workflow-message-handler";
@@ -28,7 +29,7 @@ class MemoryStateStorage implements WorkflowStateStorage {
 
 describe('WorkflowMessageHandler', function () {
   describe('#support', function () {
-    test("should be able to return true given a workflow message", (t: TestContext) => {
+    test("should be able to return true given a workflow message", () => {
       // Given
       const message: Message = {
         type: "workflow_message@v1",
@@ -41,16 +42,16 @@ describe('WorkflowMessageHandler', function () {
 
       // When
       // Then
-      t.assert.strictEqual(handler.support(message), true, "The workflow handler should support the message")
+      assert.strictEqual(handler.support(message), true, "The workflow handler should support the message")
     })
 
-    test("should be able to return false any other message", (t: TestContext) => {
+    test("should be able to return false any other message", () => {
       // Given
       const handler = new WorkflowMessageHandler([])
 
       // When
       // Then
-      t.assert.strictEqual(handler.support({
+      assert.strictEqual(handler.support({
         type: "hello",
         createdAt: new Date(),
         id: uuidv7(),
@@ -61,7 +62,7 @@ describe('WorkflowMessageHandler', function () {
   })
 
   describe('#handle', function () {
-    test("should be able to log a warning if no workflow matches the state's targeted workflow", async (t: TestContext) => {
+    test("should be able to log a warning if no workflow matches the state's targeted workflow", async () => {
       // Given
       const logger = new TestLogger()
       const handler = new WorkflowMessageHandler([], undefined, logger)
@@ -77,8 +78,8 @@ describe('WorkflowMessageHandler', function () {
       const messages = await handler.handle(message)
 
       // Then
-      t.assert.deepStrictEqual(messages, [])
-      t.assert.deepStrictEqual(logger.messages, [
+      assert.deepStrictEqual(messages, [])
+      assert.deepStrictEqual(logger.messages, [
         {
           level: "warn",
           message: `State '${state.id}' references to workflow '${state.name}' that the worker doesn't know about.`,
@@ -89,7 +90,7 @@ describe('WorkflowMessageHandler', function () {
       ])
     })
 
-    test("should be able to log a warning if there is no step to execute", async (t: TestContext) => {
+    test("should be able to log a warning if there is no step to execute", async () => {
       // Given
       const workflow = rivr.workflow<number>("calc")
       const testLogger = new TestLogger()
@@ -106,8 +107,8 @@ describe('WorkflowMessageHandler', function () {
       const messages = await handler.handle(message)
 
       // Then
-      t.assert.deepStrictEqual(messages, [])
-      t.assert.deepStrictEqual(testLogger.messages, [
+      assert.deepStrictEqual(messages, [])
+      assert.deepStrictEqual(testLogger.messages, [
         {
           level: "warn",
           message: `There is no step to execute within the workflow 'calc'`,
@@ -118,7 +119,7 @@ describe('WorkflowMessageHandler', function () {
       ])
     })
 
-    test("should be able to execute a workflow step", async (t: TestContext) => {
+    test("should be able to execute a workflow step", async () => {
       // Given
       const logger = new TestLogger()
       let called = 0
@@ -149,12 +150,12 @@ describe('WorkflowMessageHandler', function () {
       const messages = await handler.handle(message)
 
       // Then
-      t.assert.deepStrictEqual(messages, [])
-      t.assert.deepStrictEqual(logger.messages, [])
-      t.assert.strictEqual(called, 1)
+      assert.deepStrictEqual(messages, [])
+      assert.deepStrictEqual(logger.messages, [])
+      assert.strictEqual(called, 1)
     })
 
-    test("should be able to produce the message that'll trigger the next step", async (t: TestContext) => {
+    test("should be able to produce the message that'll trigger the next step", async () => {
       // Given
       const logger = new TestLogger()
       const now = new Date()
@@ -188,7 +189,7 @@ describe('WorkflowMessageHandler', function () {
       const messages = await handler.handle(message)
 
       // Then
-      t.assert.deepStrictEqual(messages.map(m => m.payload), [
+      assert.deepStrictEqual(messages.map(m => m.payload), [
         {
           ...payload,
           lastModified: now,
@@ -220,10 +221,10 @@ describe('WorkflowMessageHandler', function () {
           ]
         } satisfies NormalizedWorkflowState<number>
       ])
-      t.assert.deepStrictEqual(logger.messages, [])
+      assert.deepStrictEqual(logger.messages, [])
     })
 
-    test("should be able to save the workflow's state", async (t: TestContext) => {
+    test("should be able to save the workflow's state", async () => {
       // Given
       const logger = new TestLogger()
       const now = new Date()
@@ -253,9 +254,9 @@ describe('WorkflowMessageHandler', function () {
       const messages = await handler.handle(message)
 
       // Then
-      t.assert.deepStrictEqual(messages, [])
-      t.assert.deepStrictEqual(logger.messages, [])
-      t.assert.deepStrictEqual(stateStorage.states.get(payload.id)?.history, [
+      assert.deepStrictEqual(messages, [])
+      assert.deepStrictEqual(logger.messages, [])
+      assert.deepStrictEqual(stateStorage.states.get(payload.id)?.history, [
         {
           ...payload,
           status: "in_progress",
